@@ -9,7 +9,7 @@
 - `main`: `2b21d4a` — `.gitignore`, `CONTRIBUTING.md`만 반영된 상태. 실제 코드 없음.
   - `develop`: `9ff44b4` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리까지 반영된 상태. `./gradlew build` BUILD SUCCESSFUL 확인됨.
   - `chore/rename-package-voicebridge`, `feature/init-project`: 각각 PR #3, PR #2 병합 완료 후 원격/로컬 브랜치 삭제 완료.
-  - `fix/test-datasource-h2`: PR #4 병합 완료(`9ff44b4`), 브랜치 정리 대상.
+  - `fix/test-datasource-h2`: PR #4 병합 완료(`9ff44b4`), 원격/로컬 브랜치 삭제 완료.
   - 아직 실제 도메인 코드(User, DiagnosisSession 등)는 어느 브랜치에도 없음.
 
 ## 작업 이력
@@ -55,6 +55,5 @@
 
 ## 다음 단계 후보
 
-- 병합된 `fix/test-datasource-h2` 브랜치 정리(원격/로컬 삭제) 여부 결정.
 - 백엔드 A/B가 `feature/auth`, `feature/diagnosis-session` 등을 `develop`에서 분기해 도메인 엔티티 구현 착수.
 - 스캐폴딩 + 주요 feature 안정화 후 `develop` → `main` 승격 PR.
