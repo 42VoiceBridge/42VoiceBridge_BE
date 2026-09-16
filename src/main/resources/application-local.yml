@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/dysarthria?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      # 로컬 개발 편의용. 스키마가 안정되면 validate + 마이그레이션 도구(Flyway 등) 도입 검토
+      ddl-auto: update
+
+logging:
+  level:
+    org.hibernate.SQL: debug
