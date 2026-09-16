@@ -1,0 +1,52 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.8'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.gsia'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Web
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Persistence
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'com.h2database:h2'
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    // TODO(다음 feature 브랜치에서 필요할 때 추가 — 지금은 YAGNI 원칙에 따라 뺐음):
+    //   - spring-boot-starter-security + io.jsonwebtoken:jjwt-*  (인증 도메인, feature/auth)
+    //   - spring-boot-starter-data-redis                          (개인화 job 상태 캐시)
+    //   - software.amazon.awssdk:s3                               (녹음 파일 업로드, Presigned URL)
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
