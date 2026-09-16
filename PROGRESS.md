@@ -7,8 +7,9 @@
 ## 지금 상태 요약
 
 - `main`: `2b21d4a` — `.gitignore`, `CONTRIBUTING.md`만 반영된 상태. 실제 코드 없음.
-  - `develop`: `9d30137` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임까지 반영된 상태.
+  - `develop`: `9ff44b4` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리까지 반영된 상태. `./gradlew build` BUILD SUCCESSFUL 확인됨.
   - `chore/rename-package-voicebridge`, `feature/init-project`: 각각 PR #3, PR #2 병합 완료 후 원격/로컬 브랜치 삭제 완료.
+  - `fix/test-datasource-h2`: PR #4 병합 완료(`9ff44b4`), 브랜치 정리 대상.
   - 아직 실제 도메인 코드(User, DiagnosisSession 등)는 어느 브랜치에도 없음.
 
 ## 작업 이력
@@ -40,15 +41,20 @@
     - 전체 grep 재확인 — 잔여 `com.gsia`/`dysarthria` 없음 (`CLAUDE.md`의 챌린지명 "GSIA SW 챌린지"는 무관하여 제외).
   - 커밋(`9d1481e`) → **PR #3** (`chore/rename-package-voicebridge` → `develop`) 생성 → 병합(`9d30137`).
 
+### 4. gradle wrapper 정식 커밋 + 빌드 검증 — 완료
+
+- 누군가 로컬에서 생성해둔 `gradle/`, `gradlew`, `gradlew.bat`(untracked)를 발견, `./gradlew build` 실행.
+  - 컴파일/패키징(`assemble`, `bootJar`)은 성공했으나 `test`에서 실패: `@SpringBootTest`가 기본 프로파일(`local`)을 타면서 로컬에 없는 MySQL(`jdbc:mysql://localhost:3306/voicebridge`)에 연결 시도 → Connection refused → Hibernate가 Dialect를 못 정함. 패키지 리네임과는 무관한, PR #2 스캐폴딩부터 있던 기존 갭.
+  - `fix/test-datasource-h2` 브랜치에서 gradle wrapper 정식 커밋(`455c740`) + `src/test/resources/application.yml` 추가해 테스트가 H2 인메모리(MySQL 모드)를 쓰도록 분리(`3d103df`). Gradle 테스트 클래스패스가 main보다 우선이라 이 파일이 `src/main/resources/application.yml`을 완전히 대체하는 방식.
+  - `./gradlew build` → **BUILD SUCCESSFUL** 확인 후 **PR #4** (`fix/test-datasource-h2` → `develop`) 생성 → 병합(`9ff44b4`).
+
 ## 알려진 이슈 / 확인 필요 사항
 
-- gradle이 로컬에 없어 이번 챌린지 작업 전체에서 빌드/테스트를 한 번도 실행하지 못함. gradle 있는 환경에서 `gradle wrapper --gradle-version 8.10` 실행 후 `./gradlew build` 확인 필요.
-  - `gradle/`, `gradlew`, `gradlew.bat`이 저장소에 untracked 상태로 존재(누군가 로컬에서 wrapper를 생성한 것으로 보임) — 아직 git에 추가되지 않음, 다음 작업에서 확인 필요.
-  - `dysarthria-backend-scaffold.zip`이 저장소 루트에 남아있음(git 미포함) — 필요 없으면 수동 삭제 가능.
-  - GitHub PR 병합 시 `gh pr merge`(GraphQL)가 "Merge already in progress"로 반복 실패하는 경우가 있었음. `gh api -X PUT repos/.../pulls/{n}/merge`로 재시도하거나, `gh pr view --json mergedAt`으로 실제 상태를 먼저 확인할 것. PR #3 병합 때는 이 지연이 특히 길어서(수 분) 재시도 루프로 처리함 — `gh pr view`가 일시적으로 빈 값을 반환할 수 있으니 병합 여부 판단 시 빈 문자열과 `null`을 구분해서 체크할 것.
+- `dysarthria-backend-scaffold.zip`이 저장소 루트에 남아있음(git 미포함) — 필요 없으면 수동 삭제 가능.
+- GitHub PR 병합 시 `gh pr merge`(GraphQL) 및 REST `gh api PUT .../merge` 둘 다 간헐적으로 502 또는 "Merge already in progress" 405를 반복 반환하는 경우가 있었음(PR #3, #4에서 재현, 길게는 수 분간 지속). 원인은 확실치 않지만, 관찰된 패턴상 merge 요청이 GitHub 서버에는 이미 접수되어 비동기로 처리 중인데 그 처리(브랜치 보호 규칙 평가, 백그라운드 머지 작업 큐)가 지연되는 것으로 보임 — 즉 요청이 실패한 게 아니라 아직 끝나지 않은 상태. 대응: `gh pr view --json mergedAt`으로 실제 상태를 먼저 확인하고, 병합 전이면 15초 간격 재시도 루프(`while true` — `until true`로 쓰면 즉시 종료되므로 주의)로 처리. `gh pr view`가 일시적으로 빈 문자열을 반환할 수 있으니 병합 여부 판단 시 빈 문자열과 `null`을 반드시 구분해서 체크할 것.
 
 ## 다음 단계 후보
 
-- gradle wrapper 정식 커밋 및 빌드 검증.
-  - 백엔드 A/B가 `feature/auth`, `feature/diagnosis-session` 등을 `develop`에서 분기해 도메인 엔티티 구현 착수.
-  - 스캐폴딩 + 주요 feature 안정화 후 `develop` → `main` 승격 PR.
+- 병합된 `fix/test-datasource-h2` 브랜치 정리(원격/로컬 삭제) 여부 결정.
+- 백엔드 A/B가 `feature/auth`, `feature/diagnosis-session` 등을 `develop`에서 분기해 도메인 엔티티 구현 착수.
+- 스캐폴딩 + 주요 feature 안정화 후 `develop` → `main` 승격 PR.
