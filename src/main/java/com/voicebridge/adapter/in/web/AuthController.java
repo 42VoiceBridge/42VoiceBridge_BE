@@ -25,33 +25,37 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final SignUpUseCase signUpUseCase;
-    private final LoginUseCase loginUseCase;
-    private final KakaoLoginUseCase kakaoLoginUseCase;
-    private final RefreshTokenUseCase refreshTokenUseCase;
+  private final SignUpUseCase signUpUseCase;
+  private final LoginUseCase loginUseCase;
+  private final KakaoLoginUseCase kakaoLoginUseCase;
+  private final RefreshTokenUseCase refreshTokenUseCase;
 
-    @PostMapping("/signup")
-    public ResponseEntity<ApiResponse<SignUpResponse>> signUp(@Valid @RequestBody SignUpRequest request) {
-        var result = signUpUseCase.signUp(request.toCommand());
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(SignUpResponse.from(result)));
-    }
+  @PostMapping("/signup")
+  public ResponseEntity<ApiResponse<SignUpResponse>> signUp(
+      @Valid @RequestBody SignUpRequest request) {
+    var result = signUpUseCase.signUp(request.toCommand());
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(SignUpResponse.from(result)));
+  }
 
-    @PostMapping("/login")
-    public ResponseEntity<ApiResponse<TokenResponse>> login(@Valid @RequestBody LoginRequest request) {
-        var result = loginUseCase.login(request.toCommand());
-        return ResponseEntity.ok(ApiResponse.success(TokenResponse.from(result)));
-    }
+  @PostMapping("/login")
+  public ResponseEntity<ApiResponse<TokenResponse>> login(
+      @Valid @RequestBody LoginRequest request) {
+    var result = loginUseCase.login(request.toCommand());
+    return ResponseEntity.ok(ApiResponse.success(TokenResponse.from(result)));
+  }
 
-    @PostMapping("/kakao")
-    public ResponseEntity<ApiResponse<TokenResponse>> loginWithKakao(@Valid @RequestBody KakaoLoginRequest request) {
-        var result = kakaoLoginUseCase.loginWithKakao(request.kakaoAccessToken());
-        return ResponseEntity.ok(ApiResponse.success(TokenResponse.from(result)));
-    }
+  @PostMapping("/kakao")
+  public ResponseEntity<ApiResponse<TokenResponse>> loginWithKakao(
+      @Valid @RequestBody KakaoLoginRequest request) {
+    var result = kakaoLoginUseCase.loginWithKakao(request.kakaoAccessToken());
+    return ResponseEntity.ok(ApiResponse.success(TokenResponse.from(result)));
+  }
 
-    @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<TokenResponse>> refresh(@Valid @RequestBody RefreshRequest request) {
-        var result = refreshTokenUseCase.refresh(request.refreshToken());
-        return ResponseEntity.ok(ApiResponse.success(TokenResponse.from(result)));
-    }
+  @PostMapping("/refresh")
+  public ResponseEntity<ApiResponse<TokenResponse>> refresh(
+      @Valid @RequestBody RefreshRequest request) {
+    var result = refreshTokenUseCase.refresh(request.refreshToken());
+    return ResponseEntity.ok(ApiResponse.success(TokenResponse.from(result)));
+  }
 }

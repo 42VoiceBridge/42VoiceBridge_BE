@@ -6,11 +6,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record SignUpRequest(
-        @NotBlank @Email String email,
-        @NotBlank @Size(min = 8) String password,
-        @NotBlank String nickname
-) {
-    public SignUpUseCase.SignUpCommand toCommand() {
-        return new SignUpUseCase.SignUpCommand(email, password, nickname);
-    }
+    @NotBlank @Email String email,
+    @NotBlank @Size(min = 8) String password,
+    @NotBlank String nickname) {
+  public SignUpUseCase.SignUpCommand toCommand() {
+    return new SignUpUseCase.SignUpCommand(email, password, nickname);
+  }
 }
