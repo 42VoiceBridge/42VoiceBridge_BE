@@ -1,6 +1,6 @@
 spring:
   application:
-    name: dysarthria-backend
+    name: voicebridge-backend
   profiles:
     active: local
   jpa:
