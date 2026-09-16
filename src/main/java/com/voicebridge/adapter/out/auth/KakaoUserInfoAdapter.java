@@ -7,10 +7,6 @@ import org.springframework.web.client.RestClient;
 
 import java.util.Map;
 
-/**
- * 프론트가 카카오 SDK로 받은 accessToken을 그대로 검증하는 방식.
- * 백엔드가 카카오 REST API 키/시크릿을 별도로 가지고 있을 필요가 없다.
- */
 @Component
 public class KakaoUserInfoAdapter implements KakaoUserInfoPort {
 

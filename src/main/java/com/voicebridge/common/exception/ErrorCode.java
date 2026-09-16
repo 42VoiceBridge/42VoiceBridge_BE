@@ -3,10 +3,6 @@ package com.voicebridge.common.exception;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
-/**
- * API 명세서 0.6절의 공통 에러 코드와 1:1로 대응한다.
- * 새 에러 상황이 생기면 여기에 먼저 추가하고 API 명세서에도 동기화한다.
- */
 @Getter
 public enum ErrorCode {
 

@@ -17,11 +17,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
-/**
- * JWT 기반 무상태 인증 설정.
- * - /api/v1/auth/** 는 공개, 나머지는 인증 필요(JwtAuthenticationFilter가 SecurityContext를 채운다).
- * - CORS는 로컬 개발 편의를 위해 우선 전체 허용 — 배포 전 프론트엔드 도메인으로 제한할 것(TODO).
- */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -50,7 +45,7 @@ public class SecurityConfig {
 
     private CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*")); // TODO: 배포 시 프론트엔드 도메인으로 제한
+        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

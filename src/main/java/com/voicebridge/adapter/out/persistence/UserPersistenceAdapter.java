@@ -24,7 +24,6 @@ public class UserPersistenceAdapter implements UserRepositoryPort {
             UserJpaEntity saved = userJpaRepository.save(toEntity(user));
             return toDomain(saved);
         } catch (DataIntegrityViolationException e) {
-            // 인프라 예외(DataIntegrityViolationException)를 그대로 던지지 않고 도메인 예외로 번역한다.
             throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
     }

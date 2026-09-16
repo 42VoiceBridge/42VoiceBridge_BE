@@ -22,7 +22,7 @@ public class RefreshTokenService implements RefreshTokenUseCase {
     @Override
     public TokenResult refresh(String refreshToken) {
         UUID userId = validate(refreshToken);
-        refreshTokenStorePort.revoke(userId); // 재사용 방지: 기존 리프레시 토큰은 폐기하고 새로 발급
+        refreshTokenStorePort.revoke(userId);
         return tokenIssuer.issue(userId);
     }
 

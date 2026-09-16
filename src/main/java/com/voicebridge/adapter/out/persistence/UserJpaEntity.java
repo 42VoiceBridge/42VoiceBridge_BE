@@ -15,10 +15,6 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * {@link com.voicebridge.domain.user.User} 도메인 엔티티의 JPA 매핑 전용 클래스.
- * 도메인 ↔ 엔티티 변환은 {@link UserPersistenceAdapter}에서만 담당한다.
- */
 @Entity
 @Table(name = "users", uniqueConstraints = {
         @UniqueConstraint(name = "uk_users_email", columnNames = "email"),

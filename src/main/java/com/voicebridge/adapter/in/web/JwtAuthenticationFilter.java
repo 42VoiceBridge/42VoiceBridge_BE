@@ -16,11 +16,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Authorization: Bearer {accessToken} 헤더를 검증해 SecurityContext에 인증 정보를 채운다.
- * 여기서는 요청을 막지 않는다 — 인증이 필요한 API는 SecurityConfig가 401로 막고,
- * /auth/** 같은 공개 API는 토큰이 없어도 그대로 통과한다.
- */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
