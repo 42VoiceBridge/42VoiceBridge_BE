@@ -24,27 +24,24 @@ repositories {
 }
 
 dependencies {
-    // Web
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-    // Persistence
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
-    // Lombok
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
-    // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'com.h2database:h2'
     testImplementation 'org.junit.jupiter:junit-jupiter'
-
-    // TODO(다음 feature 브랜치에서 필요할 때 추가 — 지금은 YAGNI 원칙에 따라 뺐음):
-    //   - spring-boot-starter-security + io.jsonwebtoken:jjwt-*  (인증 도메인, feature/auth)
-    //   - spring-boot-starter-data-redis                          (개인화 job 상태 캐시)
-    //   - software.amazon.awssdk:s3                               (녹음 파일 업로드, Presigned URL)
 }
 
 tasks.named('test') {

@@ -7,3 +7,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+
+voicebridge:
+  jwt:
+    secret: test-secret-key-for-jwt-signing-in-unit-tests-32chars-min
+    access-token-expire-seconds: 3600
+    refresh-token-expire-seconds: 1209600
+  kakao:
+    user-info-uri: https://kapi.kakao.com/v2/user/me
