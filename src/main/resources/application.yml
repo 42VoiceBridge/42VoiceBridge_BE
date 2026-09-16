@@ -11,3 +11,11 @@ spring:
 
 server:
   port: 8080
+
+voicebridge:
+  jwt:
+    secret: ${JWT_SECRET:local-dev-secret-key-change-me-please-32chars-min}
+    access-token-expire-seconds: 3600
+    refresh-token-expire-seconds: 1209600 # 14일
+  kakao:
+    user-info-uri: https://kapi.kakao.com/v2/user/me
