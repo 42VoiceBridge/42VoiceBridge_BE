@@ -7,13 +7,14 @@
 ## 지금 상태 요약
 
 - `main`: `2b21d4a` — `.gitignore`, `CONTRIBUTING.md`만 반영된 상태. 실제 코드 없음.
-  - `develop`: `3a61fe9` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + Spotless/Jacoco 코드 품질 툴링(PR #6) + **진단세션 계약 + 세션 시작 유스케이스(PR #7) 병합**까지 반영된 상태. `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL, 테스트 9개 전부 통과 확인됨.
+  - `develop`: `56f9348` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + Spotless/Jacoco 코드 품질 툴링(PR #6) + 진단세션 계약(PR #7)까지 반영된 상태. `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL, 테스트 9개 전부 통과 확인됨.
   - `chore/rename-package-voicebridge`, `feature/init-project`: 각각 PR #3, PR #2 병합 완료 후 원격/로컬 브랜치 삭제 완료.
   - `fix/test-datasource-h2`: PR #4 병합 완료(`9ff44b4`), 원격/로컬 브랜치 삭제 완료.
   - `feature/auth`: `ee2d230`(feat) + `28372c6`(refactor: 주석 제거) — 인증 도메인(User) 구현 완료, **PR #5 병합 완료**(`162510b`), 원격/로컬 브랜치 삭제 완료.
   - `chore/code-quality-tooling`: `7ccdd53`(툴링) + `26a9346`(전체 재포맷) — Spotless(Google Java Format) + Jacoco 도입, **PR #6 병합 완료**(`2c01503`).
   - `feature/diagnosis-session`: `8df48bd` — 진단세션 계약(도메인/포트) + `POST /api/v1/diagnosis-sessions` 완전 구현, **PR #7 병합 완료**(`3a61fe9`). **다른 feature 브랜치와 달리 병합 후에도 삭제하지 않음** — 백엔드 A가 이 브랜치에서 나머지 4개 유스케이스(세션 조회/녹음 업로드/결과 조회/취약 음소 분석) 이어서 구현할 수 있어 사용자가 보존 요청함.
-  - 나머지 도메인 코드(취약 음소 분석 상세 로직, AI 연동 등)는 아직 구현 전.
+  - `feature/personalization-recognition`: `f5141e4` — 개인화/인식 계약(도메인/포트) + `GET /api/v1/personalization/model` 완전 구현. 기존에 이미 병합돼 있던 `AiInferenceClient.java`도 함께 수정됨(아래 8번 참고). **PR #8 오픈, 병합 대기 중** (사용자 확인 후 병합 예정 — 자동 병합하지 않음). 이 브랜치도 병합 후 삭제하지 않고 보존 예정(태원이 이어서 작업할 수 있음).
+  - 나머지 도메인 코드(취약 음소 분석 상세 로직, AI 연동 실제 구현 등)는 아직 구현 전.
 
 ## 작업 이력
 
@@ -90,17 +91,33 @@
   - 커밋(`8df48bd`, feat: 진단세션 계약 및 세션 시작 유스케이스 구현) → **PR #7** (`feature/diagnosis-session` → `develop`) 생성. PR 본문에 완전 구현 범위(POST만), 계약만 정의된 나머지 4개(백엔드 A 담당 예정), 알려진 제약(`sentences` 시드 데이터 없어 현재 호출 시 `RESOURCE_NOT_FOUND`) 명시.
   - 사용자 승인 후 **PR #7 병합 완료**(`3a61fe9`, 2026-09-16). **`feature/diagnosis-session` 브랜치는 다른 feature 브랜치와 다르게 병합 후에도 삭제하지 않음** — 백엔드 A가 이어서 나머지 4개 유스케이스를 구현할 수 있도록 사용자 요청으로 보존.
 
+### 8. 개인화/인식 계약 + 모델 상태 조회 유스케이스 (feature/personalization-recognition) — PR 생성, 병합 대기 중
+
+- 사전 확인: `develop` clean & 동기화(뒤처져 있어 pull로 최신화), `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인 후 진행.
+  - `voicebridge-personalization-recognition-contract.zip` 검토 후 `develop`에서 딴 `feature/personalization-recognition` 브랜치에 반영. 이번엔 신규 추가(20개)와 **기존 파일 수정 1건**이 섞여 있었음:
+    - 신규: `domain/personalization`(PersonalizationJob, PersonalizationJobStatus), `domain/recognition`(Recognition, ModelType), `port/in`(7개 유스케이스 인터페이스), `port/out/PersonalizationJobRepositoryPort`, `application/GetPersonalizationModelService`, `adapter/in/web/PersonalizationController`(+dto), `adapter/out/persistence`(PersonalizationJob 관련 3개), 테스트 2개, `NEXT-STEPS-personalization-recognition.md`.
+    - **기존 파일 수정**: `port/out/AiInferenceClient.java`(PR #7로 이미 develop에 병합돼 있던 파일) — 덮어쓰기 전 diff를 먼저 떠서 확인: 인터페이스 안에 직접 정의돼 있던 `enum ModelType`을 제거하고 신규 `domain.recognition.ModelType`(동일한 값 `BASE_ADAPTED`/`PERSONALIZED`)을 import해서 쓰도록 바뀐 것뿐(SSOT 목적), `recognize(...)` 메서드 시그니처와 `RecognitionResult` 필드는 그대로임을 확인. 기존 코드 중 `AiInferenceClient`를 실제 타입으로 참조하는 곳은 없고(주석/javadoc 언급뿐) `AiInferenceClient.ModelType` 형태로 쓴 곳도 없어 컴파일 영향 없음 확인.
+  - 압축 임시 폴더/zip은 스크래치패드에서 작업 후 정리, 저장소에는 흔적 없음.
+  - `./gradlew build` 1차 실행 시 Spotless 포맷 위반으로 FAILED(신규/수정 파일이 GJF 스타일이 아니었음) → `./gradlew spotlessApply`로 자동 수정(로직 변경 아니므로 별도 승인 없이 진행) → 재실행 → **BUILD SUCCESSFUL**.
+  - 테스트 14개 전부 통과 확인: 기존 9개(인증 4 + 진단세션 5) + 신규 5개(PersonalizationJobTest×3, GetPersonalizationModelServiceTest×2). 작업 지시서엔 "신규 4개"로 적혀 있었으나 실제로는 3+2=5개(사소한 표기 오차, 사용자에게 보고함).
+  - 눈으로 재검토: `PersonalizationController`에 `GET /api/v1/personalization/model` 하나만 매핑, 나머지(녹음 업로드/학습 트리거/학습 상태 조회)는 TODO 주석으로만 존재 확인. `RecognitionController`는 아예 존재하지 않음(구현된 유스케이스 없어 의도적으로 미생성) 확인. `AiInferenceClient` 구현체 여전히 없음(PoC 대기 상태 유지) 확인.
+  - `AiInferenceClient.java` 수정이 계약 변경과 한 세트라 커밋 1개로 묶음: `f5141e4`(feat: 개인화/인식 계약 및 모델 상태 조회 유스케이스 구현, 22 files changed) → **PR #8** (`feature/personalization-recognition` → `develop`) 생성. PR 본문 최상단에 "⚠️ 기존 파일 수정 포함" 섹션을 별도로 눈에 띄게 작성해 `AiInferenceClient.java`가 신규가 아니라 기존 병합 파일 수정임을 명시.
+  - **자동 병합하지 않음 — 사용자 확인/승인 대기 중.** 승인 시 `feature/diagnosis-session`과 동일하게 병합 후에도 브랜치를 삭제하지 않고 사용자에게 먼저 물어볼 예정(태원이 이어서 작업할 가능성).
+
 ## 알려진 이슈 / 확인 필요 사항
 
 - `dysarthria-backend-scaffold.zip`이 저장소 루트에 남아있음(git 미포함) — 필요 없으면 수동 삭제 가능.
 - GitHub PR 병합 시 `gh pr merge`(GraphQL) 및 REST `gh api PUT .../merge` 둘 다 간헐적으로 502 또는 "Merge already in progress" 405를 반복 반환하는 경우가 있었음(PR #3, #4에서 재현, 길게는 수 분간 지속). 원인은 확실치 않지만, 관찰된 패턴상 merge 요청이 GitHub 서버에는 이미 접수되어 비동기로 처리 중인데 그 처리(브랜치 보호 규칙 평가, 백그라운드 머지 작업 큐)가 지연되는 것으로 보임 — 즉 요청이 실패한 게 아니라 아직 끝나지 않은 상태. 대응: `gh pr view --json mergedAt`으로 실제 상태를 먼저 확인하고, 병합 전이면 15초 간격 재시도 루프(`while true` — `until true`로 쓰면 즉시 종료되므로 주의)로 처리. `gh pr view`가 일시적으로 빈 문자열을 반환할 수 있으니 병합 여부 판단 시 빈 문자열과 `null`을 반드시 구분해서 체크할 것.
 - `gh pr review --approve`는 PR 작성자와 병합 실행 계정이 같으면(`gh` 인증 계정 = PR author) GitHub이 자체 승인(self-approve)을 막아 실패함(`Can not approve your own pull request`, PR #6·#7에서 재현). 사용자가 채팅상으로 승인 의사를 밝히면 별도 GitHub 리뷰 승인 없이 병합만 진행하는 방식으로 대응 중.
 - `sentences` 테이블에 시드 데이터가 없어 `POST /api/v1/diagnosis-sessions`를 지금 호출하면 `RESOURCE_NOT_FOUND` 발생(PR #7). 코드 결함 아님, 시드 데이터 작업 필요.
+- PR #8: `AiInferenceClient.java` 수정이 섞인 PR이라 리뷰 시 "이거 신규 아니네?" 하고 헷갈릴 수 있음 — PR 본문 최상단에 경고 섹션으로 표시해둠.
 
 ## 다음 단계 후보
 
+- **PR #8(개인화/인식 계약) 사용자 확인 후 병합.**
 - 백엔드 A가 `feature/diagnosis-session` 브랜치(삭제 안 하고 보존 중)에서 나머지 4개 유스케이스(세션 조회/녹음 업로드/결과 조회/취약 음소 분석) 이어서 구현.
+- 백엔드 B(태원으로 추정, 팀 R&R 미확정이라 단정은 보류)가 `feature/personalization-recognition` 브랜치(PR #8 병합 후에도 보존 예정)에서 나머지 유스케이스(녹음 업로드/학습 트리거/학습 상태 조회/실사용 인식/인식 이력) 이어서 구현.
 - `sentences` 테이블 시드 데이터 준비 — 없으면 진단 세션 시작 API가 항상 `RESOURCE_NOT_FOUND`를 반환함.
-- 백엔드 B가 AI 연동(`AiInferenceClient` 구현체) 착수.
+- AI 연동(`AiInferenceClient` 구현체) 착수 — PoC(JPyRust vs FastAPI) 결과 대기 중.
 - 테스트 커버리지 19% → 40% 이상으로 끌어올리기(도메인/애플리케이션 계층 단위 테스트 보강). 기준 달성 후 `jacocoTestCoverageVerification`을 `check`에 묶을지 팀 논의.
 - 스캐폴딩 + 주요 feature 안정화 후 `develop` → `main` 승격 PR.
