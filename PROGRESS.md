@@ -8,7 +8,7 @@
 
 - `main`: `2b21d4a` — `.gitignore`, `CONTRIBUTING.md`만 반영된 상태. 실제 코드 없음.
 - `develop`: `9d30137` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임까지 반영된 상태.
-- `chore/rename-package-voicebridge`: PR #3 병합 완료, 브랜치는 정리 대상.
+- `chore/rename-package-voicebridge`: PR #3 병합 완료, 원격/로컬 브랜치 삭제 완료.
 - 아직 실제 도메인 코드(User, DiagnosisSession 등)는 어느 브랜치에도 없음.
 
 ## 작업 이력
@@ -49,7 +49,7 @@
 
 ## 다음 단계 후보
 
-- 병합된 `chore/rename-package-voicebridge` 브랜치 정리(원격/로컬 삭제) 여부 결정.
+- 이미 병합된 `feature/init-project` 브랜치도 정리(원격/로컬 삭제)할지 결정.
 - gradle wrapper 정식 커밋 및 빌드 검증.
 - 백엔드 A/B가 `feature/auth`, `feature/diagnosis-session` 등을 `develop`에서 분기해 도메인 엔티티 구현 착수.
 - 스캐폴딩 + 주요 feature 안정화 후 `develop` → `main` 승격 PR.
