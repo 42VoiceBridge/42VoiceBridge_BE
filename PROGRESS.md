@@ -7,12 +7,13 @@
 ## 지금 상태 요약
 
 - `main`: `2b21d4a` — `.gitignore`, `CONTRIBUTING.md`만 반영된 상태. 실제 코드 없음.
-  - `develop`: `2c01503` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + **Spotless/Jacoco 코드 품질 툴링(PR #6) 병합**까지 반영된 상태. `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인됨.
+  - `develop`: `3a61fe9` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + Spotless/Jacoco 코드 품질 툴링(PR #6) + **진단세션 계약 + 세션 시작 유스케이스(PR #7) 병합**까지 반영된 상태. `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL, 테스트 9개 전부 통과 확인됨.
   - `chore/rename-package-voicebridge`, `feature/init-project`: 각각 PR #3, PR #2 병합 완료 후 원격/로컬 브랜치 삭제 완료.
   - `fix/test-datasource-h2`: PR #4 병합 완료(`9ff44b4`), 원격/로컬 브랜치 삭제 완료.
-  - `feature/auth`: `ee2d230`(feat) + `28372c6`(refactor: 주석 제거) — 인증 도메인(User) 구현 완료, **PR #5 병합 완료**(`162510b`).
+  - `feature/auth`: `ee2d230`(feat) + `28372c6`(refactor: 주석 제거) — 인증 도메인(User) 구현 완료, **PR #5 병합 완료**(`162510b`), 원격/로컬 브랜치 삭제 완료.
   - `chore/code-quality-tooling`: `7ccdd53`(툴링) + `26a9346`(전체 재포맷) — Spotless(Google Java Format) + Jacoco 도입, **PR #6 병합 완료**(`2c01503`).
-  - `DiagnosisSession` 등 나머지 도메인 코드는 아직 어느 브랜치에도 없음.
+  - `feature/diagnosis-session`: `8df48bd` — 진단세션 계약(도메인/포트) + `POST /api/v1/diagnosis-sessions` 완전 구현, **PR #7 병합 완료**(`3a61fe9`). **다른 feature 브랜치와 달리 병합 후에도 삭제하지 않음** — 백엔드 A가 이 브랜치에서 나머지 4개 유스케이스(세션 조회/녹음 업로드/결과 조회/취약 음소 분석) 이어서 구현할 수 있어 사용자가 보존 요청함.
+  - 나머지 도메인 코드(취약 음소 분석 상세 로직, AI 연동 등)는 아직 구현 전.
 
 ## 작업 이력
 
@@ -78,13 +79,28 @@
   - `./gradlew jacocoTestCoverageVerification` 수동 실행 시 현재 커버리지 **19%**로 40% 기준 미달 FAILED 확인 — `build`/`check`에 안 엮여 있어 영향 없음(의도한 동작). 커버리지 개선은 별도 작업으로 남김.
   - Atomic PR 원칙에 따라 커밋 2개로 분리: `7ccdd53`(chore: Spotless/Jacoco 툴링 추가), `26a9346`(chore: Spotless 포맷팅 일괄 적용) → **PR #6** (`chore/code-quality-tooling` → `develop`) 생성 → 사용자 승인 후 병합(`2c01503`, 2026-09-16).
 
+### 7. 진단세션 계약 + 세션 시작 유스케이스 (feature/diagnosis-session) — 완료
+
+- 사전 확인: `develop` clean & 동기화, `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인 후 진행.
+  - `voicebridge-diagnosis-session-contract.zip` 검토 후 `develop`에서 딴 `feature/diagnosis-session` 브랜치에 반영: 기존 파일과 경로 충돌 없이 전부 **신규 파일 추가**(23개) — `domain/diagnosis`(DiagnosisSession, DiagnosisSessionStatus, Sentence), `port/in`(5개 유스케이스 인터페이스), `port/out`(AiInferenceClient, DiagnosisSessionRepositoryPort, SentenceRepositoryPort), `application/StartDiagnosisSessionService`, `adapter/in/web/DiagnosisSessionController`(+dto), `adapter/out/persistence`(DiagnosisSession·Sentence 관련 4개), 테스트 2개, 저장소 루트 `NEXT-STEPS-diagnosis-session.md`.
+  - 압축 임시 폴더/zip은 스크래치패드에서 작업 후 정리, 저장소에는 흔적 없음.
+  - `./gradlew build` 1차 실행 시 Spotless 포맷 위반으로 FAILED(신규 파일이 GJF 스타일이 아니었음) → `./gradlew spotlessApply`로 자동 수정(로직 변경 아니므로 별도 승인 없이 진행) → 재실행 → **BUILD SUCCESSFUL**.
+  - 테스트 9개 전부 통과 확인: 기존 4개(VoiceBridgeApplicationTests, UserTest×2, JwtTokenProviderTest) + 신규 5개(DiagnosisSessionTest×3, StartDiagnosisSessionServiceTest×2).
+  - 눈으로 재검토: `DiagnosisSessionController`에 `POST /api/v1/diagnosis-sessions` 하나만 매핑, 나머지 4개(세션 조회/녹음 업로드/결과 조회/취약 음소 분석)는 클래스 상단 TODO 주석으로만 존재 확인(빈 구현 없음). `AiInferenceClient` 포트에 구현체 없음(인터페이스만, PoC 대기 상태) 확인.
+  - 커밋(`8df48bd`, feat: 진단세션 계약 및 세션 시작 유스케이스 구현) → **PR #7** (`feature/diagnosis-session` → `develop`) 생성. PR 본문에 완전 구현 범위(POST만), 계약만 정의된 나머지 4개(백엔드 A 담당 예정), 알려진 제약(`sentences` 시드 데이터 없어 현재 호출 시 `RESOURCE_NOT_FOUND`) 명시.
+  - 사용자 승인 후 **PR #7 병합 완료**(`3a61fe9`, 2026-09-16). **`feature/diagnosis-session` 브랜치는 다른 feature 브랜치와 다르게 병합 후에도 삭제하지 않음** — 백엔드 A가 이어서 나머지 4개 유스케이스를 구현할 수 있도록 사용자 요청으로 보존.
+
 ## 알려진 이슈 / 확인 필요 사항
 
 - `dysarthria-backend-scaffold.zip`이 저장소 루트에 남아있음(git 미포함) — 필요 없으면 수동 삭제 가능.
 - GitHub PR 병합 시 `gh pr merge`(GraphQL) 및 REST `gh api PUT .../merge` 둘 다 간헐적으로 502 또는 "Merge already in progress" 405를 반복 반환하는 경우가 있었음(PR #3, #4에서 재현, 길게는 수 분간 지속). 원인은 확실치 않지만, 관찰된 패턴상 merge 요청이 GitHub 서버에는 이미 접수되어 비동기로 처리 중인데 그 처리(브랜치 보호 규칙 평가, 백그라운드 머지 작업 큐)가 지연되는 것으로 보임 — 즉 요청이 실패한 게 아니라 아직 끝나지 않은 상태. 대응: `gh pr view --json mergedAt`으로 실제 상태를 먼저 확인하고, 병합 전이면 15초 간격 재시도 루프(`while true` — `until true`로 쓰면 즉시 종료되므로 주의)로 처리. `gh pr view`가 일시적으로 빈 문자열을 반환할 수 있으니 병합 여부 판단 시 빈 문자열과 `null`을 반드시 구분해서 체크할 것.
+- `gh pr review --approve`는 PR 작성자와 병합 실행 계정이 같으면(`gh` 인증 계정 = PR author) GitHub이 자체 승인(self-approve)을 막아 실패함(`Can not approve your own pull request`, PR #6·#7에서 재현). 사용자가 채팅상으로 승인 의사를 밝히면 별도 GitHub 리뷰 승인 없이 병합만 진행하는 방식으로 대응 중.
+- `sentences` 테이블에 시드 데이터가 없어 `POST /api/v1/diagnosis-sessions`를 지금 호출하면 `RESOURCE_NOT_FOUND` 발생(PR #7). 코드 결함 아님, 시드 데이터 작업 필요.
 
 ## 다음 단계 후보
 
-- 백엔드 A/B가 `feature/diagnosis-session` 등 나머지 도메인을 `develop`에서 분기해 구현 착수.
+- 백엔드 A가 `feature/diagnosis-session` 브랜치(삭제 안 하고 보존 중)에서 나머지 4개 유스케이스(세션 조회/녹음 업로드/결과 조회/취약 음소 분석) 이어서 구현.
+- `sentences` 테이블 시드 데이터 준비 — 없으면 진단 세션 시작 API가 항상 `RESOURCE_NOT_FOUND`를 반환함.
+- 백엔드 B가 AI 연동(`AiInferenceClient` 구현체) 착수.
 - 테스트 커버리지 19% → 40% 이상으로 끌어올리기(도메인/애플리케이션 계층 단위 테스트 보강). 기준 달성 후 `jacocoTestCoverageVerification`을 `check`에 묶을지 팀 논의.
 - 스캐폴딩 + 주요 feature 안정화 후 `develop` → `main` 승격 PR.
