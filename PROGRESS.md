@@ -7,10 +7,11 @@
 ## 지금 상태 요약
 
 - `main`: `2b21d4a` — `.gitignore`, `CONTRIBUTING.md`만 반영된 상태. 실제 코드 없음.
-  - `develop`: `162510b` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + **인증 도메인(PR #5) 병합**까지 반영된 상태. `./gradlew build` BUILD SUCCESSFUL 확인됨.
+  - `develop`: `2c01503` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + **Spotless/Jacoco 코드 품질 툴링(PR #6) 병합**까지 반영된 상태. `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인됨.
   - `chore/rename-package-voicebridge`, `feature/init-project`: 각각 PR #3, PR #2 병합 완료 후 원격/로컬 브랜치 삭제 완료.
   - `fix/test-datasource-h2`: PR #4 병합 완료(`9ff44b4`), 원격/로컬 브랜치 삭제 완료.
   - `feature/auth`: `ee2d230`(feat) + `28372c6`(refactor: 주석 제거) — 인증 도메인(User) 구현 완료, **PR #5 병합 완료**(`162510b`).
+  - `chore/code-quality-tooling`: `7ccdd53`(툴링) + `26a9346`(전체 재포맷) — Spotless(Google Java Format) + Jacoco 도입, **PR #6 병합 완료**(`2c01503`).
   - `DiagnosisSession` 등 나머지 도메인 코드는 아직 어느 브랜치에도 없음.
 
 ## 작업 이력
@@ -63,6 +64,20 @@
   - 이후 `28372c6`(refactor: 인증 도메인 코드 주석 제거)를 `feature/auth`에 추가 반영.
   - 사용자 리뷰/승인 후 **PR #5 병합 완료**(`162510b`, 2026-09-16).
 
+### 6. 코드 품질 툴링: Spotless + Jacoco (chore/code-quality-tooling) — 완료
+
+- 사전 확인: `develop` clean & 동기화, `./gradlew build` BUILD SUCCESSFUL 확인 후 진행. FBRL 프로젝트 컨벤션을 3주 챌린지 상황에 맞게 축소 적용.
+  - `develop`에서 `chore/code-quality-tooling` 브랜치 생성.
+  - `build.gradle`에 `com.diffplug.spotless`(6.25.0), `jacoco` 플러그인 + 설정 추가:
+    - `spotless.java`: `googleJavaFormat()`, `removeUnusedImports()`, `trimTrailingWhitespace()`, `endWithNewline()`.
+    - `jacocoTestReport`(html/xml 리포트), `jacocoTestCoverageVerification`(최소 40%) — **의도적으로 `check`/`build`에 묶지 않음**. 3주 챌린지 초반이라 커버리지는 warn-only로 시작, 수동 실행(`./gradlew jacocoTestCoverageVerification`)만 가능. Spotless는 기본 동작대로 `spotlessCheck`가 `check`에 자동으로 엮여 포맷 위반 시 `build` 실패.
+  - `./gradlew spotlessApply`로 기존 코드(스캐폴딩 + 인증 도메인) 54개 파일 일괄 재포맷 — 668 insertions(+), 656 deletions(-). 4스페이스 → GJF 2스페이스 들여쓰기, 인자 줄바꿈 등 순수 포맷팅 변경만 확인(`User.java` 등 최대 diff 파일 직접 검토).
+  - 재포맷 전/후 `./gradlew test` 결과 동일 확인 — 3클래스 총 4개 테스트 전부 통과, 테스트 케이스 목록 diff 없음(로직 변경 없음 검증).
+  - 저장소 루트에 `pre-commit-config.yaml` 추가(`pre-commit install` 후 커밋 시 `spotlessApply` 자동 실행). `CONTRIBUTING.md`에 pre-commit 설치법 + `spotlessCheck`/`spotlessApply`/`jacocoTestReport` 명령어 + Jacoco HTML 리포트 경로(`build/reports/jacoco/test/html/index.html`) 추가.
+  - `./gradlew build`(spotlessCheck 포함) 재실행 → **BUILD SUCCESSFUL**.
+  - `./gradlew jacocoTestCoverageVerification` 수동 실행 시 현재 커버리지 **19%**로 40% 기준 미달 FAILED 확인 — `build`/`check`에 안 엮여 있어 영향 없음(의도한 동작). 커버리지 개선은 별도 작업으로 남김.
+  - Atomic PR 원칙에 따라 커밋 2개로 분리: `7ccdd53`(chore: Spotless/Jacoco 툴링 추가), `26a9346`(chore: Spotless 포맷팅 일괄 적용) → **PR #6** (`chore/code-quality-tooling` → `develop`) 생성 → 사용자 승인 후 병합(`2c01503`, 2026-09-16).
+
 ## 알려진 이슈 / 확인 필요 사항
 
 - `dysarthria-backend-scaffold.zip`이 저장소 루트에 남아있음(git 미포함) — 필요 없으면 수동 삭제 가능.
@@ -71,4 +86,5 @@
 ## 다음 단계 후보
 
 - 백엔드 A/B가 `feature/diagnosis-session` 등 나머지 도메인을 `develop`에서 분기해 구현 착수.
+- 테스트 커버리지 19% → 40% 이상으로 끌어올리기(도메인/애플리케이션 계층 단위 테스트 보강). 기준 달성 후 `jacocoTestCoverageVerification`을 `check`에 묶을지 팀 논의.
 - 스캐폴딩 + 주요 feature 안정화 후 `develop` → `main` 승격 PR.
