@@ -40,3 +40,11 @@ git push -u origin feature/<기능명>
 
 - 모든 PR은 최소 1인 승인 필요, 백엔드는 최종적으로 팀장 승인.
 - 기능 변경과 포맷팅/린트 정리는 같은 PR에 섞지 않는다(Atomic PR).
+
+## 코드 포맷팅 & 커버리지
+
+- 커밋 시 자동 포맷팅을 원하면 `pre-commit` 설치 후(`pip install pre-commit` 또는 `brew install pre-commit`) 저장소 루트에서 `pre-commit install`을 한 번 실행한다.
+- `./gradlew spotlessCheck`: 포맷팅 위반 여부만 확인(위반 시 `build` 실패).
+- `./gradlew spotlessApply`: Google Java Format 기준으로 코드 자동 재포맷.
+- `./gradlew jacocoTestReport`: 테스트 커버리지 리포트 생성(현재는 빌드를 막지 않는 warn-only 상태).
+- Jacoco HTML 리포트: `build/reports/jacoco/test/html/index.html`

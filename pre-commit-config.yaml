@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: spotless-apply
+        name: Spotless Java formatting
+        entry: ./gradlew spotlessApply
+        language: system
+        pass_filenames: false
+        files: \.java$

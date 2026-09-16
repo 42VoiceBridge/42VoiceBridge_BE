@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class VoiceBridgeApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(VoiceBridgeApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(VoiceBridgeApplication.class, args);
+  }
 }

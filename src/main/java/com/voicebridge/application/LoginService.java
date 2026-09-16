@@ -15,20 +15,22 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class LoginService implements LoginUseCase {
 
-    private final UserRepositoryPort userRepositoryPort;
-    private final PasswordEncoderPort passwordEncoderPort;
-    private final TokenIssuer tokenIssuer;
+  private final UserRepositoryPort userRepositoryPort;
+  private final PasswordEncoderPort passwordEncoderPort;
+  private final TokenIssuer tokenIssuer;
 
-    @Override
-    public TokenResult login(LoginCommand command) {
-        User user = userRepositoryPort.findByEmail(command.email())
-                .filter(User::isLocalUser)
-                .orElseThrow(() -> new CustomException(ErrorCode.AUTH_INVALID_CREDENTIALS));
+  @Override
+  public TokenResult login(LoginCommand command) {
+    User user =
+        userRepositoryPort
+            .findByEmail(command.email())
+            .filter(User::isLocalUser)
+            .orElseThrow(() -> new CustomException(ErrorCode.AUTH_INVALID_CREDENTIALS));
 
-        if (!passwordEncoderPort.matches(command.rawPassword(), user.getPassword())) {
-            throw new CustomException(ErrorCode.AUTH_INVALID_CREDENTIALS);
-        }
-
-        return tokenIssuer.issue(user.getId());
+    if (!passwordEncoderPort.matches(command.rawPassword(), user.getPassword())) {
+      throw new CustomException(ErrorCode.AUTH_INVALID_CREDENTIALS);
     }
+
+    return tokenIssuer.issue(user.getId());
+  }
 }

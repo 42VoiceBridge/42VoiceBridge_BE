@@ -4,9 +4,9 @@ import java.util.UUID;
 
 public interface RefreshTokenStorePort {
 
-    void save(UUID userId, String refreshToken);
+  void save(UUID userId, String refreshToken);
 
-    boolean isValid(UUID userId, String refreshToken);
+  boolean isValid(UUID userId, String refreshToken);
 
-    void revoke(UUID userId);
+  void revoke(UUID userId);
 }

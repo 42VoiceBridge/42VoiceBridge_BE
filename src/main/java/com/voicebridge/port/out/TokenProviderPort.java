@@ -4,11 +4,11 @@ import java.util.UUID;
 
 public interface TokenProviderPort {
 
-    String createAccessToken(UUID userId);
+  String createAccessToken(UUID userId);
 
-    String createRefreshToken(UUID userId);
+  String createRefreshToken(UUID userId);
 
-    long getAccessTokenExpireSeconds();
+  long getAccessTokenExpireSeconds();
 
-    UUID validateAndGetUserId(String token);
+  UUID validateAndGetUserId(String token);
 }

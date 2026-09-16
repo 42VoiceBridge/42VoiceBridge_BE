@@ -4,8 +4,7 @@ import java.util.UUID;
 
 public interface GetMyProfileUseCase {
 
-    MyProfileResult getMyProfile(UUID userId);
+  MyProfileResult getMyProfile(UUID userId);
 
-    record MyProfileResult(UUID userId, String email, String nickname) {
-    }
+  record MyProfileResult(UUID userId, String email, String nickname) {}
 }

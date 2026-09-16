@@ -1,8 +1,6 @@
 package com.voicebridge.adapter.out.persistence;
 
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.UUID;
-
-public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenJpaEntity, UUID> {
-}
+public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenJpaEntity, UUID> {}
