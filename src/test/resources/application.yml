@@ -15,3 +15,7 @@ voicebridge:
     refresh-token-expire-seconds: 1209600
   kakao:
     user-info-uri: https://kapi.kakao.com/v2/user/me
+  ai:
+    jpyrust:
+      instance-id: voicebridge-test
+      whisper-model-path: tiny

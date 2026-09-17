@@ -19,3 +19,8 @@ voicebridge:
     refresh-token-expire-seconds: 1209600
   kakao:
     user-info-uri: https://kapi.kakao.com/v2/user/me
+  ai:
+    jpyrust:
+      instance-id: voicebridge
+      # PoC에서 검증한 값. 인식 정확도 검증(AI팀)이 끝나면 base/small 등으로 교체될 수 있다.
+      whisper-model-path: tiny
