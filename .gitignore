@@ -39,3 +39,6 @@ out/
 ### Env / Secrets ###
 .env
 *.log
+
+### JPyRust runtime artifacts ###
+*.pt
