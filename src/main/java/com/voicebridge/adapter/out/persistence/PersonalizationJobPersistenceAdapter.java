@@ -1,13 +1,17 @@
 package com.voicebridge.adapter.out.persistence;
 
+import com.voicebridge.common.exception.CustomException;
+import com.voicebridge.common.exception.ErrorCode;
 import com.voicebridge.domain.personalization.PersonalizationJob;
 import com.voicebridge.domain.personalization.PersonalizationJobStatus;
 import com.voicebridge.port.out.PersonalizationJobRepositoryPort;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
+/** 현재는 PersonalizationJobJpaEntity에 unique/FK 제약이 없어 발생 시나리오가 없는 방어 코드 — 제약 추가 시를 대비한 것. */
 @Component
 @RequiredArgsConstructor
 public class PersonalizationJobPersistenceAdapter implements PersonalizationJobRepositoryPort {
@@ -16,8 +20,12 @@ public class PersonalizationJobPersistenceAdapter implements PersonalizationJobR
 
   @Override
   public PersonalizationJob save(PersonalizationJob job) {
-    PersonalizationJobJpaEntity saved = jpaRepository.save(toEntity(job));
-    return toDomain(saved);
+    try {
+      PersonalizationJobJpaEntity saved = jpaRepository.save(toEntity(job));
+      return toDomain(saved);
+    } catch (DataIntegrityViolationException e) {
+      throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, "저장 중 예상치 못한 제약 위반이 발생했습니다.");
+    }
   }
 
   @Override
