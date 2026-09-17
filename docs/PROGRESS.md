@@ -155,9 +155,9 @@
 
 ## 알려진 이슈 / 확인 필요 사항
 
+> 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.
+
 - `dysarthria-backend-scaffold.zip`이 저장소 루트에 남아있음(git 미포함) — 필요 없으면 수동 삭제 가능.
-- GitHub PR 병합 시 `gh pr merge`(GraphQL) 및 REST `gh api PUT .../merge` 둘 다 간헐적으로 502 또는 "Merge already in progress" 405를 반복 반환하는 경우가 있었음(PR #3, #4에서 재현, 길게는 수 분간 지속). 원인은 확실치 않지만, 관찰된 패턴상 merge 요청이 GitHub 서버에는 이미 접수되어 비동기로 처리 중인데 그 처리(브랜치 보호 규칙 평가, 백그라운드 머지 작업 큐)가 지연되는 것으로 보임 — 즉 요청이 실패한 게 아니라 아직 끝나지 않은 상태. 대응: `gh pr view --json mergedAt`으로 실제 상태를 먼저 확인하고, 병합 전이면 15초 간격 재시도 루프(`while true` — `until true`로 쓰면 즉시 종료되므로 주의)로 처리. `gh pr view`가 일시적으로 빈 문자열을 반환할 수 있으니 병합 여부 판단 시 빈 문자열과 `null`을 반드시 구분해서 체크할 것.
-- `gh pr review --approve`는 PR 작성자와 병합 실행 계정이 같으면(`gh` 인증 계정 = PR author) GitHub이 자체 승인(self-approve)을 막아 실패함(`Can not approve your own pull request`, PR #6·#7·#9~#13에서 재현). 사용자가 채팅상으로 승인 의사를 밝히면 별도 GitHub 리뷰 승인 없이 병합만 진행하는 방식으로 대응 중.
 - 아키텍처 감사(12번)에서 발견된 남은 참고 사항: `SecurityConfig`의 CORS가 `allowedOriginPatterns("*")` + `allowCredentials(true)` 조합 — 감사 체크리스트 항목엔 없어 수정하지 않았음, 운영 배포 전 재검토 필요.
 - 인식 유스케이스(녹음 업로드 → 실제 인식 → 결과 조회)가 아직 없어서 `JPyRustAiInferenceClient`(PR #9)는 인프라 배선만 완료된 상태 — API 레벨에서는 아직 아무 효과가 없음.
 - 테스트 커버리지 19% → 42.1%(PR #13 기준)로 개선됐지만 여전히 40% 미만 구간이 있음(`adapter.in.web`/`adapter.in.web.dto`/`adapter.out.persistence` 0%) — `jacocoTestCoverageVerification`은 여전히 `build`/`check`에 묶여 있지 않음(warn-only 유지 중).
