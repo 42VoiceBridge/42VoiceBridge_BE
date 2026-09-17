@@ -78,11 +78,11 @@ graph TB
 
 ### 진단 세션 — 세션 시작만 구현
 - `POST /api/v1/diagnosis-sessions`: 낭독 문장을 뽑아 진단 세션을 시작
-- 세션 조회 / 녹음 업로드 / 결과 조회 / 취약 음소 분석은 포트(유스케이스 인터페이스)만 정의된 상태 — [`NEXT-STEPS-diagnosis-session.md`](./NEXT-STEPS-diagnosis-session.md) 참고
+- 세션 조회 / 녹음 업로드 / 결과 조회 / 취약 음소 분석은 포트(유스케이스 인터페이스)만 정의된 상태 — [`docs/NEXT-STEPS-diagnosis-session.md`](./docs/NEXT-STEPS-diagnosis-session.md) 참고
 
 ### 개인화 — 모델 상태 조회만 구현
 - `GET /api/v1/personalization/model`: 사용자 개인화 모델 상태 조회
-- 녹음 업로드 / 학습 트리거 / 학습 상태 조회 / 실사용 인식은 포트만 정의된 상태 — [`NEXT-STEPS-personalization-recognition.md`](./NEXT-STEPS-personalization-recognition.md) 참고
+- 녹음 업로드 / 학습 트리거 / 학습 상태 조회 / 실사용 인식은 포트만 정의된 상태 — [`docs/NEXT-STEPS-personalization-recognition.md`](./docs/NEXT-STEPS-personalization-recognition.md) 참고
 
 ### 로컬 개발용 시드 데이터
 - `local` 프로파일에서만 동작하는 `SentenceSeeder` — `sentences` 테이블이 비어있으면 예시 문장 10개를 자동으로 채웁니다(재기동해도 중복 삽입되지 않음). 실제 낭독 문장 세트는 기획/AI팀이 확정하면 교체됩니다.
@@ -118,7 +118,7 @@ DB_USERNAME=root DB_PASSWORD=root ./gradlew bootRun --args='--spring.profiles.ac
 - 테스트: `./gradlew test` (H2 인메모리, MySQL 불필요)
 - 포맷팅: `./gradlew spotlessCheck` / `./gradlew spotlessApply` (Google Java Format 기준)
 - 커버리지: `./gradlew jacocoTestReport` → `build/reports/jacoco/test/html/index.html` (현재는 `build`/`check`를 막지 않는 warn-only)
-- 커밋 시 자동 포맷팅을 원하면 `pre-commit install` 실행 — 자세한 내용은 [`CONTRIBUTING.md`](./CONTRIBUTING.md) 참고
+- 커밋 시 자동 포맷팅을 원하면 `pre-commit install` 실행 — 자세한 내용은 [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) 참고
 
 ## 팀 구성
 
@@ -135,7 +135,8 @@ DB_USERNAME=root DB_PASSWORD=root ./gradlew bootRun --args='--spring.profiles.ac
 
 ## 더 알아보기
 
-- 전체 작업 이력/트러블슈팅 기록: [`PROGRESS.md`](./PROGRESS.md)
-- 기여 가이드(브랜치 전략/커밋 컨벤션): [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- 전체 작업 이력: [`docs/PROGRESS.md`](./docs/PROGRESS.md)
+- 트러블슈팅(에러 메시지 → 원인 → 해결): [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md)
+- 기여 가이드(브랜치 전략/커밋 컨벤션): [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md)
 - AI 에이전트 작업 가드레일: [`CLAUDE.md`](./CLAUDE.md)
-- 이어서 구현할 작업: [`NEXT-STEPS-diagnosis-session.md`](./NEXT-STEPS-diagnosis-session.md), [`NEXT-STEPS-personalization-recognition.md`](./NEXT-STEPS-personalization-recognition.md)
+- 이어서 구현할 작업: [`docs/NEXT-STEPS-diagnosis-session.md`](./docs/NEXT-STEPS-diagnosis-session.md), [`docs/NEXT-STEPS-personalization-recognition.md`](./docs/NEXT-STEPS-personalization-recognition.md)
