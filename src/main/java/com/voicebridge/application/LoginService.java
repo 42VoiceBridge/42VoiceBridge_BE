@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional
 public class LoginService implements LoginUseCase {
 
   private final UserRepositoryPort userRepositoryPort;
