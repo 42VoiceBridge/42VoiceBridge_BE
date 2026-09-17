@@ -2,19 +2,23 @@
 
 > 매 작업이 끝날 때마다 이 문서를 갱신한다. 새 대화를 시작할 때 이 문서부터 읽으면 이전 지시사항이 어떻게 끝났는지 복사-붙여넣기 없이 파악할 수 있다.
 
-마지막 업데이트: 2026-09-16
+마지막 업데이트: 2026-09-17
 
 ## 지금 상태 요약
 
 - `main`: `2b21d4a` — `.gitignore`, `CONTRIBUTING.md`만 반영된 상태. 실제 코드 없음.
-  - `develop`: `c9a747d` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + Spotless/Jacoco 코드 품질 툴링(PR #6) + 진단세션 계약(PR #7) + **개인화/인식 계약 + 모델 상태 조회 유스케이스(PR #8) 병합**까지 반영된 상태. `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL, 테스트 14개 전부 통과 확인됨.
+  - `develop`: `33412b6` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + Spotless/Jacoco 코드 품질 툴링(PR #6) + 진단세션 계약(PR #7) + 개인화/인식 계약(PR #8) + **JPyRust 기반 AI 연동(PR #9)** + **sentences 시드 데이터(PR #10)** + **로그인/refresh token 버그 수정(PR #11)** + **아키텍처 감사 fail 2건 수정 — 영속성 예외 번역(PR #12), 인증 서비스 실패 케이스 테스트(PR #13)**까지 반영된 상태. `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인됨.
   - `chore/rename-package-voicebridge`, `feature/init-project`: 각각 PR #3, PR #2 병합 완료 후 원격/로컬 브랜치 삭제 완료.
   - `fix/test-datasource-h2`: PR #4 병합 완료(`9ff44b4`), 원격/로컬 브랜치 삭제 완료.
   - `feature/auth`: `ee2d230`(feat) + `28372c6`(refactor: 주석 제거) — 인증 도메인(User) 구현 완료, **PR #5 병합 완료**(`162510b`), 원격/로컬 브랜치 삭제 완료.
   - `chore/code-quality-tooling`: `7ccdd53`(툴링) + `26a9346`(전체 재포맷) — Spotless(Google Java Format) + Jacoco 도입, **PR #6 병합 완료**(`2c01503`).
   - `feature/diagnosis-session`: `8df48bd` — 진단세션 계약(도메인/포트) + `POST /api/v1/diagnosis-sessions` 완전 구현, **PR #7 병합 완료**(`3a61fe9`). **다른 feature 브랜치와 달리 병합 후에도 삭제하지 않음** — 백엔드 A가 이 브랜치에서 나머지 4개 유스케이스(세션 조회/녹음 업로드/결과 조회/취약 음소 분석) 이어서 구현할 수 있어 사용자가 보존 요청함.
   - `feature/personalization-recognition`: `f5141e4` — 개인화/인식 계약(도메인/포트) + `GET /api/v1/personalization/model` 완전 구현. 기존에 이미 병합돼 있던 `AiInferenceClient.java`도 함께 수정됨(`ModelType`을 `domain.recognition.ModelType`으로 이동, SSOT). **PR #8 병합 완료**(`c9a747d`, 2026-09-16). **`feature/diagnosis-session`과 마찬가지로 병합 후에도 삭제하지 않음** — 태원이 이어서 작업할 수 있어 사용자가 보존 요청함.
-  - 나머지 도메인 코드(취약 음소 분석 상세 로직, AI 연동 실제 구현 등)는 아직 구현 전.
+  - `feature/ai-inference-jpyrust`: `2da6a63` — `JPyRustAiInferenceClient` 실제 구현체(JitPack `com.github.farmer0010:JPyRust:main-SNAPSHOT` 의존), 더미 WAV 왕복 통합 테스트 포함. **PR #9 병합 완료**(`5e599ca`, 2026-09-17). `feature/diagnosis-session`과 동일한 이유로 **병합 후에도 브랜치 보존**.
+  - `chore/seed-sentences`: `83bfea9` — `local` 프로파일 전용 `SentenceSeeder`(멱등). **PR #10 병합 완료**(`ee498c3`). 브랜치 보존.
+  - `fix/refresh-token-hash-overflow`: `15f73e6` — 로그인 500 에러 원인 2건(BCrypt 72바이트 제한, `LoginService`의 readOnly 트랜잭션에 묶인 refresh token 저장) 수정. **PR #11 병합 완료**(`eb326b0`). 브랜치 보존.
+  - `fix/persistence-exception-translation`, `test/auth-service-failure-cases`: 아키텍처 감사(9번 항목 참고)에서 발견된 fail 2건 수정. **PR #12(`7d15101`), PR #13(`33412b6`) 병합 완료 후 원격/로컬 브랜치 삭제 완료**.
+  - 나머지 도메인 코드(취약 음소 분석 상세 로직, 인식 유스케이스가 AI 연동 어댑터를 실제로 호출하는 배선 등)는 아직 구현 전.
 
 ## 작업 이력
 
@@ -104,19 +108,64 @@
   - `AiInferenceClient.java` 수정이 계약 변경과 한 세트라 커밋 1개로 묶음: `f5141e4`(feat: 개인화/인식 계약 및 모델 상태 조회 유스케이스 구현, 22 files changed) → **PR #8** (`feature/personalization-recognition` → `develop`) 생성. PR 본문 최상단에 "⚠️ 기존 파일 수정 포함" 섹션을 별도로 눈에 띄게 작성해 `AiInferenceClient.java`가 신규가 아니라 기존 병합 파일 수정임을 명시.
   - 사용자 승인 후 **PR #8 병합 완료**(`c9a747d`, 2026-09-16). `feature/diagnosis-session`과 동일하게 **병합 후에도 브랜치를 삭제하지 않고 보존**(태원이 이어서 작업할 가능성 — 사용자 요청으로 보존, 삭제 여부는 추후 사용자에게 다시 확인 예정).
 
+### 9. JPyRust 기반 AI 연동 (feature/ai-inference-jpyrust) — 완료
+
+- 사전 확인: `develop` clean & 동기화, `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인. JPyRust 저장소(farmer0010/JPyRust)의 PR #1(Whisper 지원)/PR #2(workDir 버그 수정) 둘 다 main 병합 완료 상태에서 시작.
+  - 0단계로 JitPack에서 받은 `JPyRustBridge.java`/`ai_worker.py`를 실제로 읽어 API를 재확인(추측 금지): `processAudio(ByteBuffer data, int length, int sampleRate)`, `initialize(workDir, modelPath, confidence, memoryKey, whisperModelPath)` 5-arg 오버로드, WHISPER 응답 JSON `{"recognized_text", "confidence"}` 확정.
+  - `build.gradle`에 JitPack repo + `com.github.farmer0010:JPyRust:main-SNAPSHOT` 의존성 추가 — 첫 `--refresh-dependencies` 시 GitHub 소스에서 직접 컴파일(3분 31초 소요), 성공.
+  - `JPyRustAiInferenceClient` 작성: 생성자에서 `@Value` 주입값으로 `initialize(...)` 호출, `recognize()`는 오디오를 `ByteBuffer`에 담아 브릿지 호출 후 JSON을 Jackson으로 `RecognitionResult`에 매핑, 실패 시 `CustomException(AI_INFERENCE_UNAVAILABLE)`로 번역.
+  - 지시된 `ByteBuffer.wrap()` 대신 `ByteBuffer.allocateDirect()` 사용 — Rust JNI(`get_direct_buffer_address`)가 direct buffer만 지원해서. 지시된 정적 `@Disabled` 대신 `Assumptions.assumeTrue()` 사용 — 모델 로드 실패 시에만 런타임 조건부로 테스트를 스킵해야 해서.
+  - `application.yml`/`test/application.yml`에 `voicebridge.ai.jpyrust.instance-id`/`whisper-model-path: tiny` 추가.
+  - 더미 1초 WAV 왕복 통합 테스트 추가 — 실제로 네이티브 레이어(FILE-FALLBACK WHISPER)까지 도달해 통과함을 로그로 확인(스킵 경로 아님).
+  - 테스트 실행 중 YOLO 파라미터 때문에 워킹 디렉토리에 자동 생성된 `yolov8n.pt`는 커밋 대상이 아니라 삭제 + `.gitignore`에 `*.pt` 추가.
+  - 커밋(`2da6a63`) → **PR #9** (`feature/ai-inference-jpyrust` → `develop`) 생성 → 사용자 승인 후 병합(`5e599ca`, 2026-09-17). `feature/diagnosis-session`과 동일한 이유로 브랜치 보존.
+
+### 10. 로컬 개발용 sentences 시드 데이터 (chore/seed-sentences) — 완료
+
+- 배경: `sentences` 테이블이 비어있어 `POST /api/v1/diagnosis-sessions` 호출 시 항상 `RESOURCE_NOT_FOUND` 발생 — 다음 날 회의 시연을 위해 채워야 함.
+  - `SentenceSeeder`(`ApplicationRunner` + `@Profile("local")`) 작성 — `count() > 0`이면 아무것도 안 해서 재기동해도 중복 삽입 안 됨(멱등). 예시 문장 10개는 임시 시드이며 실제 문장 세트는 기획/AI팀이 확정할 것이라는 주석을 클래스 상단에 남김.
+  - raw SQL(`data.sql`) 대신 애플리케이션 코드로 넣은 이유: UUID 컬럼이 MySQL/H2에서 바이너리로 매핑되는데 하드코딩 SQL 리터럴은 Hibernate의 런타임 인코딩과 어긋날 위험이 있어서.
+  - 검증: Docker MySQL 8 컨테이너로 로컬(local 프로파일) 기동 → DB 직접 조회로 10개 insert 확인 → 재기동 → insert 로그 0건(멱등성 확인) → `POST /api/v1/diagnosis-sessions` 실제 호출 → `RESOURCE_NOT_FOUND` 없이 문장 목록 정상 반환(최종 성공 기준).
+  - 커밋(`83bfea9`) → **PR #10** 생성 → 병합(`ee498c3`, 2026-09-17). 브랜치 보존하지 않고 이후 정리(11번 참고).
+
+### 11. 로그인 500 에러 + refresh token 저장 버그 수정 (fix/refresh-token-hash-overflow) — 완료
+
+- 배경: 10번 작업 중 API 검증 과정에서 `POST /api/v1/auth/login`이 항상 500을 반환하는 걸 발견, 별도 작업으로 분리해서 수정.
+  - **원인 1**: `RefreshTokenStoreAdapter`가 사용자 비밀번호용 `PasswordEncoderPort`(BCrypt)를 그대로 재사용해 JWT refresh token을 해싱 — BCrypt는 입력을 72바이트로 제한하는데 JWT는 보통 그보다 길어서 `IllegalArgumentException`. → 신규 `TokenHasherPort`(SHA-256, `Sha256TokenHasherAdapter`)를 만들어 refresh token 전용으로 분리(기존 `PasswordEncoderPort`/`SignUpService`/`LoginService`의 실제 비밀번호 검증 로직은 그대로 둠).
+  - **원인 2**: 원인 1을 고친 뒤에도 로그인은 성공하지만 refresh token이 DB에 실제로 저장되지 않아 `/auth/refresh`가 항상 `REFRESH_TOKEN_INVALID` — `LoginService`가 클래스 레벨 `@Transactional(readOnly = true)`였는데 내부에서 `TokenIssuer` → `RefreshTokenStoreAdapter.save()`(쓰기)까지 같은 물리 트랜잭션에 묶여 반영이 안 됨. → `@Transactional`로 변경(`KakaoLoginService`/`RefreshTokenService`는 원래 문제 없어 손대지 않음).
+  - 검증: Docker MySQL로 signup → login → refresh 전체 흐름 실제 HTTP 호출로 확인, DB에서 SHA-256 해시(Base64 44자) 정상 저장 확인.
+  - 커밋(`15f73e6`) → **PR #11** 생성 → 병합(`eb326b0`, 2026-09-17). 브랜치 보존.
+
+### 12. 아키텍처 감사 (CLAUDE.md 3장/6장/9장 대조) — 완료
+
+- `develop`(PR #11까지 반영, `eb326b0`)을 기준으로 A~E 22개 항목(헥사고날 순수성/대칭성, 예외·DTO·SSOT, 테스트 컨벤션, 포맷팅/커버리지, 보안)을 grep/빌드/git log로 직접 확인. 코드 수정 없이 감사만 수행.
+  - 결과: 19 pass, 2 fail, 1 해당없음. 전체 라인 커버리지 33.5%(183/546).
+  - **Fail 1 (B1)**: `DiagnosisSessionPersistenceAdapter`/`PersonalizationJobPersistenceAdapter`의 `save()`가 `UserPersistenceAdapter`와 달리 JPA 예외(`DataIntegrityViolationException`)를 번역 없이 그대로 던짐(현재 두 엔티티에 unique/FK 제약이 없어 실사용 리스크는 낮음).
+  - **Fail 2 (C5)**: `LoginService`/`SignUpService`/`RefreshTokenService`/`KakaoLoginService`에 테스트가 아예 없고, `JwtTokenProviderTest`도 happy path만 존재 — 인증 도메인이 6장 컨벤션(정상+거부 케이스 모두 테스트)을 어기고 있음.
+  - 체크리스트 밖 참고 사항: `SecurityConfig`의 CORS가 `allowedOriginPatterns("*")` + `allowCredentials(true)` 조합 — 운영 배포 전 재검토 권장(아직 액션 없음).
+
+### 13. 감사 fail 수정 — 예외 번역 (fix/persistence-exception-translation) / 인증 테스트 (test/auth-service-failure-cases) — 완료
+
+- 서로 무관한 두 수정이라 브랜치/커밋/PR을 분리해서 진행.
+  - **fix/persistence-exception-translation**: `DiagnosisSessionPersistenceAdapter.save()`/`PersonalizationJobPersistenceAdapter.save()`에 `UserPersistenceAdapter`와 동일한 try-catch 패턴 추가, 특정 비즈니스 의미가 없어 `INTERNAL_SERVER_ERROR`로 번역 + 클래스 상단에 "제약 추가 시를 대비한 방어 코드" 주석. 재현 불가능한 케이스라 억지 Mock 테스트는 만들지 않음. 커밋(`c67909e`) → **PR #12** → 병합(`7d15101`, 2026-09-17).
+  - **test/auth-service-failure-cases**: 기존 `StartDiagnosisSessionServiceTest` 패턴(`@ExtendWith(MockitoExtension.class)`, 명시적 생성자 주입, `assertThatThrownBy`)으로 `SignUpServiceTest`/`LoginServiceTest`/`KakaoLoginServiceTest`/`RefreshTokenServiceTest` 신규 작성(정상+실패 케이스 총 12개) + `JwtTokenProviderTest`에 만료/위조 토큰 케이스 2개 추가. 총 신규 테스트 15개 전부 통과.
+    - 커버리지 개선(수정 전 → 후): `application` 30.0%(18/60) → **85.0%(51/60)**, `adapter.out.auth` 29.4%(20/68) → **35.3%(24/68)**, 전체 33.5%(183/546) → **42.1%(230/546)**.
+    - 커밋(`f18297a`) → **PR #13** → 병합(`33412b6`, 2026-09-17).
+  - 두 브랜치 모두 병합 후 **원격/로컬 브랜치 삭제 완료**(`feature/diagnosis-session` 등과 달리 이어서 작업할 사람이 없는 일회성 수정이라 보존 요청 없었음).
+
 ## 알려진 이슈 / 확인 필요 사항
 
 - `dysarthria-backend-scaffold.zip`이 저장소 루트에 남아있음(git 미포함) — 필요 없으면 수동 삭제 가능.
 - GitHub PR 병합 시 `gh pr merge`(GraphQL) 및 REST `gh api PUT .../merge` 둘 다 간헐적으로 502 또는 "Merge already in progress" 405를 반복 반환하는 경우가 있었음(PR #3, #4에서 재현, 길게는 수 분간 지속). 원인은 확실치 않지만, 관찰된 패턴상 merge 요청이 GitHub 서버에는 이미 접수되어 비동기로 처리 중인데 그 처리(브랜치 보호 규칙 평가, 백그라운드 머지 작업 큐)가 지연되는 것으로 보임 — 즉 요청이 실패한 게 아니라 아직 끝나지 않은 상태. 대응: `gh pr view --json mergedAt`으로 실제 상태를 먼저 확인하고, 병합 전이면 15초 간격 재시도 루프(`while true` — `until true`로 쓰면 즉시 종료되므로 주의)로 처리. `gh pr view`가 일시적으로 빈 문자열을 반환할 수 있으니 병합 여부 판단 시 빈 문자열과 `null`을 반드시 구분해서 체크할 것.
-- `gh pr review --approve`는 PR 작성자와 병합 실행 계정이 같으면(`gh` 인증 계정 = PR author) GitHub이 자체 승인(self-approve)을 막아 실패함(`Can not approve your own pull request`, PR #6·#7에서 재현). 사용자가 채팅상으로 승인 의사를 밝히면 별도 GitHub 리뷰 승인 없이 병합만 진행하는 방식으로 대응 중.
-- `sentences` 테이블에 시드 데이터가 없어 `POST /api/v1/diagnosis-sessions`를 지금 호출하면 `RESOURCE_NOT_FOUND` 발생(PR #7). 코드 결함 아님, 시드 데이터 작업 필요.
-- PR #8: `AiInferenceClient.java` 수정이 섞인 PR이라 리뷰 시 "이거 신규 아니네?" 하고 헷갈릴 수 있음 — PR 본문 최상단에 경고 섹션으로 표시해둠.
+- `gh pr review --approve`는 PR 작성자와 병합 실행 계정이 같으면(`gh` 인증 계정 = PR author) GitHub이 자체 승인(self-approve)을 막아 실패함(`Can not approve your own pull request`, PR #6·#7·#9~#13에서 재현). 사용자가 채팅상으로 승인 의사를 밝히면 별도 GitHub 리뷰 승인 없이 병합만 진행하는 방식으로 대응 중.
+- 아키텍처 감사(12번)에서 발견된 남은 참고 사항: `SecurityConfig`의 CORS가 `allowedOriginPatterns("*")` + `allowCredentials(true)` 조합 — 감사 체크리스트 항목엔 없어 수정하지 않았음, 운영 배포 전 재검토 필요.
+- 인식 유스케이스(녹음 업로드 → 실제 인식 → 결과 조회)가 아직 없어서 `JPyRustAiInferenceClient`(PR #9)는 인프라 배선만 완료된 상태 — API 레벨에서는 아직 아무 효과가 없음.
+- 테스트 커버리지 19% → 42.1%(PR #13 기준)로 개선됐지만 여전히 40% 미만 구간이 있음(`adapter.in.web`/`adapter.in.web.dto`/`adapter.out.persistence` 0%) — `jacocoTestCoverageVerification`은 여전히 `build`/`check`에 묶여 있지 않음(warn-only 유지 중).
 
 ## 다음 단계 후보
 
 - 백엔드 A가 `feature/diagnosis-session` 브랜치(삭제 안 하고 보존 중)에서 나머지 4개 유스케이스(세션 조회/녹음 업로드/결과 조회/취약 음소 분석) 이어서 구현.
-- 백엔드 B(태원으로 추정, 팀 R&R 미확정이라 단정은 보류)가 `feature/personalization-recognition` 브랜치(PR #8 병합 후에도 보존 예정)에서 나머지 유스케이스(녹음 업로드/학습 트리거/학습 상태 조회/실사용 인식/인식 이력) 이어서 구현.
-- `sentences` 테이블 시드 데이터 준비 — 없으면 진단 세션 시작 API가 항상 `RESOURCE_NOT_FOUND`를 반환함.
-- AI 연동(`AiInferenceClient` 구현체) 착수 — PoC(JPyRust vs FastAPI) 결과 대기 중.
-- 테스트 커버리지 19% → 40% 이상으로 끌어올리기(도메인/애플리케이션 계층 단위 테스트 보강). 기준 달성 후 `jacocoTestCoverageVerification`을 `check`에 묶을지 팀 논의.
+- 백엔드 B(태원으로 추정, 팀 R&R 미확정이라 단정은 보류)가 `feature/personalization-recognition` 브랜치(보존 중)에서 나머지 유스케이스(녹음 업로드/학습 트리거/학습 상태 조회/실사용 인식/인식 이력) 이어서 구현 — `JPyRustAiInferenceClient`(`feature/ai-inference-jpyrust` 브랜치, 보존 중)를 실제로 호출하는 배선이 핵심.
+- 컨트롤러/DTO/영속성 어댑터 계층 통합 테스트 보강(현재 0%) — 도메인/application 계층은 이미 양호한 수준.
+- `SecurityConfig` CORS 설정(`allowedOriginPatterns("*")` + `allowCredentials(true)`) 운영 배포 전 재검토.
 - 스캐폴딩 + 주요 feature 안정화 후 `develop` → `main` 승격 PR.
