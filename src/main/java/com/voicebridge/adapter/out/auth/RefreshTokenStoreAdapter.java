@@ -1,58 +1,46 @@
 package com.voicebridge.adapter.out.auth;
 
-import com.voicebridge.adapter.out.persistence.RefreshTokenJpaEntity;
-import com.voicebridge.adapter.out.persistence.RefreshTokenJpaRepository;
 import com.voicebridge.port.out.RefreshTokenStorePort;
 import com.voicebridge.port.out.TokenHasherPort;
-import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
 public class RefreshTokenStoreAdapter implements RefreshTokenStorePort {
 
-  private final RefreshTokenJpaRepository refreshTokenJpaRepository;
+  private static final String KEY_PREFIX = "refresh_token:";
+
+  private final StringRedisTemplate redisTemplate;
   private final TokenHasherPort tokenHasherPort;
 
   @Value("${voicebridge.jwt.refresh-token-expire-seconds}")
   private long refreshTokenExpireSeconds;
 
   @Override
-  @Transactional
   public void save(UUID userId, String refreshToken) {
     String tokenHash = tokenHasherPort.hash(refreshToken);
-    LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(refreshTokenExpireSeconds);
-
-    refreshTokenJpaRepository
-        .findById(userId)
-        .ifPresentOrElse(
-            existing -> existing.update(tokenHash, expiresAt),
-            () ->
-                refreshTokenJpaRepository.save(
-                    RefreshTokenJpaEntity.builder()
-                        .userId(userId)
-                        .tokenHash(tokenHash)
-                        .expiresAt(expiresAt)
-                        .build()));
+    redisTemplate
+        .opsForValue()
+        .set(key(userId), tokenHash, Duration.ofSeconds(refreshTokenExpireSeconds));
   }
 
   @Override
-  @Transactional(readOnly = true)
   public boolean isValid(UUID userId, String refreshToken) {
-    return refreshTokenJpaRepository
-        .findById(userId)
-        .filter(entity -> entity.getExpiresAt().isAfter(LocalDateTime.now()))
-        .map(entity -> tokenHasherPort.matches(refreshToken, entity.getTokenHash()))
-        .orElse(false);
+    String storedHash = redisTemplate.opsForValue().get(key(userId));
+    return storedHash != null && tokenHasherPort.matches(refreshToken, storedHash);
   }
 
   @Override
-  @Transactional
   public void revoke(UUID userId) {
-    refreshTokenJpaRepository.deleteById(userId);
+    redisTemplate.delete(key(userId));
+  }
+
+  private String key(UUID userId) {
+    return KEY_PREFIX + userId;
   }
 }
