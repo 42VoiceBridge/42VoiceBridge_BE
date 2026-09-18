@@ -1,5 +1,9 @@
 # 브랜치 전략 & 커밋 컨벤션
 
+## 로컬 실행
+
+`docker-compose up -d` (MySQL, Redis) → `./gradlew bootRun`
+
 ## 브랜치 전략
 
 - `main`: 배포 가능 상태만 유지. **직접 커밋/푸시 금지, 항상 PR로만 병합.**
