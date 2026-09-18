@@ -58,6 +58,22 @@
 - **해결**: `local` 프로파일에서만 동작하는 `SentenceSeeder`(`ApplicationRunner`)를 추가해 앱 기동 시 테이블이 비어있으면 예시 문장 10개를 자동으로 채우도록 했다(재기동해도 중복 삽입 안 되게 멱등 처리). 운영(`prod`) 프로파일에서는 실행되지 않는다 — 운영 시드 데이터는 별도로 준비해야 한다.
 - **관련**: PR #10
 
+## 로컬 인프라 (docker-compose)
+
+### `docker-compose up -d`로 MySQL을 띄웠는데 앱 기동 시 접속 인증에 실패한다
+
+- **증상**: MySQL 공식 이미지가 `MYSQL_ROOT_PASSWORD`를 못 찾아 컨테이너 자체가 부팅을 거부하거나, 컨테이너는 떴는데 앱이 `Access denied for user 'root'`로 실패한다.
+- **원인**: `application-local.yml`은 `DB_PASSWORD` 환경변수를 안 주면 기본값이 **빈 문자열**인데, `docker-compose.yml`의 `MYSQL_ROOT_PASSWORD`가 빈 값이면 MySQL 공식 이미지는 `MYSQL_ALLOW_EMPTY_PASSWORD` 없이는 부팅 자체를 거부한다. 앱과 compose의 "환경변수 미설정 시 기본 동작"이 서로 어긋나면 이런 문제가 생긴다.
+- **해결**: `docker-compose.yml`에 `MYSQL_ALLOW_EMPTY_PASSWORD: "yes"`와 `MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-}`를 같이 둔다. `DB_PASSWORD`를 안 주면 앱과 동일하게 빈 비밀번호로 뜨고, 값을 주면 그 값이 root 비밀번호로 쓰인다.
+- **관련**: PR #17
+
+### 로그인/`/auth/refresh` 호출 시 Redis 연결 에러 (`RedisConnectionFailureException` 등)로 실패한다
+
+- **증상**: MySQL은 정상인데 로그인이나 refresh 호출이 실패하며 로그에 Redis 연결 관련 예외가 찍힌다.
+- **원인**: PR #18부터 refresh token 저장소가 MySQL에서 Redis로 이관되어, **Redis가 로그인 흐름의 필수 의존성**이 됐다. `docker-compose up -d`를 안 했거나 Redis 컨테이너만 내려간 상태에서 앱을 띄우면 발생한다.
+- **해결**: `docker-compose up -d`로 Redis까지 함께 떠 있는지 확인한다(`docker ps`에 `redis` 컨테이너가 `healthy`인지 확인). Testcontainers를 쓰는 `./gradlew test`는 Docker 데몬만 켜져 있으면 별도로 Redis를 안 띄워도 된다.
+- **관련**: PR #18
+
 ## Git / GitHub 운영
 
 ### PR 병합 요청이 502 또는 "Merge already in progress" 405를 반복 반환한다
