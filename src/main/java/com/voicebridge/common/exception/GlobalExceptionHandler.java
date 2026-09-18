@@ -6,8 +6,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-/** 모든 Controller에 공통으로 적용되는 예외 처리기. 도메인 예외 → API 명세서 0.3/0.6절 포맷으로 변환하는 지점은 여기 하나로 고정한다. */
+/** 모든 Controller에 공통으로 적용되는 예외 처리기. 도메인 예외 → API 명세서 0.3/0.6절 포맷으로 변환하는 그러지점은 여기 하나로 고정한다. */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -30,6 +31,15 @@ public class GlobalExceptionHandler {
             .orElse(ErrorCode.VALIDATION_FAILED.getMessage());
     return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.getStatus())
         .body(ApiResponse.error(ErrorCode.VALIDATION_FAILED.name(), message));
+  }
+
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<ApiResponse<Void>> handleTypeMismatchException(
+      MethodArgumentTypeMismatchException e) {
+    return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.getStatus())
+        .body(
+            ApiResponse.error(
+                ErrorCode.VALIDATION_FAILED.name(), ErrorCode.VALIDATION_FAILED.getMessage()));
   }
 
   @ExceptionHandler(Exception.class)

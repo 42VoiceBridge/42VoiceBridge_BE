@@ -1,6 +1,14 @@
 # 개인화·인식(personalization/recognition) 다음 구현 가이드 — 백엔드 B
 
-이번에 받은 건 "계약(7개 API) + 모델 상태 조회 1개 완전 구현"까지야.
+현재는 계약(7개 API)과 모델 상태 조회·학습 작업 상태 조회 2개가 구현되어 있어.
+
+## 학습 작업 상태 조회 — 구현 완료 (2026-09-18)
+
+- `GET /api/v1/personalization/train/{jobId}`: 로그인 사용자의 작업 상태, 시작 시각, 완료 시각, 실패 사유를 반환.
+- 없는 작업은 `RESOURCE_NOT_FOUND`(404), 다른 사용자의 작업은 `FORBIDDEN_ACCESS`(403), UUID 변환 실패는 `VALIDATION_FAILED`(400).
+- `GetPersonalizationTrainingStatusService` → 기존 `PersonalizationJobRepositoryPort.findById()`로 조회.
+- 실제 AI 호출 없이 DB에 저장된 상태를 읽는다. 학습 상태 갱신 및 `progress` 전달은 별도 구현 대상.
+- H2와 MockMvc를 사용하는 `PersonalizationTrainingStatusIntegrationTest`에서 네 가지 작업 상태와 예외·접근 제어를 검증.
 
 ## ⚠️ 먼저 확인할 것
 
@@ -15,7 +23,6 @@
 |---|---|---|
 | POST /personalization/recordings | `UploadPersonalizationRecordingUseCase` | feature/diagnosis-session의 업로드 패턴 참고 |
 | POST /personalization/train | `TrainPersonalizationModelUseCase` | 최소 녹음 수 미달 시 INSUFFICIENT_RECORDINGS, 중복 실행 시 INVALID_STATE_TRANSITION — findInProgressByUserId() 사용 |
-| GET /personalization/train/{jobId} | `GetPersonalizationTrainingStatusUseCase` | 단순 조회 — GetPersonalizationModelService 패턴 그대로 참고 |
 | POST /recognitions | `RecognizeSpeechUseCase` | 개인화 모델 있으면 우선 사용, 없으면 기본 모델 폴백. findLatestCompletedByUserId()로 확인 |
 | GET /recognitions | `GetRecognitionHistoryUseCase` | 페이지네이션. `Recognition` 리포지토리 포트/어댑터 아직 없음 — 새로 정의할 것 |
 | GET /recognitions/{id} | `GetRecognitionDetailUseCase` | 본인 소유 체크는 `Recognition.isOwnedBy()` |
@@ -25,8 +32,7 @@
 1. `TrainPersonalizationModelUseCase` — `PersonalizationJobRepositoryPort`가 이미 완성돼 있어서 바로 시작 가능
 2. `UploadPersonalizationRecordingUseCase` — S3 업로드 필요. 민수가 diagnosis-session에서
    StoragePort를 먼저 만들면 그거 재사용, 아직 없으면 서로 맞춰서 같이 설계할 것
-3. `GetPersonalizationTrainingStatusUseCase` — 단순 조회
-4. `RecognizeSpeechUseCase` + 이력 조회 2개 — `Recognition` 리포지토리 포트/어댑터부터 새로 설계
+3. `RecognizeSpeechUseCase` + 이력 조회 2개 — `Recognition` 리포지토리 포트/어댑터부터 새로 설계
    (`DiagnosisSessionPersistenceAdapter` 스타일 그대로 따라 하면 됨)
 
 ## 주의
