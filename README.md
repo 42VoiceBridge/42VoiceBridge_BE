@@ -12,10 +12,13 @@ GSIA SW 챌린지(3주) — **AI 구음장애 보조 서비스**의 백엔드입
 | Framework | Spring Boot 3.5.8 |
 | Architecture | 헥사고날 아키텍처 (Ports & Adapters) |
 | Database | MySQL/MariaDB (로컬/운영), H2 (테스트 — `src/test/resources/application.yml`로 분리) |
+| Cache/Store | Redis (refresh token 저장 — TTL로 자동 만료) |
 | Auth | Spring Security + JWT(jjwt 0.12.6), 이메일/비밀번호(BCrypt) + 카카오 로그인 |
 | AI 연동 | [JPyRust](https://github.com/farmer0010/JPyRust)(PyO3) in-process 브릿지 → Python Whisper(OpenAI) 데몬 |
+| API 문서 | springdoc-openapi(Swagger UI) — `/swagger-ui/index.html` |
 | Code Quality | Spotless(Google Java Format), Jacoco |
 | Build | Gradle |
+| 로컬 인프라 | Docker Compose (MySQL, Redis) |
 
 ## 아키텍처
 
@@ -39,11 +42,13 @@ graph TB
 
     subgraph adapter_out["adapter.out — 출력 어댑터"]
         PERSIST["persistence<br/>(JPA 엔티티/리포지토리)"]
-        AUTH["auth<br/>(JwtTokenProvider, BCrypt/SHA-256 해셔)"]
+        AUTH["auth<br/>(JwtTokenProvider, BCrypt/SHA-256 해셔,<br/>RefreshTokenStoreAdapter)"]
         AI["ai<br/>(JPyRustAiInferenceClient)"]
     end
 
     subgraph external["앱 프로세스 밖"]
+        MYSQL["MySQL"]
+        REDIS["Redis<br/>(refresh token, TTL)"]
         JPYRUST["JPyRust(PyO3) 브릿지<br/>→ Python Whisper 데몬"]
         KAKAO["카카오 로그인 API"]
     end
@@ -58,6 +63,8 @@ graph TB
     PORT_OUT -.구현.-> AI
 
     PERSIST --> MODEL
+    PERSIST --> MYSQL
+    AUTH --> REDIS
     AI --> JPYRUST
     AUTH --> KAKAO
 ```
@@ -69,7 +76,7 @@ graph TB
 ### 인증 — 완료
 - 이메일/비밀번호 회원가입·로그인
 - 카카오 로그인 (프론트가 카카오 SDK로 받은 accessToken을 백엔드가 그대로 카카오 API에 검증 요청 — 백엔드가 카카오 REST API 키를 가질 필요가 없는 설계)
-- JWT 액세스/리프레시 토큰 발급·재발급. refresh token은 SHA-256으로 별도 해싱해 저장(사용자 비밀번호용 BCrypt와 관심사 분리 — BCrypt는 72바이트 제한이 있어 JWT 길이의 토큰에는 쓸 수 없음)
+- JWT 액세스/리프레시 토큰 발급·재발급. refresh token은 SHA-256으로 별도 해싱해 **Redis**에 저장(사용자 비밀번호용 BCrypt와 관심사 분리 — BCrypt는 72바이트 제한이 있어 JWT 길이의 토큰에는 쓸 수 없음). Redis TTL로 만료를 자동 처리해 별도 정리(cleanup) 로직이 필요 없음 — **Redis가 기동되어 있지 않으면 로그인/refresh 자체가 실패**
 
 ### AI 음성 인식 연동 — 인프라 배선만 완료
 - [JPyRust](https://github.com/farmer0010/JPyRust)(PyO3) in-process 브릿지로 실제 Whisper 모델을 호출하는 `AiInferenceClient` 구현체(`JPyRustAiInferenceClient`)
@@ -102,20 +109,17 @@ graph TB
 
 ## 로컬 실행 방법
 
-MySQL이 필요합니다(테스트는 H2를 자동으로 쓰므로 불필요).
+MySQL과 Redis가 필요합니다(테스트는 H2 + Testcontainers Redis를 자동으로 쓰므로 둘 다 불필요).
 
 ```bash
-docker run -d --name voicebridge-mysql \
-  -e MYSQL_ROOT_PASSWORD=root \
-  -e MYSQL_DATABASE=voicebridge \
-  -p 3306:3306 \
-  mysql:8.0
-
-DB_USERNAME=root DB_PASSWORD=root ./gradlew bootRun --args='--spring.profiles.active=local'
+docker-compose up -d   # MySQL, Redis
+./gradlew bootRun
 ```
 
 - API는 `localhost:8080`에서 확인할 수 있습니다.
-- 테스트: `./gradlew test` (H2 인메모리, MySQL 불필요)
+- API 문서(Swagger UI): `localhost:8080/swagger-ui/index.html` — JWT가 필요한 엔드포인트는 우측 상단 `Authorize`에 `Bearer {accessToken}`을 넣으면 호출까지 가능합니다.
+- Redis가 떠 있지 않으면 로그인/refresh가 실패합니다 — `docker-compose up -d`를 먼저 실행했는지 확인하세요.
+- 테스트: `./gradlew test` (H2 인메모리 + Testcontainers Redis 자동 기동, 로컬 MySQL/Redis 불필요. 단 Testcontainers가 Docker 데몬을 사용하므로 Docker Desktop은 켜져 있어야 함)
 - 포맷팅: `./gradlew spotlessCheck` / `./gradlew spotlessApply` (Google Java Format 기준)
 - 커버리지: `./gradlew jacocoTestReport` → `build/reports/jacoco/test/html/index.html` (현재는 `build`/`check`를 막지 않는 warn-only)
 - 커밋 시 자동 포맷팅을 원하면 `pre-commit install` 실행 — 자세한 내용은 [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) 참고

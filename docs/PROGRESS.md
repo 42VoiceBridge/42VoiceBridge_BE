@@ -2,12 +2,13 @@
 
 > 매 작업이 끝날 때마다 이 문서를 갱신한다. 새 대화를 시작할 때 이 문서부터 읽으면 이전 지시사항이 어떻게 끝났는지 복사-붙여넣기 없이 파악할 수 있다.
 
-마지막 업데이트: 2026-09-17
+마지막 업데이트: 2026-09-18
 
 ## 지금 상태 요약
 
 - `main`: `2b21d4a` — `.gitignore`, `CONTRIBUTING.md`만 반영된 상태. 실제 코드 없음.
-  - `develop`: `33412b6` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + Spotless/Jacoco 코드 품질 툴링(PR #6) + 진단세션 계약(PR #7) + 개인화/인식 계약(PR #8) + **JPyRust 기반 AI 연동(PR #9)** + **sentences 시드 데이터(PR #10)** + **로그인/refresh token 버그 수정(PR #11)** + **아키텍처 감사 fail 2건 수정 — 영속성 예외 번역(PR #12), 인증 서비스 실패 케이스 테스트(PR #13)**까지 반영된 상태. `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인됨.
+  - `develop`: `7a1f937` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + Spotless/Jacoco 코드 품질 툴링(PR #6) + 진단세션 계약(PR #7) + 개인화/인식 계약(PR #8) + **JPyRust 기반 AI 연동(PR #9)** + **sentences 시드 데이터(PR #10)** + **로그인/refresh token 버그 수정(PR #11)** + **아키텍처 감사 fail 2건 수정 — 영속성 예외 번역(PR #12), 인증 서비스 실패 케이스 테스트(PR #13)** + **문서 디렉토리 정리(PR #15)** + **Swagger(springdoc-openapi) API 문서화(PR #16)** + **로컬 개발용 docker-compose(PR #17)** + **refresh token 저장소 MySQL → Redis 이관(PR #18)**까지 반영된 상태. `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인됨.
+  - PR #18부터 **Redis가 로그인/refresh의 필수 인프라**가 됨 — 로컬은 `docker-compose up -d`로 MySQL과 함께 기동.
   - `chore/rename-package-voicebridge`, `feature/init-project`: 각각 PR #3, PR #2 병합 완료 후 원격/로컬 브랜치 삭제 완료.
   - `fix/test-datasource-h2`: PR #4 병합 완료(`9ff44b4`), 원격/로컬 브랜치 삭제 완료.
   - `feature/auth`: `ee2d230`(feat) + `28372c6`(refactor: 주석 제거) — 인증 도메인(User) 구현 완료, **PR #5 병합 완료**(`162510b`), 원격/로컬 브랜치 삭제 완료.
@@ -18,6 +19,10 @@
   - `chore/seed-sentences`: `83bfea9` — `local` 프로파일 전용 `SentenceSeeder`(멱등). **PR #10 병합 완료**(`ee498c3`). 브랜치 보존.
   - `fix/refresh-token-hash-overflow`: `15f73e6` — 로그인 500 에러 원인 2건(BCrypt 72바이트 제한, `LoginService`의 readOnly 트랜잭션에 묶인 refresh token 저장) 수정. **PR #11 병합 완료**(`eb326b0`). 브랜치 보존.
   - `fix/persistence-exception-translation`, `test/auth-service-failure-cases`: 아키텍처 감사(9번 항목 참고)에서 발견된 fail 2건 수정. **PR #12(`7d15101`), PR #13(`33412b6`) 병합 완료 후 원격/로컬 브랜치 삭제 완료**.
+  - `docs/update-readme-progress`, `docs/organize-docs-directory`: README/PROGRESS.md 최신화 및 문서를 `docs/` 디렉토리로 정리. **PR #14, PR #15 병합 완료**(`d46a6e4`, `ed13256`) — 이 세션 밖에서 진행되어 상세 작업 기록은 남아있지 않음.
+  - `chore/add-swagger-docs`: `f62e33b` — springdoc-openapi(Swagger UI) 도입, `OpenApiConfig` 신규 + `SecurityConfig`에 `/swagger-ui/**`·`/v3/api-docs/**` permitAll 2줄만 추가(기존 인가 규칙 변경 없음), 보안 회귀 테스트(`SwaggerSecurityTest`) 3건 포함. **PR #16 병합 완료**(`637c1da`, 2026-09-18), 원격/로컬 브랜치 삭제 완료.
+  - `chore/docker-compose-local`: `a746762` — 로컬 인프라(MySQL, Redis) `docker-compose.yml` 신규(애플리케이션은 여전히 `./gradlew bootRun`). `application-local.yml`의 `DB_PASSWORD` 빈 문자열 기본값과 compose의 `MYSQL_ROOT_PASSWORD` 기본값이 어긋나 있던 걸 발견해 `MYSQL_ALLOW_EMPTY_PASSWORD` 조합으로 맞춤. **PR #17 병합 완료**(`b44fe47`, 2026-09-18), 원격/로컬 브랜치 삭제 완료.
+  - `feature/redis-refresh-token`: `1a1ffc3` — refresh token 저장소를 MySQL(`RefreshTokenJpaEntity`/`RefreshTokenJpaRepository`, 둘 다 삭제)에서 Redis(`StringRedisTemplate` + 기존 `TokenHasherPort`)로 이관. `RefreshTokenStorePort` 인터페이스는 변경 없음. Testcontainers Redis 기반 통합 테스트(`RefreshTokenStoreAdapterTest`, TTL 실측 포함) 5건 신규. **PR #18 병합 완료**(`7a1f937`, 2026-09-18), 원격/로컬 브랜치 삭제 완료. **이때부터 Redis가 로그인/refresh의 필수 인프라가 됨**.
   - 나머지 도메인 코드(취약 음소 분석 상세 로직, 인식 유스케이스가 AI 연동 어댑터를 실제로 호출하는 배선 등)는 아직 구현 전.
 
 ## 작업 이력
@@ -153,14 +158,46 @@
     - 커밋(`f18297a`) → **PR #13** → 병합(`33412b6`, 2026-09-17).
   - 두 브랜치 모두 병합 후 **원격/로컬 브랜치 삭제 완료**(`feature/diagnosis-session` 등과 달리 이어서 작업할 사람이 없는 일회성 수정이라 보존 요청 없었음).
 
+### 14. Swagger(springdoc-openapi) API 문서화 (chore/add-swagger-docs) — 완료
+
+- 사전 확인: `develop` clean & 동기화, `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인 후 진행.
+  - `build.gradle`에 `springdoc-openapi-starter-webmvc-ui:2.8.14` 추가 — `./gradlew dependencies`로 springdoc 3.x가 딸려오지 않음을 확인(Spring Boot 3.5.8과 호환되는 마지막 2.x 라인).
+  - `OpenApiConfig.java` 신규 생성 — JWT bearer 시큐리티 스킴 포함.
+  - `SecurityConfig.java`는 인가 규칙에 `/swagger-ui/**`, `/v3/api-docs/**` permitAll **두 줄만** 추가 — 덮어쓰기 전 diff를 사용자에게 먼저 보여주고 적용, `/api/v1/auth/**` permitAll과 `anyRequest().authenticated()`는 그대로 유지.
+  - 1차 빌드 시 Spotless 포맷 위반(신규 파일이 GJF 스타일 아님) → `spotlessApply`로 자동 정리 후 재통과.
+  - 보안 관련 변경이라 6장 컨벤션(정상+우회 차단 케이스 모두 테스트)에 맞춰 `SwaggerSecurityTest`(H2 기반 `@SpringBootTest`+`MockMvc`) 3건 신규: swagger-ui/api-docs 200, 기존 보호 엔드포인트(`/api/v1/users/me`)는 여전히 403(permitAll 누수 없음).
+  - 로컬에 MySQL이 없어 `bootRun` 직접 확인이 처음엔 불가했음 → 이후 Docker Desktop 기동 + 임시 MySQL 컨테이너로 실제 서버를 띄워 브라우저(Chrome, claude-in-chrome)로 Swagger UI가 정상 렌더링되는 것을 직접 확인(진단세션/인증/유저 컨트롤러 전부 노출, 보호 엔드포인트엔 자물쇠 아이콘 표시) 후 컨테이너/프로세스 정리.
+  - 커밋(`f62e33b`) → **PR #16** 생성. 보안 설정 변경 포함이라 자동 병합하지 않고 대기 → 사용자 승인 후 **병합 완료**(`637c1da`, 2026-09-18).
+
+### 15. 로컬 개발용 docker-compose 도입 (chore/docker-compose-local) — 완료
+
+- 배경: 로컬 기동 시마다 MySQL을 수동으로 띄워야 했음(14번 작업 중에도 임시 컨테이너로 우회). 16번 작업으로 Redis도 필요해져 인프라 컨테이너를 한 번에 관리할 방법이 필요했음.
+  - `docker-compose.yml` 신규 — MySQL 8.0 + Redis 7-alpine, healthcheck 포함(인프라만, 애플리케이션은 여전히 `./gradlew bootRun`).
+  - 지시받은 템플릿(`MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}`)을 그대로 쓰지 않고 `application-local.yml`을 직접 열어 확인 — `DB_PASSWORD` 미설정 시 앱 기본값이 **빈 문자열**이라 템플릿대로면 환경변수 없이 실행 시 인증이 어긋남을 발견. `MYSQL_ALLOW_EMPTY_PASSWORD: "yes"` + `MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-}` 조합으로 앱 기본값과 정확히 맞춤.
+  - `docs/CONTRIBUTING.md`에 실행법 한 줄 추가.
+  - 검증: `docker compose up -d` → 두 컨테이너 healthy, `DB_PASSWORD` 미설정 상태로 `bootRun` → MySQL 연결·스키마 생성·시드 삽입 로그 확인(기본값 불일치 없음을 실증), `docker compose down` → 정상 정리 확인.
+  - 커밋(`a746762`) → **PR #17** 생성, 자동 병합하지 않고 대기 → 사용자 승인 후 **병합 완료**(`b44fe47`, 2026-09-18).
+
+### 16. Refresh token 저장소 MySQL → Redis 이관 (feature/redis-refresh-token) — 완료
+
+- 배경: `RefreshTokenJpaEntity`/`RefreshTokenJpaRepository`/`RefreshTokenStoreAdapter`가 MySQL에 해시된 refresh token을 저장했는데 만료된 행을 정리하는 로직이 없어 계속 쌓이기만 했음. `RefreshTokenStorePort`(port.out)는 변경하지 않고 구현체만 Redis로 교체(헥사고날 원칙).
+  - 사전 조사: `TokenHasherPort`/`Sha256TokenHasherAdapter`(PR #11에서 BCrypt 대신 분리해둔 것) 확인, `RefreshTokenJpaEntity`/`RefreshTokenJpaRepository`가 `RefreshTokenStoreAdapter` 외에는 어디서도 쓰이지 않음을 grep으로 확인 후 삭제.
+  - `build.gradle`에 `spring-boot-starter-data-redis` + 테스트용 `testcontainers`/`testcontainers-junit-jupiter:1.20.4` 추가, `application.yml`에 `spring.data.redis.host/port`(`REDIS_HOST`/`REDIS_PORT`, 기본 `localhost:6379`) 추가.
+  - `RefreshTokenStoreAdapter`를 `StringRedisTemplate` + `Duration.ofSeconds(refreshTokenExpireSeconds)` TTL 기반으로 재작성(`PasswordEncoderPort`/BCrypt로 되돌리지 않도록 주의 — PR #11에서 고친 버그).
+  - 테스트 전략: Mockito 대신 **Testcontainers Redis**를 선택 — 이번 변경의 핵심(TTL이 실제로 설정되는지)은 mock으로 검증 불가능하고, 프로젝트 컨벤션(6장: 영속성 어댑터는 실제 인프라로 통합 테스트)과도 일치. `RefreshTokenStoreAdapterTest` 5건(저장 후 검증 성공/다른 토큰 실패/미저장 사용자 실패/revoke 후 실패/TTL 설정값 일치) 신규.
+  - 검증: `./gradlew build` BUILD SUCCESSFUL(테스트 14클래스 전부 통과). 15번 작업의 docker-compose로 Redis 기동 후 실제 서버 구동, HTTP로 signup→login→refresh 전 구간 호출 — `redis-cli KEYS/TTL/GET`으로 키 생성·TTL(1209596초 ≈ 설정값 1209600초)·SHA-256 해시(원문 아님) 저장을 직접 확인, refresh 후 기존 토큰 재사용 시도가 `REFRESH_TOKEN_INVALID`로 차단됨(토큰 회전)도 확인.
+  - PR 본문에 삭제 파일 목록과 "Redis 미기동 시 로그인 자체가 실패하는 새 운영 의존성" 명시.
+  - 커밋(`1a1ffc3`) → **PR #18** 생성, 자동 병합하지 않고 대기 → 사용자 승인 후 **병합 완료**(`7a1f937`, 2026-09-18).
+
 ## 알려진 이슈 / 확인 필요 사항
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.
 
-- `dysarthria-backend-scaffold.zip`이 저장소 루트에 남아있음(git 미포함) — 필요 없으면 수동 삭제 가능.
 - 아키텍처 감사(12번)에서 발견된 남은 참고 사항: `SecurityConfig`의 CORS가 `allowedOriginPatterns("*")` + `allowCredentials(true)` 조합 — 감사 체크리스트 항목엔 없어 수정하지 않았음, 운영 배포 전 재검토 필요.
 - 인식 유스케이스(녹음 업로드 → 실제 인식 → 결과 조회)가 아직 없어서 `JPyRustAiInferenceClient`(PR #9)는 인프라 배선만 완료된 상태 — API 레벨에서는 아직 아무 효과가 없음.
-- 테스트 커버리지 19% → 42.1%(PR #13 기준)로 개선됐지만 여전히 40% 미만 구간이 있음(`adapter.in.web`/`adapter.in.web.dto`/`adapter.out.persistence` 0%) — `jacocoTestCoverageVerification`은 여전히 `build`/`check`에 묶여 있지 않음(warn-only 유지 중).
+- 테스트 커버리지 19% → 42.1%(PR #13) → **48.6%**(PR #18 기준, `jacocoTestReport` 실측: 266/547 라인)로 계속 개선 중이지만 `adapter.in.web`/`adapter.in.web.dto`/`adapter.out.persistence`는 여전히 0% — `jacocoTestCoverageVerification`은 여전히 `build`/`check`에 묶여 있지 않음(warn-only 유지 중).
+- `docker-compose.yml`(PR #17)은 **로컬 개발 전용**이다 — MySQL `MYSQL_ALLOW_EMPTY_PASSWORD` 등 프로덕션에 쓰면 안 되는 설정이 포함되어 있음. 운영 배포용 compose/매니페스트는 별도로 준비해야 한다(스코프 밖).
+- PR #18부터 Redis가 로그인/refresh의 필수 인프라가 됨 — 운영 배포 시 Redis 프로비저닝을 반드시 함께 계획해야 한다(현재 운영 Redis 이중화/영속성 정책은 미정).
 
 ## 다음 단계 후보
 
@@ -168,4 +205,5 @@
 - 백엔드 B(태원으로 추정, 팀 R&R 미확정이라 단정은 보류)가 `feature/personalization-recognition` 브랜치(보존 중)에서 나머지 유스케이스(녹음 업로드/학습 트리거/학습 상태 조회/실사용 인식/인식 이력) 이어서 구현 — `JPyRustAiInferenceClient`(`feature/ai-inference-jpyrust` 브랜치, 보존 중)를 실제로 호출하는 배선이 핵심.
 - 컨트롤러/DTO/영속성 어댑터 계층 통합 테스트 보강(현재 0%) — 도메인/application 계층은 이미 양호한 수준.
 - `SecurityConfig` CORS 설정(`allowedOriginPatterns("*")` + `allowCredentials(true)`) 운영 배포 전 재검토.
+- 운영 배포용 인프라 정의(docker-compose는 로컬 전용) — 특히 Redis(PR #18부터 필수 의존성) 프로비저닝 계획 수립.
 - 스캐폴딩 + 주요 feature 안정화 후 `develop` → `main` 승격 PR.
