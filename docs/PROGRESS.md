@@ -4,6 +4,17 @@
 
 마지막 업데이트: 2026-09-18
 
+## 최신 작업 — 개인화 학습 작업 상태 조회 (2026-09-18)
+
+- `feature/personalization-training-status`에서 `GET /api/v1/personalization/train/{jobId}` 구현. 최신 `develop`을 기준으로 Draft PR을 준비한다.
+- `GetPersonalizationTrainingStatusService`가 기존 저장소 포트로 작업을 조회하고 본인 소유를 확인한 뒤 결과를 반환한다. Controller는 전용 `PersonalizationTrainingStatusResponse`와 공통 `ApiResponse`로 응답한다.
+- 없는 작업은 404 `RESOURCE_NOT_FOUND`, 타인 작업은 403 `FORBIDDEN_ACCESS`. 잘못된 UUID 등 요청 인자 타입 변환 실패를 400 `VALIDATION_FAILED`로 처리하도록 공통 예외 처리기를 확장했다.
+- 인터페이스 이름에 붙어 있던 `rms`를 제거해 파일명과 일치시켰다. 공통 예외 처리기에 있던 기존 주석 수정은 보존했다.
+- H2 DB와 MockMvc를 연결한 통합 테스트 8개 추가: 네 상태(PENDING/IN_PROGRESS/COMPLETED/FAILED), 없는 작업, 타인 작업, 잘못된 UUID, 미인증 요청. 테스트 데이터 저장 후 flush/clear로 실제 DB 조회를 검증하고 트랜잭션 롤백으로 격리한다.
+- `./gradlew spotlessApply test` 성공: 전체 테스트 22개 통과. `./gradlew build`도 Spotless 검사 포함 성공.
+- 조회는 기본 키로 작업 한 건을 읽으며 AI나 S3를 호출하지 않는다. 실제 학습에 따른 상태 갱신과 진행률 전달은 후속 작업이다.
+- `docs/NEXT-STEPS-personalization-recognition.md`에 완료 범위 반영. 팀 Notion 명세는 이번 작업에서 갱신하지 않았다.
+
 ## 지금 상태 요약
 
 - `main`: `2b21d4a` — `.gitignore`, `CONTRIBUTING.md`만 반영된 상태. 실제 코드 없음.
