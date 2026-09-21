@@ -3,16 +3,16 @@ package com.voicebridge.domain.diagnosis;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * 진단 세션 내 녹음 하나. 상태 전이(UPLOADED → PROCESSING → DONE)를 이 클래스가 직접 소유한다(Rich Domain Model) — Service는
- * 이 메서드들을 호출만 한다.
- */
 public class Recording {
 
   private final UUID id;
   private final UUID sessionId;
   private final UUID sentenceId;
+
+  // DiagnosisSession에도 있는 값이지만, 결과 조회 시 세션까지 조회하지 않고 소유권을 검증하려고
+  // 의도적으로 중복 보관한다(비정규화). 대신 create() 호출 전에 세션 소유권을 반드시 먼저 검증해야 한다.
   private final UUID userId;
+
   private final String s3Path;
   private RecordingStatus status;
   private String recognizedText;
@@ -40,7 +40,6 @@ public class Recording {
     this.createdAt = createdAt;
   }
 
-  /** 오디오 파일이 S3에 업로드된 직후 호출한다. s3Path는 StoragePort가 반환한 저장 경로다. */
   public static Recording create(UUID sessionId, UUID sentenceId, UUID userId, String s3Path) {
     if (sessionId == null || sentenceId == null || userId == null) {
       throw new IllegalArgumentException("녹음은 세션, 문장, 사용자에 반드시 속해야 합니다.");
@@ -60,7 +59,6 @@ public class Recording {
         LocalDateTime.now());
   }
 
-  /** 영속성 어댑터가 DB에서 읽어온 값을 그대로 도메인 객체로 복원할 때만 사용한다. */
   public static Recording reconstitute(
       UUID id,
       UUID sessionId,
@@ -75,7 +73,6 @@ public class Recording {
         id, sessionId, sentenceId, userId, s3Path, status, recognizedText, confidence, createdAt);
   }
 
-  /** AI 인식을 비동기로 트리거하기 직전에 호출한다. */
   public void markProcessing() {
     if (status != RecordingStatus.UPLOADED) {
       throw new IllegalStateException("업로드 직후 상태에서만 인식을 시작할 수 있습니다.");
@@ -83,13 +80,16 @@ public class Recording {
     this.status = RecordingStatus.PROCESSING;
   }
 
-  /** AI 인식 결과를 받았을 때 호출한다. */
   public void markProcessed(String recognizedText, double confidence) {
     if (status != RecordingStatus.PROCESSING) {
       throw new IllegalStateException("인식이 진행중인 녹음만 결과를 반영할 수 있습니다.");
     }
-    if (recognizedText == null || recognizedText.isBlank()) {
-      throw new IllegalArgumentException("인식 결과 텍스트가 비어 있을 수 없습니다.");
+    // 빈 문자열은 무음·비언어 오디오의 정상 응답이므로 막지 않는다
+    if (recognizedText == null) {
+      throw new IllegalArgumentException("인식 결과 텍스트는 null일 수 없습니다.");
+    }
+    if (confidence < 0.0 || confidence > 1.0) {
+      throw new IllegalArgumentException("인식 신뢰도는 0과 1 사이여야 합니다.");
     }
     this.recognizedText = recognizedText;
     this.confidence = confidence;
@@ -100,7 +100,6 @@ public class Recording {
     return this.userId.equals(userId);
   }
 
-  /** 세션의 모든 녹음이 끝났는지(취약 음소 분석의 전제 조건) 확인할 때 사용한다. */
   public boolean isDone() {
     return status == RecordingStatus.DONE;
   }

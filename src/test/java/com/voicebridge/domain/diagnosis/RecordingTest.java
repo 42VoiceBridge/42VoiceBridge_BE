@@ -68,11 +68,34 @@ class RecordingTest {
   }
 
   @Test
-  void 인식_결과_텍스트가_비어있으면_반영할_수_없다() {
+  void 무음이면_빈_텍스트로_인식_완료된다() {
     Recording recording = newRecording();
     recording.markProcessing();
 
-    assertThatThrownBy(() -> recording.markProcessed("  ", 0.87))
+    recording.markProcessed("", 0.0);
+
+    assertThat(recording.getStatus()).isEqualTo(RecordingStatus.DONE);
+    assertThat(recording.getRecognizedText()).isEmpty();
+    assertThat(recording.isDone()).isTrue();
+  }
+
+  @Test
+  void 인식_결과가_null이면_반영할_수_없다() {
+    Recording recording = newRecording();
+    recording.markProcessing();
+
+    assertThatThrownBy(() -> recording.markProcessed(null, 0.0))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void 신뢰도가_0과_1_사이를_벗어나면_반영할_수_없다() {
+    Recording recording = newRecording();
+    recording.markProcessing();
+
+    assertThatThrownBy(() -> recording.markProcessed("오늘 날씨가 좋습니다.", 1.5))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> recording.markProcessed("오늘 날씨가 좋습니다.", -0.1))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
