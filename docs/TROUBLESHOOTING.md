@@ -24,6 +24,18 @@
 - **원인**: 이 프로젝트는 Google Java Format(GJF) 기준으로 Spotless가 `check`에 자동으로 엮여 있어, 포맷이 안 맞으면 로직에 문제가 없어도 빌드가 실패한다.
 - **해결**: `./gradlew spotlessApply`로 자동 재포맷 후 다시 빌드. 커밋 시 자동으로 돌리고 싶으면 `pre-commit install`([`CONTRIBUTING.md`](./CONTRIBUTING.md) 참고).
 
+### JDK 17이 아닌 환경에서 `spotlessJava`가 javac 내부 API 에러로 실패한다
+
+- **증상**: `./gradlew build`가 `:spotlessJava`에서 실패하는데, 에러 메시지에 포맷 위반 diff 대신 `'java.util.Queue com.sun.tools.javac.util.Log$DeferredDiagnosticHandler.getDiagnostics()'` 같은 **메서드 시그니처 한 줄만** 출력된다. `./gradlew compileJava`는 정상 통과한다.
+- **원인**: `build.gradle`의 `toolchain { 17 }`은 **컴파일에만** 적용되고, Spotless는 Gradle 데몬이 돌고 있는 JVM에서 실행된다. google-java-format이 코드를 파싱할 때 javac 내부 API(`com.sun.tools.javac.*`)를 쓰는데, 이건 공개 API가 아니라 JDK 버전이 오르면 예고 없이 시그니처가 바뀐다. 맥에 JDK가 여러 개 설치돼 있고 기본값이 17이 아닐 때 발생(JDK 24, 26에서 재현).
+- **해결**: Gradle을 JDK 17로 실행한다. 일회성이면 `JAVA_HOME=/path/to/jdk17 ./gradlew build`, 고정하려면 `gradle.properties`에 `org.gradle.java.home`을 지정한다(경로가 머신마다 다르므로 `.gitignore`에 함께 추가할 것). 현재 어떤 JVM으로 도는지는 `./gradlew -version`의 `Daemon JVM` 줄에서 확인한다.
+
+### IntelliJ에서 새로 만든 파일이 프로젝트 트리에 보이지 않는다
+
+- **증상**: 터미널 `ls`로는 파일이 분명히 있는데 IntelliJ 프로젝트 트리에는 안 뜬다. `File → Reload All from Disk`, IDE 재시작, 캐시 삭제 모두 효과가 없다.
+- **원인**: Gradle 동기화가 깨져서 `src/main/java`가 **소스 루트로 등록되지 않은** 상태. `.idea/modules/`에 `.main` 모듈만 있고 `.test` 모듈이 없거나, `.iml`의 `sourceFolder`에 `build/generated/...`만 잡혀 있으면 이 경우다. 원인은 대개 `.idea/gradle.xml`의 `gradleJvm`이 프로젝트 toolchain(17)과 다른 버전으로 잡혀 있는 것 — 위 항목과 뿌리가 같다.
+- **해결**: `Settings → Build, Execution, Deployment → Build Tools → Gradle → Gradle JVM`을 17로 변경한 뒤 Gradle 패널에서 재동기화(⟳). 브랜치를 자주 갈아타 파일이 대량으로 생겼다 사라진 뒤에 특히 잘 발생한다.
+
 ## 인증 / 토큰
 
 ### 로그인 호출 시 500 (`IllegalArgumentException: password cannot be more than 72 bytes`)
@@ -72,6 +84,13 @@
 - **증상**: MySQL은 정상인데 로그인이나 refresh 호출이 실패하며 로그에 Redis 연결 관련 예외가 찍힌다.
 - **원인**: PR #18부터 refresh token 저장소가 MySQL에서 Redis로 이관되어, **Redis가 로그인 흐름의 필수 의존성**이 됐다. `docker-compose up -d`를 안 했거나 Redis 컨테이너만 내려간 상태에서 앱을 띄우면 발생한다.
 - **해결**: `docker-compose up -d`로 Redis까지 함께 떠 있는지 확인한다(`docker ps`에 `redis` 컨테이너가 `healthy`인지 확인). Testcontainers를 쓰는 `./gradlew test`는 Docker 데몬만 켜져 있으면 별도로 Redis를 안 띄워도 된다.
+- **관련**: PR #18
+
+### `./gradlew test`가 `Could not find a valid Docker environment`로 실패한다
+
+- **증상**: `RefreshTokenStoreAdapterTest`가 `IllegalStateException: Could not find a valid Docker environment`로 실패한다. 내 코드와 무관한 테스트가 깨지는 것처럼 보인다.
+- **원인**: 이 테스트는 Testcontainers로 **실제 Redis 컨테이너를 잠깐 띄웠다 지우는** 방식이라 Docker 데몬이 켜져 있어야 한다(PR #18). Mock이 아니라 진짜 Redis를 써야 TTL 설정 같은 걸 검증할 수 있기 때문.
+- **해결**: Docker Desktop을 실행한 뒤 다시 테스트한다. 컨테이너를 미리 띄울 필요는 없고 **데몬만 켜져 있으면** 된다. Docker를 쓸 수 없는 상황이면 `./gradlew test --tests "com.voicebridge.domain.*"`처럼 작업 범위만 골라 돌린다.
 - **관련**: PR #18
 
 ## Git / GitHub 운영
