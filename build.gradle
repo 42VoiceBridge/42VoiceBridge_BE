@@ -54,8 +54,16 @@ dependencies {
     testImplementation 'org.testcontainers:testcontainers:1.20.4'
 }
 
+// 지정하지 않으면 빌드하는 컴퓨터의 기본 문자셋을 따른다. 맥/리눅스는 대개 UTF-8이지만
+// 한국어 윈도우는 MS949라, 소스의 한글(ErrorCode 메시지, 도메인 예외 문구, 테스트 메서드명)이
+// 깨진 채로 컴파일되거나 식별자가 성립하지 않아 빌드가 실패한다.
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty 'file.encoding', 'UTF-8'
 }
 
 spotless {
