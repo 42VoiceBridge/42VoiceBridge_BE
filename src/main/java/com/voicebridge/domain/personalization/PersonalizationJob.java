@@ -1,5 +1,7 @@
 package com.voicebridge.domain.personalization;
 
+import com.voicebridge.common.exception.CustomException;
+import com.voicebridge.common.exception.ErrorCode;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -8,6 +10,9 @@ import java.util.UUID;
  * Model). "내 개인화 모델 상태"는 별도 엔티티 없이 "이 유저의 최신 COMPLETED job"으로부터 파생한다(YAGNI).
  */
 public class PersonalizationJob {
+
+  // 팀 확정 전 임시 정책. 최소 녹음 개수는 도메인에서만 관리한다.
+  public static final int MIN_TRAINING_RECORDING_COUNT = 5;
 
   private final UUID id;
   private final UUID userId;
@@ -41,6 +46,12 @@ public class PersonalizationJob {
   }
 
   public static PersonalizationJob create(UUID userId, int trainingRecordingCount) {
+    if (userId == null) {
+      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+    }
+    if (trainingRecordingCount < MIN_TRAINING_RECORDING_COUNT) {
+      throw new CustomException(ErrorCode.INSUFFICIENT_RECORDINGS);
+    }
     return new PersonalizationJob(
         UUID.randomUUID(),
         userId,
@@ -78,14 +89,20 @@ public class PersonalizationJob {
 
   public void markInProgress() {
     if (status != PersonalizationJobStatus.PENDING) {
-      throw new IllegalStateException("대기중인 job만 시작할 수 있습니다.");
+      throw new CustomException(ErrorCode.INVALID_STATE_TRANSITION);
     }
     this.status = PersonalizationJobStatus.IN_PROGRESS;
   }
 
   public void complete(String modelVersion, String modelArtifactPath) {
     if (status != PersonalizationJobStatus.IN_PROGRESS) {
-      throw new IllegalStateException("진행중인 job만 완료 처리할 수 있습니다.");
+      throw new CustomException(ErrorCode.INVALID_STATE_TRANSITION);
+    }
+    if (modelVersion == null
+        || modelVersion.isBlank()
+        || modelArtifactPath == null
+        || modelArtifactPath.isBlank()) {
+      throw new CustomException(ErrorCode.VALIDATION_FAILED);
     }
     this.status = PersonalizationJobStatus.COMPLETED;
     this.modelVersion = modelVersion;
@@ -94,6 +111,13 @@ public class PersonalizationJob {
   }
 
   public void fail(String reason) {
+    if (status != PersonalizationJobStatus.PENDING
+        && status != PersonalizationJobStatus.IN_PROGRESS) {
+      throw new CustomException(ErrorCode.INVALID_STATE_TRANSITION);
+    }
+    if (reason == null || reason.isBlank()) {
+      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+    }
     this.status = PersonalizationJobStatus.FAILED;
     this.failureReason = reason;
     this.completedAt = LocalDateTime.now();
