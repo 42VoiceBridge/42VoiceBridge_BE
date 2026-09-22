@@ -86,6 +86,8 @@ graph TB
 ### 진단 세션 — 세션 시작만 구현
 - `POST /api/v1/diagnosis-sessions`: 낭독 문장을 뽑아 진단 세션을 시작
 - 세션 조회 / 녹음 업로드 / 결과 조회 / 취약 음소 분석은 포트(유스케이스 인터페이스)만 정의된 상태 — [`docs/NEXT-STEPS-diagnosis-session.md`](./docs/NEXT-STEPS-diagnosis-session.md) 참고
+- `Recording` 도메인(상태 전이 `UPLOADED → PROCESSING → DONE`)과 `RecordingRepositoryPort`는 정의 완료 — 위 4개 유스케이스가 공통으로 쓰는 기반. 무음·비언어 오디오에 대한 빈 인식 결과(`""`)도 정상 완료로 처리한다(구음장애 발화 특성상 인식 실패가 흔하고, 그 패턴 자체가 취약 음소 분석 데이터이기 때문)
+- 녹음 업로드는 S3 업로드용 `StoragePort`와 `adapter/out/storage` 구현체가 아직 없어 착수 전
 
 ### 개인화 — 모델 상태 조회만 구현
 - `GET /api/v1/personalization/model`: 사용자 개인화 모델 상태 조회

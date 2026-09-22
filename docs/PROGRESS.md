@@ -2,7 +2,7 @@
 
 > 매 작업이 끝날 때마다 이 문서를 갱신한다. 새 대화를 시작할 때 이 문서부터 읽으면 이전 지시사항이 어떻게 끝났는지 복사-붙여넣기 없이 파악할 수 있다.
 
-마지막 업데이트: 2026-09-18
+마지막 업데이트: 2026-09-21
 
 ## 최신 작업 — 개인화 학습 작업 상태 조회 (2026-09-18)
 
@@ -18,7 +18,7 @@
 ## 지금 상태 요약
 
 - `main`: `2b21d4a` — `.gitignore`, `CONTRIBUTING.md`만 반영된 상태. 실제 코드 없음.
-  - `develop`: `7a1f937` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + Spotless/Jacoco 코드 품질 툴링(PR #6) + 진단세션 계약(PR #7) + 개인화/인식 계약(PR #8) + **JPyRust 기반 AI 연동(PR #9)** + **sentences 시드 데이터(PR #10)** + **로그인/refresh token 버그 수정(PR #11)** + **아키텍처 감사 fail 2건 수정 — 영속성 예외 번역(PR #12), 인증 서비스 실패 케이스 테스트(PR #13)** + **문서 디렉토리 정리(PR #15)** + **Swagger(springdoc-openapi) API 문서화(PR #16)** + **로컬 개발용 docker-compose(PR #17)** + **refresh token 저장소 MySQL → Redis 이관(PR #18)**까지 반영된 상태. `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인됨.
+  - `develop`: `7a1f937` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + Spotless/Jacoco 코드 품질 툴링(PR #6) + 진단세션 계약(PR #7) + 개인화/인식 계약(PR #8) + **JPyRust 기반 AI 연동(PR #9)** + **sentences 시드 데이터(PR #10)** + **로그인/refresh token 버그 수정(PR #11)** + **아키텍처 감사 fail 2건 수정 — 영속성 예외 번역(PR #12), 인증 서비스 실패 케이스 테스트(PR #13)** + **문서 디렉토리 정리(PR #15)** + **Swagger(springdoc-openapi) API 문서화(PR #16)** + **로컬 개발용 docker-compose(PR #17)** + **refresh token 저장소 MySQL → Redis 이관(PR #18)** + **문서 전체 최신화(PR #19)** + **개인화 학습 상태 조회(PR #20)** + **`Recording` 도메인(PR #21)**까지 반영된 상태(현재 `2824ad6`). `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인됨.
   - PR #18부터 **Redis가 로그인/refresh의 필수 인프라**가 됨 — 로컬은 `docker-compose up -d`로 MySQL과 함께 기동.
   - `chore/rename-package-voicebridge`, `feature/init-project`: 각각 PR #3, PR #2 병합 완료 후 원격/로컬 브랜치 삭제 완료.
   - `fix/test-datasource-h2`: PR #4 병합 완료(`9ff44b4`), 원격/로컬 브랜치 삭제 완료.
@@ -34,6 +34,7 @@
   - `chore/add-swagger-docs`: `f62e33b` — springdoc-openapi(Swagger UI) 도입, `OpenApiConfig` 신규 + `SecurityConfig`에 `/swagger-ui/**`·`/v3/api-docs/**` permitAll 2줄만 추가(기존 인가 규칙 변경 없음), 보안 회귀 테스트(`SwaggerSecurityTest`) 3건 포함. **PR #16 병합 완료**(`637c1da`, 2026-09-18), 원격/로컬 브랜치 삭제 완료.
   - `chore/docker-compose-local`: `a746762` — 로컬 인프라(MySQL, Redis) `docker-compose.yml` 신규(애플리케이션은 여전히 `./gradlew bootRun`). `application-local.yml`의 `DB_PASSWORD` 빈 문자열 기본값과 compose의 `MYSQL_ROOT_PASSWORD` 기본값이 어긋나 있던 걸 발견해 `MYSQL_ALLOW_EMPTY_PASSWORD` 조합으로 맞춤. **PR #17 병합 완료**(`b44fe47`, 2026-09-18), 원격/로컬 브랜치 삭제 완료.
   - `feature/redis-refresh-token`: `1a1ffc3` — refresh token 저장소를 MySQL(`RefreshTokenJpaEntity`/`RefreshTokenJpaRepository`, 둘 다 삭제)에서 Redis(`StringRedisTemplate` + 기존 `TokenHasherPort`)로 이관. `RefreshTokenStorePort` 인터페이스는 변경 없음. Testcontainers Redis 기반 통합 테스트(`RefreshTokenStoreAdapterTest`, TTL 실측 포함) 5건 신규. **PR #18 병합 완료**(`7a1f937`, 2026-09-18), 원격/로컬 브랜치 삭제 완료. **이때부터 Redis가 로그인/refresh의 필수 인프라가 됨**.
+  - `feature/recording-domain`: `24e2a98` — `Recording` 도메인 + `RecordingStatus` + `RecordingRepositoryPort` 신규, 단위 테스트 10건. **develop 최신(`01a99a2`)에서 새로 딴 브랜치** — 당초 지시는 `feature/diagnosis-session`에서 이어가는 것이었으나 그 브랜치가 `8df48bd`에 멈춰 있어 PR #9~#19가 빠진 상태였음(17번 항목 참고). **PR #21 병합 완료**(`2824ad6`, 2026-09-21). 브랜치 보존.
   - 나머지 도메인 코드(취약 음소 분석 상세 로직, 인식 유스케이스가 AI 연동 어댑터를 실제로 호출하는 배선 등)는 아직 구현 전.
 
 ## 작업 이력
@@ -200,6 +201,20 @@
   - PR 본문에 삭제 파일 목록과 "Redis 미기동 시 로그인 자체가 실패하는 새 운영 의존성" 명시.
   - 커밋(`1a1ffc3`) → **PR #18** 생성, 자동 병합하지 않고 대기 → 사용자 승인 후 **병합 완료**(`7a1f937`, 2026-09-18).
 
+### 17. Recording 도메인 설계 (feature/recording-domain) — 완료
+
+- 배경: 진단 세션 5개 엔드포인트 중 세션 시작(PR #7)만 구현된 상태인데, 나머지 4개가 전부 의존하는 `Recording` 도메인이 어디에도 없었음. 팀장이 넘긴 작업 지시(필드 구성, 팩토리 메서드, 상태 전이 메서드)를 기준으로 신규 설계.
+  - **브랜치 기준 변경**: 지시문에는 `feature/diagnosis-session`에서 이어가라고 되어 있었으나, 그 브랜치는 `8df48bd`에 멈춰 있고 그 사이 develop에 PR #9~#19(JPyRust 연동, 시드 데이터, Swagger, docker-compose, Redis 이관, 문서 정리)가 들어와 있었음. 지시문 자체도 "`AiInferenceClient`는 구현체 없음"(실제로는 PR #9로 존재), "`sentences` 시드해뒀음"(PR #10, 해당 브랜치엔 없음)처럼 서로 다른 시점의 정보가 섞여 있어 사용자 확인 후 **develop 최신(`01a99a2`)에서 새 브랜치**를 따는 방식으로 진행.
+  - `domain/diagnosis/Recording.java` 신규: `private` 생성자 + `create()`/`reconstitute()` 정적 팩토리, 상태 전이 `markProcessing()`/`markProcessed()`, 질의 `isOwnedBy()`/`isDone()`. setter 없음(Rich Domain Model). 변하지 않는 필드에 `final`을 붙여 변경 가능 여부를 컴파일러가 강제하게 함.
+  - `domain/diagnosis/RecordingStatus.java` 신규: `UPLOADED`/`PROCESSING`/`DONE`. `PROCESSING`은 AI 인식을 비동기로 트리거하는 설계를 전제로 둔 중간 상태.
+  - `port/out/RecordingRepositoryPort.java` 신규: `save`/`findById`/`findBySessionId` 3개만 정의 — 남은 4개 엔드포인트가 실제로 쓰는 것만(YAGNI).
+  - `RecordingTest` 10건: 초기 상태 / 생성 검증 2건 / 정상 전이 / 가드 위반 2건 / 빈 결과 허용 / null 차단 / confidence 범위 / 소유권. Mockito 없이 순수 단위 테스트(`DiagnosisSessionTest` 패턴).
+  - **리뷰에서 발견된 버그 수정**: `markProcessed()`가 `recognizedText.isBlank()`를 예외로 막고 있었는데, JPyRust는 무음·비언어 오디오에 `{"recognized_text": "", "confidence": 0.0}`를 **정상 응답**으로 돌려준다(리뷰어가 PoC 때 실측). 이대로면 해당 녹음이 `PROCESSING`에 갇히고, 취약 음소 분석은 세션의 모든 녹음이 `DONE`이어야 하므로 **세션 전체가 영구 완료 불가** 상태가 됨. 구음장애 발화 특성상 인식 실패가 흔하고 그 패턴 자체가 취약 음소 분석 데이터라 더더욱 막으면 안 되는 지점. `null`만 차단하도록 수정하고, 빈 문자열을 왜 허용하는지 주석으로 남김(선의로 되돌려지는 것을 막기 위해).
+  - 리뷰 반영 2건: `confidence` 0~1 범위 검증 추가, `userId` 중복 보관 사유 주석(`DiagnosisSession`에도 있는 값이지만 결과 조회 시 세션 조회를 피하기 위한 **의도된 비정규화** — 대신 `create()` 호출 전에 세션 소유권 검증이 선행돼야 한다는 조건도 함께 명시).
+  - 검증: `./gradlew test --tests "com.voicebridge.domain.diagnosis.*"` BUILD SUCCESSFUL(10건 전부 통과). 이 머신의 기본 JDK가 26이라 `spotlessJava`가 깨져 `JAVA_HOME`으로 JDK 17을 지정해 실행함 — 원인과 대응은 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) 참고.
+  - 커밋 4개(`67ec151` feat → `137c6e9` refactor → `d5cea11` test → `24e2a98` fix) → **PR #21** 생성 → 리뷰어 승인 → 리뷰 코멘트 2건 답글 처리 → **병합 완료**(`2824ad6`, 2026-09-21). 브랜치 보존.
+  - 참고: 리뷰어는 지적 2건을 남긴 뒤 **수정을 기다리지 않고 먼저 승인**했다(비차단 제안). 승인 시점이 수정 커밋보다 1시간 앞서므로, 리뷰어는 최종 코드를 보지 않은 상태에서 승인한 것 — 답글로 처리 내역을 남겨두었다.
+
 ## 알려진 이슈 / 확인 필요 사항
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.
@@ -212,7 +227,10 @@
 
 ## 다음 단계 후보
 
-- 백엔드 A가 `feature/diagnosis-session` 브랜치(삭제 안 하고 보존 중)에서 나머지 4개 유스케이스(세션 조회/녹음 업로드/결과 조회/취약 음소 분석) 이어서 구현.
+- 백엔드 A가 진단 세션 나머지 4개 유스케이스(세션 조회/녹음 업로드/결과 조회/취약 음소 분석)를 **엔드포인트별 브랜치로 나눠** 이어서 구현. PR #21(`Recording` 도메인) 병합 후 develop에서 분기하며, 다음은 **녹음 업로드**(`UploadDiagnosisRecordingUseCase`) 차례.
+  - 업로드 구현 전 선행 필요: `build.gradle`에 AWS SDK(`software.amazon.awssdk:s3`) 추가, `port/out/StoragePort` 정의(`String upload(byte[] fileBytes, String fileName)`), `adapter/out/storage` 구현체 — 현재 이 패키지는 `package-info.java`만 있는 빈 상태.
+  - 미결정 사항 2건: (1) AI 인식 비동기 트리거 방식(동기 / `@Async` / 스프링 이벤트 + `@TransactionalEventListener`) — 팀장이 판단을 위임했고 코드리뷰에서 함께 논의 예정. 비동기 선택 시 서버 재시작으로 `PROCESSING`에 갇힌 녹음을 되살릴 복구 수단을 함께 설계할지 결정 필요. (2) 로컬 개발에서 S3를 어떻게 대체할지(실제 버킷 / LocalStack / 파일시스템 어댑터를 프로파일로 분리) — 인프라 담당 확인 필요.
+- `feature/diagnosis-session` 브랜치(보존 중)는 `8df48bd`에서 멈춰 있고 develop과 크게 벌어져 있음 — 더 쓰지 않을 거면 정리 여부를 팀에서 결정할 것.
 - 백엔드 B(태원으로 추정, 팀 R&R 미확정이라 단정은 보류)가 `feature/personalization-recognition` 브랜치(보존 중)에서 나머지 유스케이스(녹음 업로드/학습 트리거/학습 상태 조회/실사용 인식/인식 이력) 이어서 구현 — `JPyRustAiInferenceClient`(`feature/ai-inference-jpyrust` 브랜치, 보존 중)를 실제로 호출하는 배선이 핵심.
 - 컨트롤러/DTO/영속성 어댑터 계층 통합 테스트 보강(현재 0%) — 도메인/application 계층은 이미 양호한 수준.
 - `SecurityConfig` CORS 설정(`allowedOriginPatterns("*")` + `allowCredentials(true)`) 운영 배포 전 재검토.
