@@ -9,6 +9,11 @@ spring:
       # 로컬 개발 편의용. 스키마가 안정되면 validate + 마이그레이션 도구(Flyway 등) 도입 검토
       ddl-auto: update
 
+voicebridge:
+  storage:
+    # 로컬 전용. LocalFileStorageAdapter가 여기에 음성 파일을 저장한다.
+    local-dir: ./uploads
+
 logging:
   level:
     org.hibernate.SQL: debug

@@ -12,6 +12,11 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+  servlet:
+    multipart:
+      # 기본값 1MB는 녹음 파일에 부족하다. 동시에 과도한 업로드를 막는 상한 역할도 한다.
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 server:
   port: 8080
@@ -28,3 +33,6 @@ voicebridge:
       instance-id: voicebridge
       # PoC에서 검증한 값. 인식 정확도 검증(AI팀)이 끝나면 base/small 등으로 교체될 수 있다.
       whisper-model-path: tiny
+  s3:
+    bucket: ${S3_BUCKET:voicebridge-recordings}
+    region: ${AWS_REGION:ap-northeast-2}

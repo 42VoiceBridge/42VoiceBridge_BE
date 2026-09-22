@@ -100,6 +100,34 @@ class RecordingTest {
   }
 
   @Test
+  void 인식이_진행중인_녹음은_실패_처리할_수_있다() {
+    Recording recording = newRecording();
+    recording.markProcessing();
+
+    recording.markFailed();
+
+    assertThat(recording.getStatus()).isEqualTo(RecordingStatus.FAILED);
+    assertThat(recording.isDone()).isFalse();
+  }
+
+  @Test
+  void 인식을_시작하지_않은_녹음은_실패_처리할_수_없다() {
+    Recording recording = newRecording();
+
+    assertThatThrownBy(recording::markFailed).isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void 실패한_녹음에는_결과를_반영할_수_없다() {
+    Recording recording = newRecording();
+    recording.markProcessing();
+    recording.markFailed();
+
+    assertThatThrownBy(() -> recording.markProcessed("오늘 날씨가 좋습니다.", 0.87))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
   void 소유자를_확인할_수_있다() {
     UUID userId = UUID.randomUUID();
     Recording recording =
