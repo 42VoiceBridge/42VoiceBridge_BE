@@ -204,6 +204,9 @@
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.
 
+- **`AsyncConfig`에 커스텀 Executor가 없다.** `@EnableAsync`만 선언해 둔 상태라 기본 실행기를 쓰며, 스레드 풀 크기·큐 용량·거부 정책을 제어하지 못한다. 업로드가 몰리면 스레드가 무제한으로 늘어날 수 있다. 시연 규모에서는 문제가 되지 않아 의도적으로 미루지만, 운영 전에는 `ThreadPoolTaskExecutor`를 명시하고 AI 추론 동시 실행 수를 제한해야 한다(AI 서버가 v1에서 추론을 직렬화하므로 백엔드가 과도하게 밀어 넣을 이유가 없다).
+- **비동기 인식 중 서버가 죽으면 해당 녹음이 `PROCESSING`에 갇힌다.** 재시도 경로가 없어 세션이 완료 불가 상태가 된다(취약 음소 분석은 모든 녹음이 종료 상태여야 함). 복구 수단(재시도 API 또는 오래된 `PROCESSING` 정리 스케줄러)을 만들지는 취약 음소 분석 착수 전에 결정한다.
+
 - 아키텍처 감사(12번)에서 발견된 남은 참고 사항: `SecurityConfig`의 CORS가 `allowedOriginPatterns("*")` + `allowCredentials(true)` 조합 — 감사 체크리스트 항목엔 없어 수정하지 않았음, 운영 배포 전 재검토 필요.
 - 인식 유스케이스(녹음 업로드 → 실제 인식 → 결과 조회)가 아직 없어서 `JPyRustAiInferenceClient`(PR #9)는 인프라 배선만 완료된 상태 — API 레벨에서는 아직 아무 효과가 없음.
 - 테스트 커버리지 19% → 42.1%(PR #13) → **48.6%**(PR #18 기준, `jacocoTestReport` 실측: 266/547 라인)로 계속 개선 중이지만 `adapter.in.web`/`adapter.in.web.dto`/`adapter.out.persistence`는 여전히 0% — `jacocoTestCoverageVerification`은 여전히 `build`/`check`에 묶여 있지 않음(warn-only 유지 중).
