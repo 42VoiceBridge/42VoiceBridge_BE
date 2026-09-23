@@ -42,6 +42,25 @@ public class GlobalExceptionHandler {
                 ErrorCode.VALIDATION_FAILED.name(), ErrorCode.VALIDATION_FAILED.getMessage()));
   }
 
+  /**
+   * 도메인 상태 전이 위반(IllegalStateException)과 검증 실패(IllegalArgumentException)를 각각 409/400으로 매핑하는 범용 핸들러.
+   * 특정 유스케이스가 더 구체적인 에러 코드가 필요하면(예: INSUFFICIENT_RECORDINGS), 해당 도메인 패키지 안에 프레임워크 의존성 없는 전용 예외 클래스를
+   * 만들고 여기에 전용 @ExceptionHandler를 추가할 것 — 도메인이 CustomException/ErrorCode를 직접 참조하게 하지 말 것(도메인 순수성
+   * 위반).
+   */
+  @ExceptionHandler(IllegalStateException.class)
+  public ResponseEntity<ApiResponse<Void>> handleIllegalStateException(IllegalStateException e) {
+    return ResponseEntity.status(ErrorCode.INVALID_STATE_TRANSITION.getStatus())
+        .body(ApiResponse.error(ErrorCode.INVALID_STATE_TRANSITION.name(), e.getMessage()));
+  }
+
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(
+      IllegalArgumentException e) {
+    return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.getStatus())
+        .body(ApiResponse.error(ErrorCode.VALIDATION_FAILED.name(), e.getMessage()));
+  }
+
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
     log.error("[UnhandledException]", e);
