@@ -39,9 +39,10 @@ public class PersonalizationController {
   @GetMapping("/train/{jobId}")
   public ApiResponse<PersonalizationTrainingStatusResponse> getTrainingStatus(
       @AuthenticationPrincipal UUID userId, @PathVariable("jobId") UUID jobId) {
-
+    // @AuthenticationPrincipal UUID userId - 인증 과정에서 확인된 로그인 사용자 id
+    //  @PathVariable("jobId") UUID jobId - get 요청 url 경로상의 {jobId}를 받음
     var result = getPersonalizationTrainingStatusUseCase.getStatus(userId, jobId);
-
     return ApiResponse.success(PersonalizationTrainingStatusResponse.from(result));
+    // result를 인자로 받아서 json 응답 생성 및 전송
   }
 }

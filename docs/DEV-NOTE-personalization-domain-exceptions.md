@@ -2,7 +2,7 @@
 
 작성일: 2026-09-23
 작업 브랜치: `feature/personalization-job-validation`
-상태: 로컬 코드 및 테스트 검증 완료. 이번 작업에서 커밋·푸시하지 않음.
+상태: PR #25 리뷰에 따라 범위 밖 변경을 별도 커밋으로 분리했다. 최신 전체 빌드 결과는 아래 리뷰 반영 내역에 기록한다.
 
 ## 변경 배경
 
@@ -60,11 +60,15 @@ Controller → Service → PersonalizationJob.create(userId, count)
 - 녹음 부족 응답에서 개발 메모를 제거했다. 최소 5개 임시 정책은 기존 도메인 상수의 주석과 이 문서에 남겨두었다.
 - `PersonalizationJobTest` 19건, `GlobalExceptionHandlerTest` 3건, `GlobalExceptionHandlerMvcTest` 4건을 재실행해 총 26건 통과했다. 수정한 도메인 파일 두 개의 Spotless 검사도 통과했다.
 
-## PR 반영 전 남은 작업
+## PR #25 추가 리뷰 반영
 
-- `GlobalExceptionHandler` 운영 파일의 포맷을 검사한다.
-- 새 예외 파일은 초기 빈 클래스 버전이 스테이징되어 있으므로 최종 내용을 다시 스테이징한다. 무관한 `PersonalizationController` 수정, `.codex/`, `PROJECT_MEMORY.md`는 이번 PR 범위와 구분한다.
-- 최종 파일들을 PR #25 브랜치에 커밋·푸시하고 PR 설명의 예외 처리·검증 내용을 갱신한다.
+- 2026-09-23 `./gradlew build` 전체 실행: **BUILD SUCCESSFUL**. 테스트 78건, 실패 0건, 오류 0건, 건너뜀 0건.
+- `GlobalExceptionHandler.java`를 포함한 전체 `spotlessCheck` 통과. 추가 포맷 수정은 필요하지 않았다.
+- 첫 실행은 Docker 미실행으로 Redis 통합 테스트 초기화가 실패했다. Docker Desktop 실행 후 테스트 제외 없이 전체 빌드를 재실행해 통과했다.
+
+- `PersonalizationController.java`를 develop 기준으로 복원하고 `PROJECT_MEMORY.md`를 PR 변경분에서 제외했다.
+- 제외한 원본 변경은 `feature/personalization-review-followup` 브랜치의 `0dd5de9` 커밋으로 분리했다. 컨트롤러 주석 정리와 프로젝트 메모만 포함한다.
+- 일반 Java 예외 핸들러의 적용 범위는 이번 리뷰에서 수용되었으므로 동작을 유지한다. 예외 사용 규칙의 프로젝트 지침 반영은 리뷰어가 별도로 진행한다.
 
 ## 검토 시 유의점
 
