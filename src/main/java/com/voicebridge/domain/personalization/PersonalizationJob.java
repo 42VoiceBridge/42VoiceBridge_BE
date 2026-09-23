@@ -9,6 +9,9 @@ import java.util.UUID;
  */
 public class PersonalizationJob {
 
+  // 팀 확정 전 임시 정책. 최소 녹음 개수는 도메인에서만 관리한다.
+  public static final int MIN_TRAINING_RECORDING_COUNT = 5;
+
   private final UUID id;
   private final UUID userId;
   private PersonalizationJobStatus status;
@@ -41,6 +44,12 @@ public class PersonalizationJob {
   }
 
   public static PersonalizationJob create(UUID userId, int trainingRecordingCount) {
+    if (userId == null) {
+      throw new IllegalArgumentException("사용자 ID가 필요합니다.");
+    }
+    if (trainingRecordingCount < MIN_TRAINING_RECORDING_COUNT) {
+      throw new InsufficientRecordingException();
+    }
     return new PersonalizationJob(
         UUID.randomUUID(),
         userId,
@@ -78,14 +87,20 @@ public class PersonalizationJob {
 
   public void markInProgress() {
     if (status != PersonalizationJobStatus.PENDING) {
-      throw new IllegalStateException("대기중인 job만 시작할 수 있습니다.");
+      throw new IllegalStateException("대기 중인 학습 작업만 시작할 수 있습니다.");
     }
     this.status = PersonalizationJobStatus.IN_PROGRESS;
   }
 
   public void complete(String modelVersion, String modelArtifactPath) {
     if (status != PersonalizationJobStatus.IN_PROGRESS) {
-      throw new IllegalStateException("진행중인 job만 완료 처리할 수 있습니다.");
+      throw new IllegalStateException("진행 중인 학습 작업만 완료할 수 있습니다.");
+    }
+    if (modelVersion == null
+        || modelVersion.isBlank()
+        || modelArtifactPath == null
+        || modelArtifactPath.isBlank()) {
+      throw new IllegalArgumentException("모델 버전과 모델 저장 경로가 필요합니다.");
     }
     this.status = PersonalizationJobStatus.COMPLETED;
     this.modelVersion = modelVersion;
@@ -94,6 +109,13 @@ public class PersonalizationJob {
   }
 
   public void fail(String reason) {
+    if (status != PersonalizationJobStatus.PENDING
+        && status != PersonalizationJobStatus.IN_PROGRESS) {
+      throw new IllegalStateException("대기 중이거나 진행 중인 학습 작업만 실패 처리할 수 있습니다.");
+    }
+    if (reason == null || reason.isBlank()) {
+      throw new IllegalArgumentException("실패 사유가 필요합니다.");
+    }
     this.status = PersonalizationJobStatus.FAILED;
     this.failureReason = reason;
     this.completedAt = LocalDateTime.now();
