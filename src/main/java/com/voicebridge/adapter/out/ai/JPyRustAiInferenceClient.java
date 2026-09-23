@@ -11,9 +11,13 @@ import java.nio.ByteBuffer;
 import java.nio.file.Paths;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
+// 생성자에서 파이썬 venv를 만들고 pip install을 돌리기 때문에, 그 환경이 없는 개발 머신에서는 빈 생성이 실패하고
+// 앱 전체가 기동하지 못한다. 로컬에서는 StubAiInferenceClient로 대체해 나머지 개발이 막히지 않게 한다.
 @Component
+@Profile("!local")
 public class JPyRustAiInferenceClient implements AiInferenceClient {
 
   private static final int SAMPLE_RATE_HZ = 16000;

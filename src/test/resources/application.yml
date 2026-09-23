@@ -19,3 +19,6 @@ voicebridge:
     jpyrust:
       instance-id: voicebridge-test
       whisper-model-path: tiny
+  s3:
+    bucket: test-bucket
+    region: ap-northeast-2

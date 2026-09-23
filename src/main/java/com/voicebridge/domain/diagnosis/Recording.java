@@ -96,6 +96,14 @@ public class Recording {
     this.status = RecordingStatus.DONE;
   }
 
+  // 비동기 인식이라 실패를 HTTP 응답으로 알릴 수 없다. 상태로 남겨야 결과 조회 API가 알려줄 수 있다.
+  public void markFailed() {
+    if (status != RecordingStatus.PROCESSING) {
+      throw new IllegalStateException("인식이 진행중인 녹음만 실패 처리할 수 있습니다.");
+    }
+    this.status = RecordingStatus.FAILED;
+  }
+
   public boolean isOwnedBy(UUID userId) {
     return this.userId.equals(userId);
   }
