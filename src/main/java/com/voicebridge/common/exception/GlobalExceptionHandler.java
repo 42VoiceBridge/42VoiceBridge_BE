@@ -1,6 +1,7 @@
 package com.voicebridge.common.exception;
 
 import com.voicebridge.common.response.ApiResponse;
+import com.voicebridge.domain.personalization.InsufficientRecordingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -69,5 +70,12 @@ public class GlobalExceptionHandler {
             ApiResponse.error(
                 ErrorCode.INTERNAL_SERVER_ERROR.name(),
                 ErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
+  }
+
+  @ExceptionHandler(InsufficientRecordingException.class)
+  public ResponseEntity<ApiResponse<Void>> handleInsufficientRecordingException(
+      InsufficientRecordingException e) {
+    return ResponseEntity.status(ErrorCode.INSUFFICIENT_RECORDINGS.getStatus())
+        .body(ApiResponse.error(ErrorCode.INSUFFICIENT_RECORDINGS.name(), e.getMessage()));
   }
 }

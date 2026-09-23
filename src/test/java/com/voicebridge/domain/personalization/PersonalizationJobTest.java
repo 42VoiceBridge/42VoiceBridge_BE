@@ -3,8 +3,6 @@ package com.voicebridge.domain.personalization;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.voicebridge.common.exception.CustomException;
-import com.voicebridge.common.exception.ErrorCode;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -29,10 +27,7 @@ class PersonalizationJobTest {
     job.markInProgress();
 
     assertThat(job.getStatus()).isEqualTo(PersonalizationJobStatus.IN_PROGRESS);
-    assertThatThrownBy(job::markInProgress)
-        .isInstanceOf(CustomException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+    assertThatThrownBy(job::markInProgress).isInstanceOf(IllegalStateException.class);
   }
 
   @Test
@@ -44,6 +39,7 @@ class PersonalizationJobTest {
 
     assertThat(job.getStatus()).isEqualTo(PersonalizationJobStatus.COMPLETED);
     assertThat(job.getModelVersion()).isEqualTo("v1");
+    assertThat(job.getModelArtifactPath()).isEqualTo("s3://models/v1.pt");
     assertThat(job.getCompletedAt()).isNotNull();
   }
 
@@ -58,17 +54,13 @@ class PersonalizationJobTest {
   @ValueSource(ints = {-1, 0, 4})
   void 녹음이_부족하면_생성할_수_없다(int count) {
     assertThatThrownBy(() -> PersonalizationJob.create(UUID.randomUUID(), count))
-        .isInstanceOf(CustomException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.INSUFFICIENT_RECORDINGS);
+        .isInstanceOf(InsufficientRecordingException.class);
   }
 
   @Test
   void 사용자_없이_생성할_수_없다() {
     assertThatThrownBy(() -> PersonalizationJob.create(null, 5))
-        .isInstanceOf(CustomException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @ParameterizedTest
@@ -94,22 +86,16 @@ class PersonalizationJobTest {
     if (status == PersonalizationJobStatus.COMPLETED) job.complete("v1", "models/v1.pt");
     else job.fail("학습 실패");
     var completedAt = job.getCompletedAt();
-    assertThatThrownBy(job::markInProgress)
-        .isInstanceOf(CustomException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+    assertThatThrownBy(job::markInProgress).isInstanceOf(IllegalStateException.class);
     assertThatThrownBy(() -> job.complete("v2", "models/v2.pt"))
-        .isInstanceOf(CustomException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
-    assertThatThrownBy(() -> job.fail("다른 실패 사유"))
-        .isInstanceOf(CustomException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> job.fail("다른 실패 사유")).isInstanceOf(IllegalStateException.class);
     assertThat(job.getStatus()).isEqualTo(status);
     assertThat(job.getCompletedAt()).isEqualTo(completedAt);
     assertThat(job.getModelVersion())
         .isEqualTo(status == PersonalizationJobStatus.COMPLETED ? "v1" : null);
+    assertThat(job.getModelArtifactPath())
+        .isEqualTo(status == PersonalizationJobStatus.COMPLETED ? "models/v1.pt" : null);
     assertThat(job.getFailureReason())
         .isEqualTo(status == PersonalizationJobStatus.FAILED ? "학습 실패" : null);
   }
@@ -118,9 +104,7 @@ class PersonalizationJobTest {
   void 시작하지_않은_작업은_완료할_수_없다() {
     var job = PersonalizationJob.create(UUID.randomUUID(), 5);
     assertThatThrownBy(() -> job.complete("v1", "models/v1.pt"))
-        .isInstanceOf(CustomException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+        .isInstanceOf(IllegalStateException.class);
     assertThat(job.getStatus()).isEqualTo(PersonalizationJobStatus.PENDING);
   }
 
@@ -131,13 +115,9 @@ class PersonalizationJobTest {
     var job = PersonalizationJob.create(UUID.randomUUID(), 5);
     job.markInProgress();
     assertThatThrownBy(() -> job.complete(invalid, "models/v1.pt"))
-        .isInstanceOf(CustomException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> job.complete("v1", invalid))
-        .isInstanceOf(CustomException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        .isInstanceOf(IllegalArgumentException.class);
     assertThat(job.getStatus()).isEqualTo(PersonalizationJobStatus.IN_PROGRESS);
     assertThat(job.getModelVersion()).isNull();
     assertThat(job.getModelArtifactPath()).isNull();
@@ -149,10 +129,7 @@ class PersonalizationJobTest {
   @ValueSource(strings = {" "})
   void 실패_사유가_없으면_상태를_변경하지_않는다(String reason) {
     var job = PersonalizationJob.create(UUID.randomUUID(), 5);
-    assertThatThrownBy(() -> job.fail(reason))
-        .isInstanceOf(CustomException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.VALIDATION_FAILED);
+    assertThatThrownBy(() -> job.fail(reason)).isInstanceOf(IllegalArgumentException.class);
     assertThat(job.getStatus()).isEqualTo(PersonalizationJobStatus.PENDING);
     assertThat(job.getFailureReason()).isNull();
     assertThat(job.getCompletedAt()).isNull();

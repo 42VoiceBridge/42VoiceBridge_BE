@@ -1,7 +1,5 @@
 package com.voicebridge.domain.personalization;
 
-import com.voicebridge.common.exception.CustomException;
-import com.voicebridge.common.exception.ErrorCode;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -47,10 +45,10 @@ public class PersonalizationJob {
 
   public static PersonalizationJob create(UUID userId, int trainingRecordingCount) {
     if (userId == null) {
-      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+      throw new IllegalArgumentException("사용자 ID가 필요합니다.");
     }
     if (trainingRecordingCount < MIN_TRAINING_RECORDING_COUNT) {
-      throw new CustomException(ErrorCode.INSUFFICIENT_RECORDINGS);
+      throw new InsufficientRecordingException();
     }
     return new PersonalizationJob(
         UUID.randomUUID(),
@@ -89,20 +87,20 @@ public class PersonalizationJob {
 
   public void markInProgress() {
     if (status != PersonalizationJobStatus.PENDING) {
-      throw new CustomException(ErrorCode.INVALID_STATE_TRANSITION);
+      throw new IllegalStateException("대기 중인 학습 작업만 시작할 수 있습니다.");
     }
     this.status = PersonalizationJobStatus.IN_PROGRESS;
   }
 
   public void complete(String modelVersion, String modelArtifactPath) {
     if (status != PersonalizationJobStatus.IN_PROGRESS) {
-      throw new CustomException(ErrorCode.INVALID_STATE_TRANSITION);
+      throw new IllegalStateException("진행 중인 학습 작업만 완료할 수 있습니다.");
     }
     if (modelVersion == null
         || modelVersion.isBlank()
         || modelArtifactPath == null
         || modelArtifactPath.isBlank()) {
-      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+      throw new IllegalArgumentException("모델 버전과 모델 저장 경로가 필요합니다.");
     }
     this.status = PersonalizationJobStatus.COMPLETED;
     this.modelVersion = modelVersion;
@@ -113,10 +111,10 @@ public class PersonalizationJob {
   public void fail(String reason) {
     if (status != PersonalizationJobStatus.PENDING
         && status != PersonalizationJobStatus.IN_PROGRESS) {
-      throw new CustomException(ErrorCode.INVALID_STATE_TRANSITION);
+      throw new IllegalStateException("대기 중이거나 진행 중인 학습 작업만 실패 처리할 수 있습니다.");
     }
     if (reason == null || reason.isBlank()) {
-      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+      throw new IllegalArgumentException("실패 사유가 필요합니다.");
     }
     this.status = PersonalizationJobStatus.FAILED;
     this.failureReason = reason;
