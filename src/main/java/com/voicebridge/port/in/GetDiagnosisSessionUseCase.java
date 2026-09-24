@@ -1,16 +1,19 @@
 package com.voicebridge.port.in;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
-/**
- * 계약만 정의된 상태 — 구현은 백엔드 A 담당. application 패키지에 GetDiagnosisSessionService를 만들어 이 인터페이스를 구현할 것. 본인 소유
- * 세션이 아니면 FORBIDDEN_ACCESS (DiagnosisSession.isOwnedBy() 사용). API 명세서 2.2절 참고.
- */
 public interface GetDiagnosisSessionUseCase {
 
   GetResult getSession(UUID userId, UUID sessionId);
 
-  record GetResult(UUID sessionId, String status) {
-    // TODO(백엔드 A): 문장별 녹음 여부 등 API 명세서 2.2 응답 필드를 마저 채워 넣을 것
-  }
+  record GetResult(
+      UUID sessionId, String status, List<SentenceView> sentences, LocalDateTime createdAt) {}
+
+  /**
+   * 아직 녹음하지 않은 문장은 recordingId와 recordingStatus가 null이다. 같은 문장을 다시 녹음하면 Recording이 여러 개 생기므로 가장 최근
+   * 것을 노출한다.
+   */
+  record SentenceView(UUID sentenceId, String text, UUID recordingId, String recordingStatus) {}
 }
