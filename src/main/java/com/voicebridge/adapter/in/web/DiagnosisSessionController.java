@@ -1,10 +1,14 @@
 package com.voicebridge.adapter.in.web;
 
+import com.voicebridge.adapter.in.web.dto.DiagnosisSessionResponse;
+import com.voicebridge.adapter.in.web.dto.RecordingResultResponse;
 import com.voicebridge.adapter.in.web.dto.StartDiagnosisSessionResponse;
 import com.voicebridge.adapter.in.web.dto.UploadRecordingResponse;
 import com.voicebridge.common.exception.CustomException;
 import com.voicebridge.common.exception.ErrorCode;
 import com.voicebridge.common.response.ApiResponse;
+import com.voicebridge.port.in.GetDiagnosisSessionUseCase;
+import com.voicebridge.port.in.GetRecordingResultUseCase;
 import com.voicebridge.port.in.StartDiagnosisSessionUseCase;
 import com.voicebridge.port.in.UploadDiagnosisRecordingUseCase;
 import java.io.IOException;
@@ -14,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,10 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * TODO(백엔드 A) — 구현 완료 후 여기에 매핑 추가: - GET /api/v1/diagnosis-sessions/{sessionId} →
- * GetDiagnosisSessionUseCase - GET
- * /api/v1/diagnosis-sessions/{sessionId}/recordings/{recordingId}/result →
- * GetRecordingResultUseCase - GET /api/v1/diagnosis-sessions/{sessionId}/weak-phonemes →
+ * TODO(백엔드 A) — 구현 완료 후 여기에 매핑 추가: - GET /api/v1/diagnosis-sessions/{sessionId}/weak-phonemes →
  * AnalyzeWeakPhonemesUseCase
  */
 @RestController
@@ -36,6 +38,8 @@ public class DiagnosisSessionController {
 
   private final StartDiagnosisSessionUseCase startDiagnosisSessionUseCase;
   private final UploadDiagnosisRecordingUseCase uploadDiagnosisRecordingUseCase;
+  private final GetDiagnosisSessionUseCase getDiagnosisSessionUseCase;
+  private final GetRecordingResultUseCase getRecordingResultUseCase;
 
   @PostMapping
   public ResponseEntity<ApiResponse<StartDiagnosisSessionResponse>> start(
@@ -43,6 +47,22 @@ public class DiagnosisSessionController {
     var result = startDiagnosisSessionUseCase.start(userId);
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResponse.success(StartDiagnosisSessionResponse.from(result)));
+  }
+
+  @GetMapping("/{sessionId}")
+  public ResponseEntity<ApiResponse<DiagnosisSessionResponse>> getSession(
+      @AuthenticationPrincipal UUID userId, @PathVariable UUID sessionId) {
+    var result = getDiagnosisSessionUseCase.getSession(userId, sessionId);
+    return ResponseEntity.ok(ApiResponse.success(DiagnosisSessionResponse.from(result)));
+  }
+
+  @GetMapping("/{sessionId}/recordings/{recordingId}/result")
+  public ResponseEntity<ApiResponse<RecordingResultResponse>> getRecordingResult(
+      @AuthenticationPrincipal UUID userId,
+      @PathVariable UUID sessionId,
+      @PathVariable UUID recordingId) {
+    var result = getRecordingResultUseCase.getResult(userId, sessionId, recordingId);
+    return ResponseEntity.ok(ApiResponse.success(RecordingResultResponse.from(result)));
   }
 
   // AI 인식은 비동기로 돌기 때문에 여기서는 접수만 하고 202를 돌려준다. 결과는 결과 조회 API로 확인한다.
