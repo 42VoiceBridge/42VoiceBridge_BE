@@ -8,6 +8,7 @@ import com.voicebridge.port.out.TtsRequestRepositoryPort;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * TtsRequest 자체는 사용자를 직접 들고 있지 않아(비정규화하지 않음), 연결된 confirmation을 거쳐 소유권을 확인한다 — 다른 조회 유스케이스와 동일하게 본인
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class GetTtsStatusService implements GetTtsStatusUseCase {
 
   private final TtsRequestRepositoryPort ttsRequestRepositoryPort;

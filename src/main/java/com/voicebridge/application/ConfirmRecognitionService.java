@@ -10,9 +10,11 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ConfirmRecognitionService implements ConfirmRecognitionUseCase {
 
   private final RecognitionRepositoryPort recognitionRepositoryPort;
@@ -32,8 +34,9 @@ public class ConfirmRecognitionService implements ConfirmRecognitionUseCase {
       throw new CustomException(ErrorCode.FORBIDDEN_ACCESS);
     }
 
-    // 저장(부수효과) 전에 먼저 생성해서 confirmedText 검증을 통과시킨다 — 검증 실패 시 아래 무효화가
-    // 먼저 반영돼버리는 반쪽짜리 상태를 만들지 않기 위함이다.
+    // 저장(부수효과) 전에 먼저 생성해서 confirmedText 검증부터 통과시킨다 — 아래 두 save()는
+    // 클래스 레벨 @Transactional로 하나의 트랜잭션에 묶여 있어 둘 중 하나만 실패해도 함께
+    // 롤백되지만, 애초에 검증 실패로 트랜잭션을 열 필요조차 없게 만드는 게 더 낫다.
     var newConfirmation = Confirmation.create(recognitionId, userId, confirmedText);
 
     Optional<Confirmation> previous =

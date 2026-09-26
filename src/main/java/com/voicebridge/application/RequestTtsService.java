@@ -9,9 +9,11 @@ import com.voicebridge.port.out.TtsRequestRepositoryPort;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class RequestTtsService implements RequestTtsUseCase {
 
   private final ConfirmationRepositoryPort confirmationRepositoryPort;
