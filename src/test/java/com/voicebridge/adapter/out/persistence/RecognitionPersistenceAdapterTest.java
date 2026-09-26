@@ -35,9 +35,19 @@ class RecognitionPersistenceAdapterTest {
 
   @Test
   void 빈_인식결과도_DB에_저장한다() {
-    var saved = adapter.save(Recognition.create(UUID.randomUUID(), "", ModelType.BASE_ADAPTED, 0));
+    var saved =
+        adapter.save(Recognition.create(UUID.randomUUID(), "", ModelType.BASE_ADAPTED, 0.0));
     entityManager.clear();
     assertThat(repository.findById(saved.getId()).orElseThrow().getRecognizedText()).isEmpty();
+  }
+
+  @Test
+  void 신뢰도가_null이어도_DB에_저장한다() {
+    var saved =
+        adapter.save(
+            Recognition.create(UUID.randomUUID(), "물 좀 주세요", ModelType.BASE_ADAPTED, null));
+    entityManager.clear();
+    assertThat(repository.findById(saved.getId()).orElseThrow().getConfidence()).isNull();
   }
 
   @Test

@@ -88,9 +88,19 @@ class RecognizeSpeechServiceTest {
   void 무음의_빈_텍스트도_정상_저장한다() {
     when(jobs.findLatestCompletedByUserId(userId)).thenReturn(Optional.empty());
     when(ai.recognize(audio, ModelType.BASE_ADAPTED, userId))
-        .thenReturn(new AiInferenceClient.RecognitionResult("", 0));
+        .thenReturn(new AiInferenceClient.RecognitionResult("", 0.0));
     when(recordings.save(any())).thenAnswer(i -> i.getArgument(0));
     assertThat(service.recognize(userId, audio, "silence.wav").recognizedText()).isEmpty();
+  }
+
+  @Test
+  void 신뢰도가_null이어도_v1_계약대로_정상_저장한다() {
+    when(jobs.findLatestCompletedByUserId(userId)).thenReturn(Optional.empty());
+    when(ai.recognize(audio, ModelType.BASE_ADAPTED, userId))
+        .thenReturn(new AiInferenceClient.RecognitionResult("물 좀 주세요", null));
+    when(recordings.save(any())).thenAnswer(i -> i.getArgument(0));
+    var result = service.recognize(userId, audio, "voice.wav");
+    assertThat(result.confidence()).isNull();
   }
 
   @Test
@@ -99,7 +109,7 @@ class RecognizeSpeechServiceTest {
     var invalid =
         new AiInferenceClient.RecognitionResult[] {
           null,
-          new AiInferenceClient.RecognitionResult(null, 0),
+          new AiInferenceClient.RecognitionResult(null, 0.0),
           new AiInferenceClient.RecognitionResult("text", Double.NaN),
           new AiInferenceClient.RecognitionResult("text", Double.POSITIVE_INFINITY),
           new AiInferenceClient.RecognitionResult("text", -0.1),

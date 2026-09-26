@@ -38,8 +38,8 @@ public class RecognitionJpaEntity {
   @Column(nullable = false)
   private ModelType modelUsed;
 
-  @Column(nullable = false)
-  private double confidence;
+  @Column(nullable = true)
+  private Double confidence;
 
   @Column(nullable = false)
   private LocalDateTime createdAt;
@@ -50,7 +50,7 @@ public class RecognitionJpaEntity {
       UUID userId,
       String recognizedText,
       ModelType modelUsed,
-      double confidence,
+      Double confidence,
       LocalDateTime createdAt) {
     this.id = id;
     this.userId = userId;

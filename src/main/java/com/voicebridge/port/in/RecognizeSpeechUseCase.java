@@ -11,5 +11,5 @@ public interface RecognizeSpeechUseCase {
   RecognizeResult recognize(UUID userId, byte[] audioBytes, String fileName);
 
   record RecognizeResult(
-      UUID recognitionId, String recognizedText, String modelUsed, double confidence) {}
+      UUID recognitionId, String recognizedText, String modelUsed, Double confidence) {}
 }

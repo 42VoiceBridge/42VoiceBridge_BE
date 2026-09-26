@@ -80,7 +80,7 @@ public class Recording {
     this.status = RecordingStatus.PROCESSING;
   }
 
-  public void markProcessed(String recognizedText, double confidence) {
+  public void markProcessed(String recognizedText, Double confidence) {
     if (status != RecordingStatus.PROCESSING) {
       throw new IllegalStateException("인식이 진행중인 녹음만 결과를 반영할 수 있습니다.");
     }
@@ -88,7 +88,8 @@ public class Recording {
     if (recognizedText == null) {
       throw new IllegalArgumentException("인식 결과 텍스트는 null일 수 없습니다.");
     }
-    if (confidence < 0.0 || confidence > 1.0) {
+    // confidence는 AI 계약상 null일 수 있다(v1은 항상 null) — null이 아닐 때만 범위를 검증한다.
+    if (confidence != null && (confidence < 0.0 || confidence > 1.0)) {
       throw new IllegalArgumentException("인식 신뢰도는 0과 1 사이여야 합니다.");
     }
     this.recognizedText = recognizedText;

@@ -14,7 +14,7 @@ public interface AiInferenceClient {
 
   RecognitionResult recognize(byte[] audioBytes, ModelType modelType, UUID userId);
 
-  record RecognitionResult(String recognizedText, double confidence) {
+  record RecognitionResult(String recognizedText, Double confidence) {
     // TODO: phonemeAlignments(음소 정렬 정보) 추가 — 취약 음소 분석에 필요
   }
 }
