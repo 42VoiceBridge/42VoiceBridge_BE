@@ -52,7 +52,32 @@
 - **해결**: `LoginService`는 로그인이라는 이름과 달리 refresh token 저장이라는 부수효과(쓰기)를 갖고 있으므로 `readOnly = true`가 애초에 잘못된 설정이었다. `@Transactional`(쓰기 가능)로 변경. `KakaoLoginService`(이미 `@Transactional`)와 `RefreshTokenService`(클래스 레벨 어노테이션 없음)는 같은 문제가 없어 손대지 않았다.
 - **관련**: PR #11
 
-## AI 연동 (JPyRust)
+## AI 연동 (HTTP)
+
+### `HttpAiInferenceClientTest`가 `IncompatibleClassChangeError`로 실패한다
+
+- **증상**: WireMock 테스트 실행 시 `class org.eclipse.jetty.http2.server.HttpChannelOverHTTP2 has interface org.eclipse.jetty.server.HttpChannel as super class` 같은 `IncompatibleClassChangeError`가 서버 기동 단계에서 발생.
+- **원인**: `com.github.tomakehurst:wiremock-jre8`(Jetty 11 기반)이 프로젝트가 이미 물고 있는 Jetty 12 트랜지티브 의존성과 클래스패스에서 충돌한다. Gradle이 일부 Jetty 아티팩트만 12로 승격시키고 `jetty-servlet` 등은 11에 남아, 서로 다른 바이너리 버전의 클래스가 상속 관계로 얽히면서 발생.
+- **해결**: `org.wiremock:wiremock-standalone`(shaded/재배치된 jar)으로 교체한다. 클래스가 자체 네임스페이스로 재배치돼 있어 프로젝트의 다른 Jetty 버전과 부딪히지 않는다. import 경로(`com.github.tomakehurst.wiremock.*`)는 동일하게 유지된다.
+- **관련**: PR #29
+
+### WireMock에 `stubFor`/`verify`를 등록했는데 `Connection refused`로 실패한다
+
+- **증상**: `@RegisterExtension`으로 등록한 `WireMockExtension`이 정상 기동했는데도, `WireMock.stubFor(...)` / `WireMock.verify(...)`(static import) 호출 시 `Connect to http://localhost:8080 failed: Connection refused`가 난다.
+- **원인**: `WireMock` 클래스의 static 메서드는 기본 포트(8080)를 보는 전역 클라이언트를 사용한다. `WireMockExtension`을 `dynamicPort()`로 띄우면 실제 서버는 임의 포트에서 뜨는데, static 클라이언트는 그 사실을 모른다.
+- **해결**: static import 대신 `WireMockExtension` 인스턴스의 메서드(`wireMock.stubFor(...)`, `wireMock.verify(...)`)를 쓴다 — 인스턴스는 자신이 띄운 실제 포트를 알고 있다.
+- **관련**: PR #29
+
+### `HttpAiInferenceClient`가 로컬에서 계속 연결 실패로 끝난다
+
+- **증상**: `local`이 아닌 프로파일로 앱을 띄우고 진단 녹음을 업로드하면 인식이 항상 `AI_INFERENCE_UNAVAILABLE`(503)로 실패한다.
+- **원인**: `HttpAiInferenceClient`(`@Profile("!local & !jpyrust-experiment")`)는 `voicebridge.ai.http.base-url`(기본 `http://127.0.0.1:8000`)에 실제로 떠 있는 AI 서버가 필요하다. 아무것도 안 띄운 상태로 기본 프로파일이 아닌 프로파일로 기동하면 매 요청이 연결 거부로 끝난다.
+- **해결**: AI팀 mock 서버를 먼저 띄운다 — 42VoiceBridge_AI 레포에서 `ASR_ENGINE=mock python3 demo/server.py`. 그냥 로컬 개발만 할 거면 `local` 프로파일로 띄워 `StubAiInferenceClient`(고정 응답)를 쓰는 편이 더 간단하다.
+- **관련**: PR #29
+
+## AI 연동 (JPyRust, 실험적 보존)
+
+> `JPyRustAiInferenceClient`는 삭제되지 않고 `jpyrust-experiment` 프로파일로 남아있다. 기본 프로파일에서는 비활성화되어 아래 항목은 이 프로파일을 직접 켰을 때만 해당한다.
 
 ### JNI 네이티브 호출에서 버퍼 주소를 읽지 못한다
 

@@ -24,6 +24,10 @@
 - `markProcessed()`는 **빈 문자열을 정상 결과로 받아들인다.** 무음·비언어 오디오에서
   JPyRust가 `{"recognized_text": "", "confidence": 0.0}`를 정상 응답으로 돌려주기 때문.
   여기를 막으면 해당 녹음이 `PROCESSING`에 갇혀 세션 전체가 완료 불가가 된다.
+  기본(v1) 구현체인 HTTP 어댑터(`HttpAiInferenceClient`)에도 같은 계약이 그대로 적용된다 —
+  `status: no_speech`(빈 텍스트)도 정상 응답이고, `confidence`는 이제 `Double`(nullable)이며
+  AI 서버 v1 계약상 `score`는 항상 `null`이다. `markProcessed()`는 `confidence == null`이면
+  범위 검증을 생략하고 그대로 반영한다.
 - `Recording.userId`는 `DiagnosisSession`과 중복되는 **의도된 비정규화**다. 이 값을 신뢰하려면
   `create()` 호출 전에 반드시 `DiagnosisSession.isOwnedBy()`로 세션 소유권을 먼저 검증해야 한다.
 
