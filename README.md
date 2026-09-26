@@ -95,6 +95,10 @@ graph TB
 - `GET /api/v1/personalization/model`: 사용자 개인화 모델 상태 조회
 - 녹음 업로드 / 학습 트리거 / 학습 상태 조회 / 실사용 인식은 포트만 정의된 상태 — [`docs/NEXT-STEPS-personalization-recognition.md`](./docs/NEXT-STEPS-personalization-recognition.md) 참고
 
+### Confirmation/TTS 게이트 — 구현 완료
+- 인식 결과를 사용자가 최종 확정(Confirmation)하고, 그 확정된 텍스트만으로 TTS를 요청할 수 있게 하는 게이트. 같은 인식 결과에 재확인이 들어오면 이전 확인은 무효화되고, **무효화된 확인으로는 TTS 요청이 거부됨** — TTS는 AI가 인식한 원문이 아니라 사용자가 확정한 텍스트만 신뢰한다는 불변조건
+- `TtsEnginePort`(실제 음성 합성 엔진 호출)는 앱 OS TTS/외부 TTS API 중 엔진이 아직 미정이라 구현체가 없음 — `AiInferenceClient`를 PoC 전까지 스텁으로 뒀던 것과 같은 원칙. 그래서 TTS 요청은 항상 `PENDING` 상태로 접수된 뒤 더 진행되지 않는다
+
 ### 로컬 개발용 시드 데이터
 - `local` 프로파일에서만 동작하는 `SentenceSeeder` — `sentences` 테이블이 비어있으면 예시 문장 10개를 자동으로 채웁니다(재기동해도 중복 삽입되지 않음). 실제 낭독 문장 세트는 기획/AI팀이 확정하면 교체됩니다.
 
@@ -108,6 +112,9 @@ graph TB
 | 4 | `POST /api/v1/auth/refresh` | 불필요 | 액세스/리프레시 토큰 재발급 |
 | 5 | `POST /api/v1/diagnosis-sessions` | JWT 필요 | 진단 세션 시작(낭독 문장 목록 반환) |
 | 6 | `GET /api/v1/personalization/model` | JWT 필요 | 개인화 모델 상태 조회 |
+| 7 | `POST /api/v1/recognitions/{recognitionId}/confirm` | JWT 필요 | 인식 결과 확인(같은 인식 결과 재확인 시 이전 확인 무효화) |
+| 8 | `POST /api/v1/tts` | JWT 필요 | 확인된 텍스트로 TTS 요청(무효화된 확인으로는 요청 불가, 엔진 미정으로 항상 PENDING) |
+| 9 | `GET /api/v1/tts/{ttsId}` | JWT 필요 | TTS 요청 상태 조회 |
 
 > `/api/v1/auth/**`를 제외한 모든 API는 JWT 인증이 필요합니다(`POST /api/v1/auth/login`으로 발급, `Authorization: Bearer {token}` 헤더로 호출).
 
