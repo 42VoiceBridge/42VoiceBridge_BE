@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -14,12 +15,14 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/* 인식 결과를 DB에 어떻게 저장할건지 저장 형태 정의
- * PK : Id
- * */
-
+// (user_id, created_at, id) 복합 인덱스는 findByUserId의 사용자별 조회 + createdAt desc, id desc 정렬 패턴 때문에 필요하다.
 @Entity
-@Table(name = "recognitions")
+@Table(
+    name = "recognitions",
+    indexes =
+        @Index(
+            name = "idx_recognitions_user_id_created_at_id",
+            columnList = "user_id, created_at DESC, id DESC"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RecognitionJpaEntity {
