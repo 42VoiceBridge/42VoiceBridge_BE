@@ -1,65 +1,79 @@
 # 진단 세션(diagnosis-session) 다음 구현 가이드 — 백엔드 A
 
-계약(5개 API)과 "세션 시작" 1개 완전 구현이 PR #7로 들어와 있고, 그 위에
-`Recording` 도메인(PR #21)까지 정의된 상태다. 남은 4개는 아래 순서로 채우면 된다.
-패턴은 `AuthController` / `LoginService` / `UserPersistenceAdapter`를 그대로 따라 하면 됨.
+5개 엔드포인트 중 **4개 구현 완료**. 남은 것은 취약 음소 분석 하나다.
 
-## 남은 엔드포인트 (API 명세서 2장)
+## 구현 현황
 
-| 엔드포인트 | port.in 인터페이스 | 비고 |
-|---|---|---|
-| GET /diagnosis-sessions/{id} | `GetDiagnosisSessionUseCase` | 본인 소유 아니면 FORBIDDEN_ACCESS — `DiagnosisSession.isOwnedBy()` 사용 |
-| POST /diagnosis-sessions/{id}/recordings | `UploadDiagnosisRecordingUseCase` | multipart 업로드. S3 저장 포트가 아직 없음 — 아래 "선행 작업" 참고 |
-| GET .../recordings/{rid}/result | `GetRecordingResultUseCase` | AI 인식 결과 조회. 폴링 방식이라 `PROCESSING` 상태를 그대로 응답 |
-| GET .../weak-phonemes | `AnalyzeWeakPhonemesUseCase` | 세션의 모든 녹음이 DONE이어야 호출 가능. `DiagnosisSession.markAnalyzed()`가 이 상태 전이를 담당 |
+| 엔드포인트 | 상태 |
+|---|---|
+| POST /diagnosis-sessions | 완료 (PR #7) |
+| GET /diagnosis-sessions/{id} | 완료 |
+| POST /diagnosis-sessions/{id}/recordings | 완료 (PR #24) |
+| GET .../recordings/{rid}/result | 완료 |
+| GET .../weak-phonemes | **미착수** |
 
-## 이미 준비된 것 (PR #21)
+## 이미 갖춰진 기반
 
-- `domain/diagnosis/Recording` — 팩토리 `create()`/`reconstitute()`, 상태 전이 `markProcessing()`/`markProcessed()`, 질의 `isOwnedBy()`/`isDone()`
-- `domain/diagnosis/RecordingStatus` — `UPLOADED` / `PROCESSING` / `DONE`
+- `domain/diagnosis/Recording` — 팩토리 `create()`/`reconstitute()`, 상태 전이
+  `markProcessing()`/`markProcessed()`/`markFailed()`, 질의 `isOwnedBy()`/`isDone()`
+- `domain/diagnosis/RecordingStatus` — `UPLOADED` / `PROCESSING` / `DONE` / `FAILED`
 - `port/out/RecordingRepositoryPort` — `save` / `findById` / `findBySessionId`
+- `port/out/StoragePort` — S3 어댑터와 로컬 파일 어댑터를 프로파일로 분리.
+  키 생성 규칙은 `StorageKeys` 공통. AWS 크레덴셜 없이 개발 가능
+- `port/out/SentenceRepositoryPort.findAllByIds` — 문장 ID로 원문 조회
+- 비동기 인식: `RecordingUploadedEvent` + `RecordingRecognitionHandler`
+  (`@Async` + `@TransactionalEventListener(AFTER_COMMIT)`)
 
-주의할 규칙 두 가지:
+### 건드리기 전에 알아야 할 규칙
 
 - `markProcessed()`는 **빈 문자열을 정상 결과로 받아들인다.** 무음·비언어 오디오에서
-  JPyRust가 `{"recognized_text": "", "confidence": 0.0}`를 정상 응답으로 돌려주기 때문.
-  여기를 막으면 해당 녹음이 `PROCESSING`에 갇혀 세션 전체가 완료 불가가 된다.
-- `Recording.userId`는 `DiagnosisSession`과 중복되는 **의도된 비정규화**다. 이 값을 신뢰하려면
-  `create()` 호출 전에 반드시 `DiagnosisSession.isOwnedBy()`로 세션 소유권을 먼저 검증해야 한다.
+  AI가 빈 텍스트를 정상 응답으로 돌려주기 때문. 여기를 막으면
+  해당 녹음이 `PROCESSING`에 갇혀 세션 전체가 완료 불가가 된다.
+- `Recording.userId`는 `DiagnosisSession`과 중복되는 **의도된 비정규화**다. 이 값을
+  신뢰하려면 `create()` 호출 전에 반드시 세션 소유권을 먼저 검증해야 한다.
+- `@Async` 메서드를 같은 클래스 안에서 호출하면 프록시를 거치지 않아 **조용히 동기로
+  실행된다**(에러도 안 남). 반드시 별도 빈으로 분리할 것.
 
-## 선행 작업 — 녹음 업로드 착수 전에 필요한 것
+---
 
-- `build.gradle`에 AWS SDK 추가 (`software.amazon.awssdk:s3`) — 현재 없음
-- `port/out/StoragePort` 정의:
-  ```java
-  public interface StoragePort {
-      String upload(byte[] fileBytes, String fileName);  // 반환값: 저장된 경로
-  }
-  ```
-- `adapter/out/storage`에 구현체 — 현재 `package-info.java`만 있는 빈 패키지
-- 로컬 개발에서 S3를 무엇으로 대체할지 결정 (실제 버킷 / LocalStack / 파일시스템 어댑터를
-  프로파일로 분리) — 인프라 담당 확인 필요
+## 취약 음소 분석 — 착수 전 메모
 
-## 구현 순서 추천
+세부 설계(인터페이스 시그니처, 응답 형태, AI 호출 방식)는 **팀 논의 진행 중**이다.
+결론이 나면 이 문서에 반영한다. 아래는 그 논의의 입력으로 확보해 둔 사실만 적는다.
 
-1. `UploadDiagnosisRecordingUseCase` — 위 선행 작업부터. 흐름은
-   컨트롤러가 multipart 수신 → `StoragePort`로 S3 저장 → `Recording.create()`로 `UPLOADED` 저장
-   → AI 인식은 **비동기로 트리거**(사용자가 인식 시간까지 기다리지 않게)
-2. `GetRecordingResultUseCase`, `GetDiagnosisSessionUseCase` — 단순 조회라
-   `GetMyProfileService` 패턴 그대로
-3. `AnalyzeWeakPhonemesUseCase` — 제일 복잡하니 마지막에. 음소 분석 알고리즘 자체는 AI팀 담당이라
-   여기선 AI가 준 데이터를 집계해 API 응답으로 만드는 부분만. **착수 전 AI 담당과 주고받을
-   데이터 형식부터 합의할 것** (`AiInferenceClient.RecognitionResult`의 `phonemeAlignments`가 아직 TODO)
+### 통계는 여러 세션을 누적해 계산한다 (2026-09-24 결정)
 
-## 주의
+세션당 5문장으로는 자모별 표본이 모이지 않는다. 문장 DB에서 5문장을 무작위로 뽑아
+30회 평균한 실측:
 
-- AI 인식 **비동기 방식은 미결정**이다(동기 / `@Async` / 스프링 이벤트 + `@TransactionalEventListener`).
-  판단은 담당자에게 위임됐고 코드리뷰에서 함께 논의한다. 비동기를 택하면 서버 재시작으로
-  `PROCESSING`에 갇힌 녹음을 되살릴 복구 수단을 함께 설계할지도 정해야 한다.
-- `@Async`를 쓸 경우 **같은 클래스 안에서 호출하면 동작하지 않는다**(AOP self-invocation).
-  반드시 별도 빈으로 분리할 것 — CLAUDE.md 3장에 명시된 안티패턴.
-- 새로 만드는 영속성 어댑터는 `UserPersistenceAdapter.save()`처럼 **JPA 예외를 도메인 예외로 번역**할 것.
-- `DiagnosisSessionController` 상단 TODO 주석 — 엔드포인트 하나 구현할 때마다 거기서 하나씩 지워나갈 것.
-- 6장 코드 컨벤션(Spotless, record 네이밍, MockMvc/SpringBootTest 구분, `@MockitoBean`) 그대로 적용.
+| 세션 수 | 누적 자모 수 | 표본 20개 이상 모인 자모 종류 |
+|---|---|---|
+| 1 | 97개 | **0종류** |
+| 2 | 196개 | 2.5종류 |
+| 3 | 291개 | 4종류 |
+| 5 | 490개 | 8.5종류 |
+
+한 세션의 문장 수를 늘리는 대신 **세션을 누적**하는 방향으로 정했다. 진단 부담을
+키우지 않으면서 표본을 확보할 수 있기 때문. 참고로 선행연구
+(Awasthi et al., ICASSP 2021)의 시드셋은 50문장이다.
+
+이 결정에 따라 `markAnalyzed()`는 **코드를 바꾸지 않고 의미만 재정의**하면 된다 —
+"이 세션의 녹음이 전부 끝나 통계 집계 대상이 되었다". 누적 계산은 `ANALYZED` 세션들만
+모으면 되고, 계산 자체는 세션 상태와 무관하게 언제든 다시 할 수 있다.
+
+### 자모 분해는 백엔드가 구현하지 않는다
+
+정답 문장과 인식 결과 쌍만 AI에 넘기면 자모 단위 오류 집계는 AI가 돌려준다.
+단, 정답으로 넘기는 텍스트는 **등록 프롬프트나 사람이 교정한 텍스트**여야 하고
+모델 출력을 정답으로 되먹이면 안 된다.
+
+## 그 외 주의
+
+- 새로 만드는 영속성 어댑터는 `UserPersistenceAdapter.save()`처럼 **JPA 예외를 도메인
+  예외로 번역**할 것.
+- 도메인이 던지는 `IllegalStateException`/`IllegalArgumentException`은 PR #27의 전역
+  핸들러가 각각 409/400으로 매핑한다. 도메인이 `CustomException`/`ErrorCode`를 직접
+  참조하게 하지 말 것(도메인 순수성).
 - 테스트는 도메인 로직(단위, Mockito 없이)과 application 서비스(Mockito 목) 두 종류로 —
-  `RecordingTest`, `StartDiagnosisSessionServiceTest` 패턴 참고.
+  `RecordingTest`, `UploadDiagnosisRecordingServiceTest` 패턴 참고.
+- 6장 코드 컨벤션(Spotless, record 네이밍, MockMvc/SpringBootTest 구분, `@MockitoBean`) 적용.

@@ -83,11 +83,14 @@ graph TB
 - 현재 PoC 단계로 Whisper 모델은 `tiny` 고정 (정확도 검증은 AI팀 담당, 추후 `base`/`small` 등으로 교체 예정)
 - 이 구현체를 실제로 호출하는 인식 유스케이스(녹음 업로드 → 인식 → 결과 조회)는 아직 없음 — 현재는 어댑터 자체의 왕복 동작만 통합 테스트로 검증된 상태
 
-### 진단 세션 — 세션 시작만 구현
+### 진단 세션 — 5개 중 4개 구현
 - `POST /api/v1/diagnosis-sessions`: 낭독 문장을 뽑아 진단 세션을 시작
-- 세션 조회 / 녹음 업로드 / 결과 조회 / 취약 음소 분석은 포트(유스케이스 인터페이스)만 정의된 상태 — [`docs/NEXT-STEPS-diagnosis-session.md`](./docs/NEXT-STEPS-diagnosis-session.md) 참고
-- `Recording` 도메인(상태 전이 `UPLOADED → PROCESSING → DONE`)과 `RecordingRepositoryPort`는 정의 완료 — 위 4개 유스케이스가 공통으로 쓰는 기반. 무음·비언어 오디오에 대한 빈 인식 결과(`""`)도 정상 완료로 처리한다(구음장애 발화 특성상 인식 실패가 흔하고, 그 패턴 자체가 취약 음소 분석 데이터이기 때문)
-- 녹음 업로드는 S3 업로드용 `StoragePort`와 `adapter/out/storage` 구현체가 아직 없어 착수 전
+- `GET /{sessionId}`: 세션과 문장별 녹음 상태를 반환해 프론트가 이어하기를 구현할 수 있다. 같은 문장을 다시 녹음한 경우 가장 최근 녹음을 노출한다
+- `POST /{sessionId}/recordings`: multipart 음성을 저장하고 `PROCESSING`으로 기록한 뒤 **202 Accepted**를 즉시 반환. AI 인식은 트랜잭션 커밋 이후 별도 스레드에서 수행하고 결과를 `DONE` 또는 `FAILED`로 남긴다
+- `GET /{sessionId}/recordings/{recordingId}/result`: 인식 결과와 정답 문장을 함께 반환
+- **취약 음소 분석은 미착수** — 계약 변경 검토 중([`docs/NEXT-STEPS-diagnosis-session.md`](./docs/NEXT-STEPS-diagnosis-session.md) 참고)
+- `Recording` 도메인은 상태 전이 `UPLOADED → PROCESSING → DONE | FAILED`를 직접 소유한다. 무음·비언어 오디오의 빈 인식 결과(`""`)는 **정상 완료**로 처리한다 — 구음장애 발화 특성상 인식 실패가 흔하고 그 패턴 자체가 분석 데이터이기 때문. `FAILED`는 AI 호출이 실패한 경우로, 비동기라 HTTP 응답으로 알릴 수 없어 상태로 남긴다
+- 음성 저장은 `StoragePort` 뒤에 있다. 로컬 프로파일은 파일시스템, 그 외에는 S3를 쓰므로 **AWS 크레덴셜 없이도 개발할 수 있다**. 사용자가 보낸 파일명은 저장 키에 쓰지 않고 허용 목록의 확장자만 추출한다
 
 ### 개인화 — 모델 상태 조회만 구현
 - `GET /api/v1/personalization/model`: 사용자 개인화 모델 상태 조회
@@ -105,7 +108,10 @@ graph TB
 | 3 | `POST /api/v1/auth/kakao` | 불필요 | 카카오 로그인 |
 | 4 | `POST /api/v1/auth/refresh` | 불필요 | 액세스/리프레시 토큰 재발급 |
 | 5 | `POST /api/v1/diagnosis-sessions` | JWT 필요 | 진단 세션 시작(낭독 문장 목록 반환) |
-| 6 | `GET /api/v1/personalization/model` | JWT 필요 | 개인화 모델 상태 조회 |
+| 6 | `GET /api/v1/diagnosis-sessions/{sessionId}` | JWT 필요 | 세션 조회(문장별 녹음 상태 포함) |
+| 7 | `POST /api/v1/diagnosis-sessions/{sessionId}/recordings` | JWT 필요 | 녹음 업로드(multipart). 접수만 하고 `202` 반환 |
+| 8 | `GET /api/v1/diagnosis-sessions/{sessionId}/recordings/{recordingId}/result` | JWT 필요 | 인식 결과 조회(정답 문장 포함) |
+| 9 | `GET /api/v1/personalization/model` | JWT 필요 | 개인화 모델 상태 조회 |
 
 > `/api/v1/auth/**`를 제외한 모든 API는 JWT 인증이 필요합니다(`POST /api/v1/auth/login`으로 발급, `Authorization: Bearer {token}` 헤더로 호출).
 
