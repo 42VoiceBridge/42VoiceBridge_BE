@@ -36,3 +36,9 @@ voicebridge:
   s3:
     bucket: ${S3_BUCKET:voicebridge-recordings}
     region: ${AWS_REGION:ap-northeast-2}
+  tts:
+    naver:
+      base-url: https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts
+      api-key-id: ${NCP_TTS_API_KEY_ID:}
+      api-key: ${NCP_TTS_API_KEY:}
+      speaker: nara

@@ -36,9 +36,9 @@
   재확인하면 이전 확인은 무효화된다.
 - `POST /api/v1/tts`: 확인된 텍스트로 TTS 요청. 무효화된 confirmation으로는 요청 불가.
 - `GET /api/v1/tts/{ttsId}`: TTS 요청 상태 조회.
-- 남은 작업: `TtsEnginePort`는 실제 음성 합성 엔진(앱 OS TTS vs 외부 TTS API)이 미정이라 구현체가
-  없는 빈 인터페이스 상태 — 엔진이 결정되면 `synthesize(text)` 같은 메서드와 `adapter/out/tts`
-  구현체를 추가해야 한다. 그전까지 TTS 요청은 항상 `PENDING`에서 멈춘다.
+- `TtsEnginePort` 구현체(`NaverClovaVoiceAdapter`, CLOVA Voice TTS Premium)와 비동기 합성 흐름까지
+  구현 완료 — `RequestTtsService`가 `TtsRequestedEvent`를 발행하면 `TtsSynthesisHandler`가
+  `@Async` + `AFTER_COMMIT`으로 합성 후 `StoragePort`에 저장, `COMPLETED`/`FAILED`로 전이한다.
 
 ## 구현 순서 추천
 

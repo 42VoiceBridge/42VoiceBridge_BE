@@ -4,6 +4,28 @@
 
 마지막 업데이트: 2026-09-26
 
+## 최신 작업 — 네이버 클로바 보이스 TTS 엔진 연동 (2026-09-26)
+
+- `feature/naver-clova-tts`에서 `TtsEnginePort`의 실제 구현체(`NaverClovaVoiceAdapter`, CLOVA Voice
+  TTS Premium)를 추가하고, `TtsRequest`가 `PENDING → COMPLETED/FAILED`로 전이하는 비동기 합성 흐름을
+  완성. `RecordingRecognitionHandler`(PR #24)와 동일한 패턴 — `@Async` + `@TransactionalEventListener
+  (phase = AFTER_COMMIT)` + 별도 빈(`TtsSynthesisHandler`)으로 self-invocation 방지.
+- API 계약은 https://api.ncloud-docs.com/docs/ai-naver-clovavoice-ttspremium 문서로 확인: `POST
+  https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts`, 헤더 `X-NCP-APIGW-API-KEY-ID`/
+  `X-NCP-APIGW-API-KEY`, `application/x-www-form-urlencoded` 바디(`speaker`/`text`/`format` 등),
+  응답은 JSON/base64로 감싸지 않은 mp3/wav 바이너리 그대로.
+- `RequestTtsService`가 `TtsRequest` 저장 직후 `TtsRequestedEvent(ttsId, confirmedText)`를 발행하도록
+  생성자에 `ApplicationEventPublisher`를 추가. confirmedText는 이벤트 발행 시점에 이미 조회해둔
+  `confirmation` 객체에서 꺼내 핸들러가 다시 조회하는 왕복을 피했다.
+- `NaverClovaVoiceAdapter`는 생성자에서 `@Value` 값만 주입받고 네트워크 호출을 하지 않아, 실제 API 키가
+  없는 CI 환경에서도 빌드가 깨지지 않는다(`JPyRustAiInferenceClient`와 달리 무거운 초기화 없음). 실제
+  키 값은 `application.yml`에 커밋하지 않고 `${NCP_TTS_API_KEY_ID}`/`${NCP_TTS_API_KEY}` 환경변수
+  참조만 남김.
+- 테스트: 기존 166개 + 신규 14개(도메인 상태 전이 5, `RequestTtsService` 이벤트 발행 1,
+  `TtsSynthesisHandler` 4, `NaverClovaVoiceAdapter` WireMock 4) = 180개 전부 통과.
+- **실제 NCP API 키로 왕복 검증은 아직 못 했다** — 키 발급 전이라 WireMock 계약 테스트까지만 확인.
+  키 발급 후 로컬에서 짧은 문장 합성 → 오디오 파일 저장까지 실제 왕복 확인이 남은 작업.
+
 ## 최신 작업 — Confirmation/TTS 게이트 (2026-09-26)
 
 - `feature/confirmation-tts-gate`에서 인식 결과 확인(Confirmation)과 TTS 요청 게이트 구현. 신규 엔드포인트 3개:
