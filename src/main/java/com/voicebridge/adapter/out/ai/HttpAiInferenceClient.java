@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 @Component
-@Profile("!local")
+@Profile("!local & !jpyrust-experiment")
 public class HttpAiInferenceClient implements AiInferenceClient {
 
   private static final String STATUS_OK = "ok";
