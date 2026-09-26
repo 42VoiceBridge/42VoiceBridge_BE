@@ -27,6 +27,19 @@
 | GET /recognitions | `GetRecognitionHistoryUseCase` | 페이지네이션. `Recognition` 리포지토리 포트/어댑터 아직 없음 — 새로 정의할 것 |
 | GET /recognitions/{id} | `GetRecognitionDetailUseCase` | 본인 소유 체크는 `Recognition.isOwnedBy()` |
 
+## Confirmation/TTS 게이트 — 신규 도메인, 구현 완료 (PR #31, 2026-09-26)
+
+위 6개 유스케이스 목록에는 원래 없던 신규 도메인이지만, 인식 결과(Recognition)를 다루는 같은
+`RecognitionController`에 엔드포인트가 추가돼 있어 여기 같이 기록한다.
+
+- `POST /api/v1/recognitions/{recognitionId}/confirm`: 인식 결과 확인. 같은 recognitionId로
+  재확인하면 이전 확인은 무효화된다.
+- `POST /api/v1/tts`: 확인된 텍스트로 TTS 요청. 무효화된 confirmation으로는 요청 불가.
+- `GET /api/v1/tts/{ttsId}`: TTS 요청 상태 조회.
+- 남은 작업: `TtsEnginePort`는 실제 음성 합성 엔진(앱 OS TTS vs 외부 TTS API)이 미정이라 구현체가
+  없는 빈 인터페이스 상태 — 엔진이 결정되면 `synthesize(text)` 같은 메서드와 `adapter/out/tts`
+  구현체를 추가해야 한다. 그전까지 TTS 요청은 항상 `PENDING`에서 멈춘다.
+
 ## 구현 순서 추천
 
 1. `TrainPersonalizationModelUseCase` — `PersonalizationJobRepositoryPort`가 이미 완성돼 있어서 바로 시작 가능

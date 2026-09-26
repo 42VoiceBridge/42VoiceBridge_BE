@@ -4,6 +4,30 @@
 
 마지막 업데이트: 2026-09-26
 
+## 최신 작업 — Confirmation/TTS 게이트 (2026-09-26)
+
+- `feature/confirmation-tts-gate`에서 인식 결과 확인(Confirmation)과 TTS 요청 게이트 구현. 신규 엔드포인트 3개:
+  `POST /api/v1/recognitions/{recognitionId}/confirm`, `POST /api/v1/tts`, `GET /api/v1/tts/{ttsId}`.
+- `TtsRequest`가 `confirmedText`를 직접 들고 있지 않고 `confirmationId`만 참조하는 구조로 설계. confirmedText의
+  SSOT는 `Confirmation` 하나뿐이어야 하는데(같은 recognitionId로 재확인이 들어오면 이전 확인은
+  `invalidate()`로 무효화됨), TtsRequest가 텍스트를 복제해서 들고 있으면 원본이 무효화돼도 TTS는 그 사실을
+  모른 채 스냅샷을 그대로 신뢰하게 된다. `RequestTtsService`가 매 요청마다 confirmation을 다시 조회해
+  `isValid()`를 확인하는 이유이기도 하다.
+- 리뷰에서 `ConfirmRecognitionService`/`RequestTtsService`/`GetTtsStatusService`에 `@Transactional`이 빠져
+  있는 걸 지적받아 추가(`14f835d`). `ConfirmRecognitionService.confirm()`은 이전 confirmation을
+  `invalidate()`한 뒤 새 confirmation을 `save()`하는 2단계 쓰기라, 트랜잭션 경계 없이는 두 번째 save가
+  실패해도 첫 번째 무효화만 반영되는 반쪽짜리 상태가 나올 수 있었다(원자성 문제).
+- `@DataJpaTest`로 실제 스키마 생성 로그를 찍어 인덱스가 의도대로 만들어지는지 확인했다:
+  `confirmations.recognition_id`는 `create index idx_confirmations_recognition_id on confirmations
+  (recognition_id)`로 별도 `CREATE INDEX` 문이 찍히지만, `tts_requests.idempotency_key`는 유니크
+  인덱스라서 H2가 `create table ... constraint idx_tts_requests_idempotency_key unique
+  (idempotency_key)` 형태로 테이블 생성문에 인라인시킨다 — 유니크 인덱스는 별도 `CREATE INDEX` 로그를
+  찾으면 안 보여서 헷갈릴 수 있다는 점을 기록해 둔다.
+- `TtsEnginePort`는 실제 음성 합성 엔진(앱 OS TTS vs 외부 TTS API, 미정)이 결정되기 전이라 메서드 없는
+  빈 스텁 인터페이스만 있고 어디에도 주입되지 않는다 — `AiInferenceClient`를 PoC 전까지 스텁으로 뒀던
+  것과 같은 원칙. TTS 요청은 그래서 항상 `PENDING`으로 접수된 뒤 더 진행되지 않는다.
+- `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL. **PR #31 병합 완료**(`eadaed2`, 2026-09-26).
+
 ## 최신 작업 — AI 연동 JPyRust → HTTP 전환 (PR #29, 2026-09-26)
 
 - `feature/http-ai-inference`에서 `AiInferenceClient` 포트의 기본(v1) 구현체를 JPyRust(in-process) 브릿지에서
