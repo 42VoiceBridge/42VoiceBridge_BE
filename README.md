@@ -135,6 +135,36 @@ docker-compose up -d   # MySQL, Redis
 - 커버리지: `./gradlew jacocoTestReport` → `build/reports/jacoco/test/html/index.html` (현재는 `build`/`check`를 막지 않는 warn-only)
 - 커밋 시 자동 포맷팅을 원하면 `pre-commit install` 실행 — 자세한 내용은 [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) 참고
 
+## 배포
+
+`SPRING_PROFILES_ACTIVE=prod`로 뜰 때 필요한 환경변수 대부분은 인프라([`42VoiceBridge_Infra`](https://github.com/42VoiceBridge/42VoiceBridge_Infra), Terraform 레이어형 구조 `1_base`/`2_storage`/`3_application`)의 output에서 가져옵니다.
+
+```mermaid
+graph LR
+    subgraph infra["42VoiceBridge_Infra"]
+        L2["2_storage<br/>RDS · Redis · S3"]
+    end
+
+    subgraph manual["Terraform 범위 밖"]
+        NCP["NCP 콘솔"]
+        AITEAM["AI팀 서버 주소"]
+        OPENSSL["openssl rand"]
+    end
+
+    subgraph be["42VoiceBridge_BE"]
+        ENV[".env"] --> SPRING["Spring Boot(prod)"]
+    end
+
+    L2 -- "rds_endpoint, rds_secret_arn" --> ENV
+    L2 -- "redis_endpoint, redis_port" --> ENV
+    L2 -- "s3_bucket_name" --> ENV
+    NCP -- "NCP_TTS_API_KEY(_ID)" --> ENV
+    AITEAM -- "AI_SERVER_BASE_URL" --> ENV
+    OPENSSL -- "JWT_SECRET" --> ENV
+```
+
+변수별 상세(용도, 정확한 조회 명령, 로컬 기본값으로 충분한지 여부)는 [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md)를, 값을 채우는 템플릿은 [`.env.example`](./.env.example)을 참고하세요.
+
 ## 팀 구성
 
 | 역할 | 담당 영역 |
@@ -150,6 +180,7 @@ docker-compose up -d   # MySQL, Redis
 
 ## 더 알아보기
 
+- 배포 환경변수 전체 목록·출처: [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md)
 - 전체 작업 이력: [`docs/PROGRESS.md`](./docs/PROGRESS.md)
 - 트러블슈팅(에러 메시지 → 원인 → 해결): [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md)
 - 기여 가이드(브랜치 전략/커밋 컨벤션): [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md)
