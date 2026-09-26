@@ -29,10 +29,10 @@ voicebridge:
   kakao:
     user-info-uri: https://kapi.kakao.com/v2/user/me
   ai:
-    jpyrust:
-      instance-id: voicebridge
-      # PoC에서 검증한 값. 인식 정확도 검증(AI팀)이 끝나면 base/small 등으로 교체될 수 있다.
-      whisper-model-path: tiny
+    http:
+      base-url: ${AI_SERVER_BASE_URL:http://127.0.0.1:8000}
+      connect-timeout-ms: 3000
+      read-timeout-ms: 10000
   s3:
     bucket: ${S3_BUCKET:voicebridge-recordings}
     region: ${AWS_REGION:ap-northeast-2}

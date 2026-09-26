@@ -14,10 +14,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-// 생성자에서 파이썬 venv를 만들고 pip install을 돌리기 때문에, 그 환경이 없는 개발 머신에서는 빈 생성이 실패하고
-// 앱 전체가 기동하지 못한다. 로컬에서는 StubAiInferenceClient로 대체해 나머지 개발이 막히지 않게 한다.
+// AI 연동을 HTTP(HttpAiInferenceClient)로 전환하면서 기본 프로필에서 비활성화했다. JPyRust 자체 성과물은
+// 보존 목적으로 코드만 남겨두며, 필요 시 이 프로필을 활성화해 다시 띄울 수 있다.
 @Component
-@Profile("!local")
+@Profile("jpyrust-experiment")
 public class JPyRustAiInferenceClient implements AiInferenceClient {
 
   private static final int SAMPLE_RATE_HZ = 16000;

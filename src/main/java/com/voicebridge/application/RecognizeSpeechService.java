@@ -53,14 +53,17 @@ public class RecognizeSpeechService implements RecognizeSpeechUseCase {
     }
     /*
        AI 응답 누락 또는 신뢰도 유효하지 않으면 저장 안하고 오류처리로 간다.
-       하지만 인식한 글자가 없는 빈 문자열은 정상 결과로 허용
+       하지만 인식한 글자가 없는 빈 문자열은 정상 결과로 허용.
+       confidence는 null이면(v1 계약상 score는 항상 null) 정상으로 허용하고,
+       값이 있을 때만(v1 이후 대비) 범위를 검증한다.
     */
 
     if (result == null
         || result.recognizedText() == null
-        || !Double.isFinite(result.confidence())
-        || result.confidence() < 0
-        || result.confidence() > 1) {
+        || (result.confidence() != null
+            && (!Double.isFinite(result.confidence())
+                || result.confidence() < 0
+                || result.confidence() > 1))) {
       throw new CustomException(ErrorCode.AI_INFERENCE_UNAVAILABLE);
     }
     // 도메인 객체 생성해서 save 인자로 넘긴다.

@@ -31,6 +31,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.14'
 
+    // 실험용, 기본 비활성(JPyRustAiInferenceClient는 @Profile("jpyrust-experiment")).
+    // JPyRustAiInferenceClient.java가 여전히 JPyRustBridge 타입을 직접 참조하므로 의존성은 유지한다.
     implementation 'com.github.farmer0010:JPyRust:main-SNAPSHOT'
 
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -55,6 +57,9 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'org.testcontainers:junit-jupiter:1.20.4'
     testImplementation 'org.testcontainers:testcontainers:1.20.4'
+    // standalone(shaded) 아티팩트 사용 — Jetty가 프로젝트 클래스패스에 이미 다른 버전으로 존재해 충돌하므로,
+    // 별도 클래스로 재배치(shading)된 standalone 아티팩트로 충돌을 피한다.
+    testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
 }
 
 // 지정하지 않으면 빌드하는 컴퓨터의 기본 문자셋을 따른다. 맥/리눅스는 대개 UTF-8이지만

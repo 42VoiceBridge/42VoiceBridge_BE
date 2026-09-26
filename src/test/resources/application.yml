@@ -16,9 +16,10 @@ voicebridge:
   kakao:
     user-info-uri: https://kapi.kakao.com/v2/user/me
   ai:
-    jpyrust:
-      instance-id: voicebridge-test
-      whisper-model-path: tiny
+    http:
+      base-url: http://127.0.0.1:8000
+      connect-timeout-ms: 3000
+      read-timeout-ms: 10000
   s3:
     bucket: test-bucket
     region: ap-northeast-2

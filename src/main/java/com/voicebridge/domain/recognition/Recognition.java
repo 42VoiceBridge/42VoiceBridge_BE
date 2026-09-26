@@ -10,7 +10,7 @@ public class Recognition {
   private final UUID userId;
   private final String recognizedText;
   private final ModelType modelUsed;
-  private final double confidence;
+  private final Double confidence;
   private final LocalDateTime createdAt;
 
   private Recognition(
@@ -18,7 +18,7 @@ public class Recognition {
       UUID userId,
       String recognizedText,
       ModelType modelUsed,
-      double confidence,
+      Double confidence,
       LocalDateTime createdAt) {
     this.id = id;
     this.userId = userId;
@@ -29,7 +29,7 @@ public class Recognition {
   }
 
   public static Recognition create(
-      UUID userId, String recognizedText, ModelType modelUsed, double confidence) {
+      UUID userId, String recognizedText, ModelType modelUsed, Double confidence) {
     return new Recognition(
         UUID.randomUUID(), userId, recognizedText, modelUsed, confidence, LocalDateTime.now());
   }
@@ -39,7 +39,7 @@ public class Recognition {
       UUID userId,
       String recognizedText,
       ModelType modelUsed,
-      double confidence,
+      Double confidence,
       LocalDateTime createdAt) {
     return new Recognition(id, userId, recognizedText, modelUsed, confidence, createdAt);
   }
@@ -64,7 +64,7 @@ public class Recognition {
     return modelUsed;
   }
 
-  public double getConfidence() {
+  public Double getConfidence() {
     return confidence;
   }
 

@@ -80,6 +80,17 @@ class RecordingTest {
   }
 
   @Test
+  void 신뢰도가_null이면_범위_검증_없이_반영된다() {
+    Recording recording = newRecording();
+    recording.markProcessing();
+
+    recording.markProcessed("오늘 날씨가 좋습니다.", null);
+
+    assertThat(recording.getStatus()).isEqualTo(RecordingStatus.DONE);
+    assertThat(recording.getConfidence()).isNull();
+  }
+
+  @Test
   void 인식_결과가_null이면_반영할_수_없다() {
     Recording recording = newRecording();
     recording.markProcessing();

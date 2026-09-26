@@ -12,5 +12,5 @@ public interface GetRecognitionHistoryUseCase {
       List<RecognitionView> content, int page, int size, long totalElements, int totalPages) {}
 
   record RecognitionView(
-      UUID recognitionId, String recognizedText, String modelUsed, double confidence) {}
+      UUID recognitionId, String recognizedText, String modelUsed, Double confidence) {}
 }
