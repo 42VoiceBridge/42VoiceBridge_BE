@@ -37,7 +37,8 @@
 
 ## 주의
 
-- `AiInferenceClient` 구현체는 아직 없음(JPyRust vs FastAPI PoC 대기중) — 실제 인식 로직은
-  이 포트가 스텁으로라도 구현되기 전까진 완성 못 함. 주영한테 PoC 진행 상황 확인하고 진행할 것.
+- `AiInferenceClient` 구현체는 이미 있음 — HTTP(`RestClient`) 기반 `adapter/out/ai/HttpAiInferenceClient.java`가
+  기본(v1) 구현체다(PR #29). JPyRust 구현체(`JPyRustAiInferenceClient`)는 삭제되지 않고
+  `jpyrust-experiment` 프로파일로 실험적으로 보존 중이며 기본 프로파일에서는 비활성화되어 있다.
 - `PersonalizationController`에 새 엔드포인트 추가할 때마다 상단 TODO 주석에서 하나씩 지워나갈 것.
 - 6장 코드 컨벤션(Spotless, record 네이밍, MockMvc/SpringBootTest 구분, `@MockitoBean`) 그대로 적용.

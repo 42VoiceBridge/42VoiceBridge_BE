@@ -74,7 +74,7 @@
 
 ### AI 연동
 - Python 3.12+, PyTorch, Hugging Face Transformers(Whisper)
-- Java↔Python 통신: **JPyRust(PyO3) in-process 브릿지가 1순위 검토 대상**, GPU 분리 필요 시 FastAPI(HTTP) 하이브리드로 전환 — `AiInferenceClient` 포트 인터페이스는 구현 방식과 무관하게 고정
+- Java↔Python 통신: **HTTP(RestClient)가 v1 기본 구현체, JPyRust(PyO3) in-process 브릿지는 실험적으로 보존**(`jpyrust-experiment` 프로파일, 기본 비활성) — `AiInferenceClient` 포트 인터페이스는 구현 방식과 무관하게 고정
 - PoC 결과가 나오기 전까지는 `AiInferenceClient` 구현체를 스텁으로 두고 나머지 개발이 막히지 않게 안내
 
 ### 데이터/인프라

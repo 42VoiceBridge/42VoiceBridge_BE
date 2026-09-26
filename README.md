@@ -14,7 +14,7 @@ GSIA SW 챌린지(3주) — **AI 구음장애 보조 서비스**의 백엔드입
 | Database | MySQL/MariaDB (로컬/운영), H2 (테스트 — `src/test/resources/application.yml`로 분리) |
 | Cache/Store | Redis (refresh token 저장 — TTL로 자동 만료) |
 | Auth | Spring Security + JWT(jjwt 0.12.6), 이메일/비밀번호(BCrypt) + 카카오 로그인 |
-| AI 연동 | [JPyRust](https://github.com/farmer0010/JPyRust)(PyO3) in-process 브릿지 → Python Whisper(OpenAI) 데몬 |
+| AI 연동 | HTTP(`RestClient`) → AI 서버(Python, Whisper 기반) — [JPyRust](https://github.com/farmer0010/JPyRust)(PyO3) in-process 브릿지는 `jpyrust-experiment` 프로파일로 실험적으로 보존 중, 기본 비활성 |
 | API 문서 | springdoc-openapi(Swagger UI) — `/swagger-ui/index.html` |
 | Code Quality | Spotless(Google Java Format), Jacoco |
 | Build | Gradle |
@@ -43,13 +43,13 @@ graph TB
     subgraph adapter_out["adapter.out — 출력 어댑터"]
         PERSIST["persistence<br/>(JPA 엔티티/리포지토리)"]
         AUTH["auth<br/>(JwtTokenProvider, BCrypt/SHA-256 해셔,<br/>RefreshTokenStoreAdapter)"]
-        AI["ai<br/>(JPyRustAiInferenceClient)"]
+        AI["ai<br/>(HttpAiInferenceClient)"]
     end
 
     subgraph external["앱 프로세스 밖"]
         MYSQL["MySQL"]
         REDIS["Redis<br/>(refresh token, TTL)"]
-        JPYRUST["JPyRust(PyO3) 브릿지<br/>→ Python Whisper 데몬"]
+        AISERVER["AI 서버(HTTP)<br/>POST /v1/asr/transcribe"]
         KAKAO["카카오 로그인 API"]
     end
 
@@ -65,7 +65,7 @@ graph TB
     PERSIST --> MODEL
     PERSIST --> MYSQL
     AUTH --> REDIS
-    AI --> JPYRUST
+    AI --> AISERVER
     AUTH --> KAKAO
 ```
 
@@ -78,10 +78,12 @@ graph TB
 - 카카오 로그인 (프론트가 카카오 SDK로 받은 accessToken을 백엔드가 그대로 카카오 API에 검증 요청 — 백엔드가 카카오 REST API 키를 가질 필요가 없는 설계)
 - JWT 액세스/리프레시 토큰 발급·재발급. refresh token은 SHA-256으로 별도 해싱해 **Redis**에 저장(사용자 비밀번호용 BCrypt와 관심사 분리 — BCrypt는 72바이트 제한이 있어 JWT 길이의 토큰에는 쓸 수 없음). Redis TTL로 만료를 자동 처리해 별도 정리(cleanup) 로직이 필요 없음 — **Redis가 기동되어 있지 않으면 로그인/refresh 자체가 실패**
 
-### AI 음성 인식 연동 — 인프라 배선만 완료
-- [JPyRust](https://github.com/farmer0010/JPyRust)(PyO3) in-process 브릿지로 실제 Whisper 모델을 호출하는 `AiInferenceClient` 구현체(`JPyRustAiInferenceClient`)
-- 현재 PoC 단계로 Whisper 모델은 `tiny` 고정 (정확도 검증은 AI팀 담당, 추후 `base`/`small` 등으로 교체 예정)
-- 이 구현체를 실제로 호출하는 인식 유스케이스(녹음 업로드 → 인식 → 결과 조회)는 아직 없음 — 현재는 어댑터 자체의 왕복 동작만 통합 테스트로 검증된 상태
+### AI 음성 인식 연동 — HTTP 어댑터로 배선 완료
+- `AiInferenceClient` 포트의 기본(v1) 구현체는 HTTP(`RestClient`) 기반 `HttpAiInferenceClient` — AI팀이 제공하는 `POST /v1/asr/transcribe`(raw WAV body, `user_id` 쿼리 파라미터)를 호출
+- AI 서버 계약(v1)상 `score`(신뢰도)는 항상 `null` — `AiInferenceClient.RecognitionResult.confidence`는 `Double`(nullable)로 정의되어 있고, 도메인/영속성 계층까지 nullable로 반영됨
+- 진단 녹음 업로드 후 비동기로 이 어댑터를 호출해 인식 결과를 반영하는 흐름(`RecordingRecognitionHandler`)이 실제로 배선되어 있음. `RecognizeSpeechUseCase`/`RecognizeSpeechService`(실사용 인식)도 구현은 완료됐으나 아직 컨트롤러로 노출되지 않음
+- [JPyRust](https://github.com/farmer0010/JPyRust)(PyO3) in-process 브릿지 구현체(`JPyRustAiInferenceClient`)는 삭제되지 않고 `jpyrust-experiment` 프로파일로 실험적으로 보존 중 — 기본 프로파일에서는 비활성화됨
+- 로컬(`local` 프로파일)에서는 실제 AI 서버 대신 `StubAiInferenceClient`가 고정 응답을 돌려줌. HTTP 어댑터를 실제로 띄워보려면 AI팀 mock 서버(`ASR_ENGINE=mock python3 demo/server.py`, 42VoiceBridge_AI 레포)가 `voicebridge.ai.http.base-url`(기본 `http://127.0.0.1:8000`)에 떠 있어야 함
 
 ### 진단 세션 — 세션 시작만 구현
 - `POST /api/v1/diagnosis-sessions`: 낭독 문장을 뽑아 진단 세션을 시작
@@ -130,7 +132,7 @@ docker-compose up -d   # MySQL, Redis
 
 | 역할 | 담당 영역 |
 |---|---|
-| 팀장·백엔드 리드 | 전체 아키텍처, Spring Boot 메인 서버, JPyRust 브릿지, 코드리뷰, API 명세 관리 |
+| 팀장·백엔드 리드 | 전체 아키텍처, Spring Boot 메인 서버, AI 연동(HTTP) 브릿지, 코드리뷰, API 명세 관리 |
 | 백엔드 개발자 A | 회원/인증, 진단세션·녹음 업로드, 추천 문장 |
 | 백엔드 개발자 B | AI 연동, 개인화 job, 실사용 인식 |
 | 인프라 담당 | Docker Compose, Nginx/TLS, GPU 서버, 배포 |

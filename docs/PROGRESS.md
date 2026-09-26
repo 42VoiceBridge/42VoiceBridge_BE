@@ -2,7 +2,28 @@
 
 > 매 작업이 끝날 때마다 이 문서를 갱신한다. 새 대화를 시작할 때 이 문서부터 읽으면 이전 지시사항이 어떻게 끝났는지 복사-붙여넣기 없이 파악할 수 있다.
 
-마지막 업데이트: 2026-09-23
+마지막 업데이트: 2026-09-26
+
+## 최신 작업 — AI 연동 JPyRust → HTTP 전환 (PR #29, 2026-09-26)
+
+- `feature/http-ai-inference`에서 `AiInferenceClient` 포트의 기본(v1) 구현체를 JPyRust(in-process) 브릿지에서
+  HTTP(`RestClient`) 기반 `HttpAiInferenceClient`로 전환. AI팀의 실제 계약 문서(`AI_BACKEND_CONTRACT_v1_EN.md`)를
+  직접 대조해 검증(`POST /v1/asr/transcribe`, raw WAV body, `user_id` 쿼리 파라미터, `score`는 v1에서 항상 `null`).
+- v1 계약상 신뢰도가 항상 `null`일 수 있어 `AiInferenceClient.RecognitionResult.confidence`를
+  `double` → `Double`로 변경하고 도메인(`Recognition`, `Recording`)·영속성(`RecognitionJpaEntity`)·
+  포트·DTO까지 전부 nullable로 파급 수정.
+- `JPyRustAiInferenceClient`는 삭제하지 않고 `@Profile("jpyrust-experiment")`로 비활성화해 코드만 보존.
+- 후속 리뷰에서 `HttpAiInferenceClient`가 `@Profile("!local")`만 걸려 있어 `jpyrust-experiment` 프로파일로
+  띄우면 `JPyRustAiInferenceClient`와 동시에 활성화돼 `AiInferenceClient` 빈이 중복 등록되는 문제가 지적됨 —
+  `@Profile("!local & !jpyrust-experiment")`로 수정(`0d0999c`). 실제 Spring 프로파일 조건 평가로 버그를
+  재현한 뒤 수정을 검증하는 회귀 테스트(`AiInferenceClientProfileWiringTest`)를 추가.
+- WireMock 기반 `HttpAiInferenceClientTest` 신규 작성. `com.github.tomakehurst:wiremock-jre8`이 프로젝트의
+  Jetty 12 의존성과 충돌해 `org.wiremock:wiremock-standalone`으로 교체(자세한 내용은
+  [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) "AI 연동 (HTTP)" 참고).
+- `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL, 137개 테스트 통과. **PR #29 병합 완료**(`5e00ec9`,
+  2026-09-26), `feature/http-ai-inference` 브랜치는 AI팀 mock 서버 왕복 검증이 아직 안 끝난 상태라 보존.
+- README, `TROUBLESHOOTING.md`, `NEXT-STEPS-*.md`, `CLAUDE.md`의 JPyRust 관련 서술을 HTTP 기준으로 갱신하는
+  작업은 별도 `chore/update-ai-docs-http` 브랜치에서 진행(PR #9 등 과거 JPyRust 작업 기록 자체는 보존).
 
 ## 최신 작업 — PR #25 도메인 예외 분리 검증 (2026-09-23)
 
