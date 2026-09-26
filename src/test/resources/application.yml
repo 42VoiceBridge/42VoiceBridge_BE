@@ -23,3 +23,9 @@ voicebridge:
   s3:
     bucket: test-bucket
     region: ap-northeast-2
+  tts:
+    naver:
+      base-url: https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts
+      api-key-id: test-api-key-id
+      api-key: test-api-key
+      speaker: nara

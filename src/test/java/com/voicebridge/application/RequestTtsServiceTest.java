@@ -20,11 +20,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class RequestTtsServiceTest {
   @Mock ConfirmationRepositoryPort confirmationRepositoryPort;
   @Mock TtsRequestRepositoryPort ttsRequestRepositoryPort;
+  @Mock ApplicationEventPublisher eventPublisher;
   RequestTtsService service;
 
   final UUID userId = UUID.randomUUID();
@@ -33,7 +35,8 @@ class RequestTtsServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new RequestTtsService(confirmationRepositoryPort, ttsRequestRepositoryPort);
+    service =
+        new RequestTtsService(confirmationRepositoryPort, ttsRequestRepositoryPort, eventPublisher);
   }
 
   private Confirmation validConfirmation() {
@@ -53,6 +56,19 @@ class RequestTtsServiceTest {
 
     assertThat(result.status()).isEqualTo("PENDING");
     assertThat(result.ttsId()).isNotNull();
+  }
+
+  @Test
+  void 정상_요청이면_확인된_텍스트를_실은_이벤트를_발행한다() {
+    Confirmation confirmation = validConfirmation();
+    when(ttsRequestRepositoryPort.findByIdempotencyKey(idempotencyKey))
+        .thenReturn(Optional.empty());
+    when(ttsRequestRepositoryPort.save(any())).thenAnswer(i -> i.getArgument(0));
+
+    var result = service.request(userId, confirmationId, idempotencyKey);
+
+    verify(eventPublisher)
+        .publishEvent(new TtsRequestedEvent(result.ttsId(), confirmation.getConfirmedText()));
   }
 
   @Test
@@ -101,6 +117,7 @@ class RequestTtsServiceTest {
     assertThat(result.ttsId()).isEqualTo(existing.getId());
     assertThat(result.status()).isEqualTo("PENDING");
     verify(ttsRequestRepositoryPort, never()).save(any());
+    verify(eventPublisher, never()).publishEvent(any());
   }
 
   @Test

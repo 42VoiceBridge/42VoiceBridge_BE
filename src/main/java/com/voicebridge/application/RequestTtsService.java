@@ -8,6 +8,7 @@ import com.voicebridge.port.out.ConfirmationRepositoryPort;
 import com.voicebridge.port.out.TtsRequestRepositoryPort;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ public class RequestTtsService implements RequestTtsUseCase {
 
   private final ConfirmationRepositoryPort confirmationRepositoryPort;
   private final TtsRequestRepositoryPort ttsRequestRepositoryPort;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   public RequestResult request(UUID userId, UUID confirmationId, UUID idempotencyKey) {
@@ -47,6 +49,11 @@ public class RequestTtsService implements RequestTtsUseCase {
     }
 
     var saved = ttsRequestRepositoryPort.save(TtsRequest.create(confirmationId, idempotencyKey));
+
+    // 리스너는 AFTER_COMMIT에 걸려 있어 이 트랜잭션이 커밋된 뒤에 실행된다.
+    eventPublisher.publishEvent(
+        new TtsRequestedEvent(saved.getId(), confirmation.getConfirmedText()));
+
     return new RequestResult(saved.getId(), saved.getStatus().name());
   }
 }
