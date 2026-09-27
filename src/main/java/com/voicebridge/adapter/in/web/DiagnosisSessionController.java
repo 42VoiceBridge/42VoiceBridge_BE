@@ -71,15 +71,15 @@ public class DiagnosisSessionController {
       @AuthenticationPrincipal UUID userId,
       @PathVariable UUID sessionId,
       @RequestParam UUID sentenceId,
-      @RequestPart("file") MultipartFile file) {
+      @RequestPart("audioFile") MultipartFile audioFile) {
 
-    if (file.isEmpty()) {
+    if (audioFile.isEmpty()) {
       throw new CustomException(ErrorCode.VALIDATION_FAILED, "녹음 파일이 비어 있습니다.");
     }
 
     byte[] audioBytes;
     try {
-      audioBytes = file.getBytes();
+      audioBytes = audioFile.getBytes();
     } catch (IOException e) {
       throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, "녹음 파일을 읽지 못했습니다.");
     }
@@ -87,7 +87,7 @@ public class DiagnosisSessionController {
     var result =
         uploadDiagnosisRecordingUseCase.upload(
             new UploadDiagnosisRecordingUseCase.UploadCommand(
-                userId, sessionId, sentenceId, audioBytes, file.getOriginalFilename()));
+                userId, sessionId, sentenceId, audioBytes, audioFile.getOriginalFilename()));
 
     return ResponseEntity.status(HttpStatus.ACCEPTED)
         .body(ApiResponse.success(UploadRecordingResponse.from(result)));

@@ -5,9 +5,11 @@ import com.voicebridge.domain.personalization.InsufficientRecordingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 /** 모든 Controller에 공통으로 적용되는 예외 처리기. 도메인 예외 → API 명세서 0.3/0.6절 포맷으로 변환하는 그러지점은 여기 하나로 고정한다. */
 @Slf4j
@@ -41,6 +43,21 @@ public class GlobalExceptionHandler {
         .body(
             ApiResponse.error(
                 ErrorCode.VALIDATION_FAILED.name(), ErrorCode.VALIDATION_FAILED.getMessage()));
+  }
+
+  // 필수 쿼리 파라미터나 multipart 파트가 빠진 요청은 클라이언트 실수다. 전용 처리가 없으면 맨 아래 Exception 핸들러로 떨어져
+  // 500이 나가는데, 그러면 프론트는 자기 요청이 틀린 게 아니라 서버가 고장 난 것으로 보게 된다.
+  @ExceptionHandler({
+    MissingServletRequestParameterException.class,
+    MissingServletRequestPartException.class
+  })
+  public ResponseEntity<ApiResponse<Void>> handleMissingRequestValue(Exception e) {
+    String name =
+        e instanceof MissingServletRequestPartException part
+            ? part.getRequestPartName()
+            : ((MissingServletRequestParameterException) e).getParameterName();
+    return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.getStatus())
+        .body(ApiResponse.error(ErrorCode.VALIDATION_FAILED.name(), "필수 요청 값이 없습니다: " + name));
   }
 
   /**
