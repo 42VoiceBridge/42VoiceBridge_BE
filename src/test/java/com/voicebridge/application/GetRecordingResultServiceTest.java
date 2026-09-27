@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.voicebridge.common.exception.CustomException;
 import com.voicebridge.common.exception.ErrorCode;
+import com.voicebridge.domain.diagnosis.RecognitionDiff.Highlight;
 import com.voicebridge.domain.diagnosis.Recording;
 import com.voicebridge.domain.diagnosis.Sentence;
 import com.voicebridge.port.out.RecordingRepositoryPort;
@@ -61,6 +62,8 @@ class GetRecordingResultServiceTest {
     assertThat(result.recognizedText()).isEqualTo("오늘 날띠가 조습니다.");
     assertThat(result.answerText()).isEqualTo("오늘 날씨가 좋습니다.");
     assertThat(result.confidence()).isEqualTo(0.62);
+    assertThat(result.diffHighlights())
+        .containsExactly(new Highlight(4, "씨", "띠"), new Highlight(7, "좋", "조"));
   }
 
   @Test
@@ -77,6 +80,7 @@ class GetRecordingResultServiceTest {
     assertThat(result.recognizedText()).isNull();
     assertThat(result.confidence()).isNull();
     assertThat(result.answerText()).isEqualTo("오늘 날씨가 좋습니다.");
+    assertThat(result.diffHighlights()).isEmpty();
   }
 
   @Test

@@ -2,6 +2,7 @@ package com.voicebridge.application;
 
 import com.voicebridge.common.exception.CustomException;
 import com.voicebridge.common.exception.ErrorCode;
+import com.voicebridge.domain.diagnosis.RecognitionDiff;
 import com.voicebridge.domain.diagnosis.Recording;
 import com.voicebridge.domain.diagnosis.Sentence;
 import com.voicebridge.port.in.GetRecordingResultUseCase;
@@ -47,6 +48,7 @@ public class GetRecordingResultService implements GetRecordingResultUseCase {
         recording.getStatus().name(),
         recording.getRecognizedText(),
         answerText,
-        recording.getConfidence());
+        recording.getConfidence(),
+        RecognitionDiff.between(answerText, recording.getRecognizedText()));
   }
 }
