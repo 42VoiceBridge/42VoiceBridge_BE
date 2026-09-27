@@ -81,7 +81,7 @@ graph TB
 ### AI 음성 인식 연동 — HTTP 어댑터로 배선 완료
 - `AiInferenceClient` 포트의 기본(v1) 구현체는 HTTP(`RestClient`) 기반 `HttpAiInferenceClient` — AI팀이 제공하는 `POST /v1/asr/transcribe`(raw WAV body, `user_id` 쿼리 파라미터)를 호출
 - AI 서버 계약(v1)상 `score`(신뢰도)는 항상 `null` — `AiInferenceClient.RecognitionResult.confidence`는 `Double`(nullable)로 정의되어 있고, 도메인/영속성 계층까지 nullable로 반영됨
-- 진단 녹음 업로드 후 비동기로 이 어댑터를 호출해 인식 결과를 반영하는 흐름(`RecordingRecognitionHandler`)이 실제로 배선되어 있음. 실사용 인식은 `POST /api/v1/recognitions`에서 `RecognizeSpeechUseCase`를 호출해 동기적으로 인식·저장 후 `201 Created`를 반환
+- 진단 녹음 업로드 후 비동기로 이 어댑터를 호출해 인식 결과를 반영하는 흐름(`RecordingRecognitionHandler`)이 실제로 배선되어 있음. 실사용 인식은 `POST /api/v1/recognitions`에서 `RecognizeSpeechUseCase`를 호출해 동기적으로 인식·저장 후 `200 OK`를 반환
 - [JPyRust](https://github.com/farmer0010/JPyRust)(PyO3) in-process 브릿지 구현체(`JPyRustAiInferenceClient`)는 삭제되지 않고 `jpyrust-experiment` 프로파일로 실험적으로 보존 중 — 기본 프로파일에서는 비활성화됨
 - 로컬(`local` 프로파일)에서는 실제 AI 서버 대신 `StubAiInferenceClient`가 고정 응답을 돌려줌. HTTP 어댑터를 실제로 띄워보려면 AI팀 mock 서버(`ASR_ENGINE=mock python3 demo/server.py`, 42VoiceBridge_AI 레포)가 `voicebridge.ai.http.base-url`(기본 `http://127.0.0.1:8000`)에 떠 있어야 함
 
@@ -122,14 +122,14 @@ graph TB
 | 10 | `POST /api/v1/recognitions/{recognitionId}/confirm` | JWT 필요 | 인식 결과 확인(같은 인식 결과 재확인 시 이전 확인 무효화) |
 | 11 | `POST /api/v1/tts` | JWT 필요 | 확인된 텍스트로 TTS 요청(무효화된 확인으로는 요청 불가). 비동기로 CLOVA Voice 합성 후 완료 |
 | 12 | `GET /api/v1/tts/{ttsId}` | JWT 필요 | TTS 요청 상태 조회 |
-| 13 | `POST /api/v1/recognitions` | JWT 필요 | `audioFile` multipart 업로드 → 인식·저장 결과 (`201`) |
+| 13 | `POST /api/v1/recognitions` | JWT 필요 | `audioFile` multipart 업로드 → 인식·저장 결과 (`200`) |
 
 > `/api/v1/auth/**`를 제외한 모든 API는 JWT 인증이 필요합니다(`POST /api/v1/auth/login`으로 발급, `Authorization: Bearer {token}` 헤더로 호출).
 
 ## 실사용 인식 업로드
 
 `POST /api/v1/recognitions`는 `multipart/form-data`의 필수 `audioFile`을 받습니다.
-인증된 사용자의 인식 결과를 저장한 뒤 `201 Created`와 기존 `RecognitionResponse`를 반환합니다.
+인증된 사용자의 인식 결과를 저장한 뒤 `200 OK`와 기존 `RecognitionResponse`를 반환합니다.
 `userId`는 요청 필드가 아니라 JWT에서 가져옵니다.
 
 ```bash

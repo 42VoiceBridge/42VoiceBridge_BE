@@ -61,7 +61,7 @@ class RecognitionUploadIntegrationTest {
                     .file(new MockMultipartFile("audioFile", "speech.wav", "audio/wav", audio))
                     .param("userId", suppliedUserId.toString())
                     .header("Authorization", token(userId)))
-            .andExpect(status().isCreated())
+            .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.recognizedText").value("안녕하세요"))
             .andExpect(jsonPath("$.data.modelUsed").value("BASE_ADAPTED"))
@@ -140,7 +140,7 @@ class RecognitionUploadIntegrationTest {
     when(aiInferenceClient.recognize(any(), any(), eq(userId)))
         .thenReturn(new AiInferenceClient.RecognitionResult("", null));
     mvc.perform(multipart(URL).file(wav("audioFile")).header("Authorization", token(userId)))
-        .andExpect(status().isCreated())
+        .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.recognizedText").value(""))
         .andExpect(jsonPath("$.data.confidence").value(nullValue()));
     assertThat(repository.findByUserId(userId, 0, 20).totalElements()).isEqualTo(1);

@@ -26,7 +26,7 @@
 
 ## 실사용 인식 업로드·조회 — 구현 완료
 
-- `POST /api/v1/recognitions`: JWT 인증 + multipart `audioFile` → 기존 인식 서비스 호출·저장 → `201`.
+- `POST /api/v1/recognitions`: JWT 인증 + multipart `audioFile` → 기존 인식 서비스 호출·저장 → `200`.
 - `GET /api/v1/recognitions`, `GET /api/v1/recognitions/{id}`로 저장 결과 조회.
 - HTTP/DB 통합 테스트는 AI 포트만 대체한다. 실제 AI 서버 왕복은 별도 검증 대상.
 - 규격 WAV 파일로 호출한다. 브라우저 WebM 변환·오디오 내용 검증 및 모델 메타데이터 보존은 후속 작업.
