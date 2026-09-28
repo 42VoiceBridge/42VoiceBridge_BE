@@ -3,7 +3,10 @@ package com.voicebridge.adapter.out.persistence;
 import com.voicebridge.common.exception.CustomException;
 import com.voicebridge.common.exception.ErrorCode;
 import com.voicebridge.domain.diagnosis.DiagnosisSession;
+import com.voicebridge.domain.diagnosis.DiagnosisSessionStatus;
 import com.voicebridge.port.out.DiagnosisSessionRepositoryPort;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +33,14 @@ public class DiagnosisSessionPersistenceAdapter implements DiagnosisSessionRepos
   @Override
   public Optional<DiagnosisSession> findById(UUID id) {
     return jpaRepository.findById(id).map(DiagnosisSessionPersistenceAdapter::toDomain);
+  }
+
+  @Override
+  public List<DiagnosisSession> findByUserIdAndStatusIn(
+      UUID userId, Collection<DiagnosisSessionStatus> statuses) {
+    return jpaRepository.findByUserIdAndStatusIn(userId, statuses).stream()
+        .map(DiagnosisSessionPersistenceAdapter::toDomain)
+        .toList();
   }
 
   private static DiagnosisSessionJpaEntity toEntity(DiagnosisSession session) {

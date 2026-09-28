@@ -105,6 +105,18 @@ class UploadDiagnosisRecordingServiceTest {
   }
 
   @Test
+  void 분석이_끝난_세션에는_업로드할_수_없고_파일도_올리지_않는다() {
+    DiagnosisSession analyzed = sessionOwnedBy(userId);
+    analyzed.markAnalyzed();
+    when(diagnosisSessionRepositoryPort.findById(sessionId)).thenReturn(Optional.of(analyzed));
+
+    // 도메인이 던지는 IllegalStateException은 전역 핸들러가 409(INVALID_STATE_TRANSITION)로 바꾼다
+    assertThatThrownBy(() -> service.upload(command())).isInstanceOf(IllegalStateException.class);
+
+    verify(storagePort, never()).upload(any(), any());
+  }
+
+  @Test
   void 세션에_속하지_않은_문장은_업로드할_수_없다() {
     when(diagnosisSessionRepositoryPort.findById(sessionId))
         .thenReturn(Optional.of(sessionOwnedBy(userId)));

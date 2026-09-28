@@ -112,4 +112,20 @@ class RecordingPersistenceAdapterTest {
   void 존재하지_않는_녹음을_조회하면_비어있다() {
     assertThat(adapter.findById(UUID.randomUUID())).isEmpty();
   }
+
+  @Test
+  void 여러_세션의_녹음을_한_번에_조회한다() {
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    Recording a = adapter.save(newRecording(first, userId));
+    Recording b = adapter.save(newRecording(second, userId));
+    adapter.save(newRecording(UUID.randomUUID(), userId));
+    entityManager.flush();
+    entityManager.clear();
+
+    List<Recording> found = adapter.findBySessionIdIn(List.of(first, second));
+
+    assertThat(found).extracting(Recording::getId).containsExactlyInAnyOrder(a.getId(), b.getId());
+  }
 }

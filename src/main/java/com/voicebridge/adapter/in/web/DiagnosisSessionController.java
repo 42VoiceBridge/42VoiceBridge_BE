@@ -27,10 +27,6 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * TODO(백엔드 A) — 구현 완료 후 여기에 매핑 추가: - GET /api/v1/diagnosis-sessions/{sessionId}/weak-phonemes →
- * AnalyzeWeakPhonemesUseCase
- */
 @RestController
 @RequestMapping("/api/v1/diagnosis-sessions")
 @RequiredArgsConstructor

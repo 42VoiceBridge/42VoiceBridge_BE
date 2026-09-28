@@ -22,12 +22,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class RecordingRecognitionHandlerTest {
 
   @Mock private RecordingRepositoryPort recordingRepositoryPort;
   @Mock private AiInferenceClient aiInferenceClient;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   private RecordingRecognitionHandler handler;
 
@@ -36,7 +38,8 @@ class RecordingRecognitionHandlerTest {
 
   @BeforeEach
   void setUp() {
-    handler = new RecordingRecognitionHandler(recordingRepositoryPort, aiInferenceClient);
+    handler =
+        new RecordingRecognitionHandler(recordingRepositoryPort, aiInferenceClient, eventPublisher);
   }
 
   /** 업로드 서비스가 이미 PROCESSING으로 저장한 뒤 이벤트를 발행하므로, 핸들러가 보는 상태는 항상 PROCESSING이다. */
@@ -121,7 +124,7 @@ class RecordingRecognitionHandlerTest {
   }
 
   @Test
-  void 진단_세션은_개인화_이전이라_BASE_ADAPTED_모델로_호출한다() {
+  void 진단은_개인화_여부와_무관하게_항상_기본_모델로_인식한다() {
     Recording recording = processingRecording();
     when(recordingRepositoryPort.findById(recording.getId())).thenReturn(Optional.of(recording));
     when(aiInferenceClient.recognize(any(), any(), any()))
@@ -130,5 +133,29 @@ class RecordingRecognitionHandlerTest {
     handler.handle(new RecordingUploadedEvent(recording.getId(), audioBytes));
 
     verify(aiInferenceClient).recognize(eq(audioBytes), eq(ModelType.BASE_ADAPTED), eq(userId));
+  }
+
+  @Test
+  void 인식에_성공하면_세션_완료_판단을_위해_이벤트를_발행한다() {
+    Recording recording = processingRecording();
+    when(recordingRepositoryPort.findById(recording.getId())).thenReturn(Optional.of(recording));
+    when(aiInferenceClient.recognize(any(), any(), any()))
+        .thenReturn(new AiInferenceClient.RecognitionResult("오늘 날씨가 좋습니다.", null));
+
+    handler.handle(new RecordingUploadedEvent(recording.getId(), audioBytes));
+
+    verify(eventPublisher).publishEvent(new RecordingRecognizedEvent(recording.getSessionId()));
+  }
+
+  @Test
+  void 인식에_실패하면_세션을_끝낼_수_없으므로_이벤트를_발행하지_않는다() {
+    Recording recording = processingRecording();
+    when(recordingRepositoryPort.findById(recording.getId())).thenReturn(Optional.of(recording));
+    when(aiInferenceClient.recognize(any(), any(), any()))
+        .thenThrow(new RuntimeException("AI 서버 다운"));
+
+    handler.handle(new RecordingUploadedEvent(recording.getId(), audioBytes));
+
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
   }
 }

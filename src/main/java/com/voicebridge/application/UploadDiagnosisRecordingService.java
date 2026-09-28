@@ -35,6 +35,7 @@ public class UploadDiagnosisRecordingService implements UploadDiagnosisRecording
     if (!session.isOwnedBy(command.userId())) {
       throw new CustomException(ErrorCode.FORBIDDEN_ACCESS);
     }
+    session.ensureRecordable();
     if (!session.getSentenceIds().contains(command.sentenceId())) {
       throw new CustomException(ErrorCode.VALIDATION_FAILED, "이 세션에 포함된 문장이 아닙니다.");
     }

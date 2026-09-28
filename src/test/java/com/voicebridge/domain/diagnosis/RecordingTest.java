@@ -147,4 +147,18 @@ class RecordingTest {
     assertThat(recording.isOwnedBy(userId)).isTrue();
     assertThat(recording.isOwnedBy(UUID.randomUUID())).isFalse();
   }
+
+  @Test
+  void 자모_통계에는_인식이_끝났고_무음이_아닌_녹음만_쓴다() {
+    Recording spoken = newRecording();
+    spoken.markProcessing();
+    assertThat(spoken.isUsableForJamoStats()).isFalse();
+    spoken.markProcessed("오늘 날씨가 좋습니다.", null);
+    assertThat(spoken.isUsableForJamoStats()).isTrue();
+
+    Recording silent = newRecording();
+    silent.markProcessing();
+    silent.markProcessed("", null);
+    assertThat(silent.isUsableForJamoStats()).isFalse();
+  }
 }

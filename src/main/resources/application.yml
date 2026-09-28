@@ -5,6 +5,10 @@ spring:
     active: local
   jpa:
     open-in-view: false
+  task:
+    execution:
+      # 진단 인식 전용 실행기(AsyncConfig)를 따로 등록해도 스프링 부트 기본 실행기를 그대로 만든다. 없으면 TTS 같은 다른 @Async까지 진단 실행기로 몰린다.
+      mode: force
     properties:
       hibernate:
         format_sql: true
@@ -33,6 +37,15 @@ voicebridge:
       base-url: ${AI_SERVER_BASE_URL:http://127.0.0.1:8000}
       connect-timeout-ms: 3000
       read-timeout-ms: 10000
+    jamo-stats:
+      # 자모 하나의 오류율을 보여주려면 최소 이만큼 표본이 필요하다. AI 기본값은 20이지만 세션 2~3개로는 거의 아무것도 안 보여서
+      # 진단 화면용으로 10을 쓴다(2026-09-29 결정, 근거는 PROGRESS 23번). 바꾸면 기존 스냅샷은 다음 조회 때 새 기준으로 다시 계산된다.
+      min-support: 10
+  diagnosis:
+    recognition:
+      # 진단 녹음 인식 전용 스레드 수와 대기열. AI 서버가 요청을 하나씩 처리하므로 스레드를 늘려도 빨라지지 않는다.
+      threads: 2
+      queue-capacity: 200
   s3:
     bucket: ${S3_BUCKET:voicebridge-recordings}
     region: ${AWS_REGION:ap-northeast-2}

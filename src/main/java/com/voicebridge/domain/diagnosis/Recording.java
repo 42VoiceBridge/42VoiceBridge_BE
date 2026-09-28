@@ -113,6 +113,14 @@ public class Recording {
     return status == RecordingStatus.DONE;
   }
 
+  /**
+   * 자모 오류 통계의 인식 결과로 쓸 수 있는가. 무음(빈 텍스트)은 인식이 정상적으로 끝났어도 빼는데, 넣으면 정답의 모든 자모가 "빠졌다"로 세어져 발음이 아니라 녹음
+   * 실패가 오류율을 끌어올린다.
+   */
+  public boolean isUsableForJamoStats() {
+    return isDone() && !recognizedText.isEmpty();
+  }
+
   public UUID getId() {
     return id;
   }
