@@ -94,6 +94,12 @@ graph TB
 - `Recording` 도메인은 상태 전이 `UPLOADED → PROCESSING → DONE | FAILED`를 직접 소유한다. 무음·비언어 오디오의 빈 인식 결과(`""`)는 **정상 완료**로 처리한다 — 구음장애 발화 특성상 인식 실패가 흔하고 그 패턴 자체가 분석 데이터이기 때문. `FAILED`는 AI 호출이 실패한 경우로, 비동기라 HTTP 응답으로 알릴 수 없어 상태로 남긴다
 - 음성 저장은 `StoragePort` 뒤에 있다. 로컬 프로파일은 파일시스템, 그 외에는 S3를 쓰므로 **AWS 크레덴셜 없이도 개발할 수 있다**. 사용자가 보낸 파일명은 저장 키에 쓰지 않고 허용 목록의 확장자만 추출한다
 
+### 추천 문장 — 구현
+- `POST /api/v1/users/me/recommendations`: 개인화 등록용으로 읽을 문장을 추천. **문장 선택은 AI(`/v1/enroll/next-prompts`)가 하고**, 백엔드는 보여준 문장을 전략·버전·seed와 함께 `shown_prompts`에 기록한다(AI 계약 §1, §3.6)
+- 문장 ID는 우리 `sentences` 테이블이 아니라 AI 문장 풀의 `promptId`다. 이미 보여준 문장은 다음 추천에서 빠진다
+- AI v1은 무작위(`random`) 선택만 지원한다. 오류 기반 선택은 AI 쪽 구현 이후
+- 로컬(`local` 프로파일)은 `StubEnrollmentPromptClient`가 고정 12문장에서 고른다
+
 ### 개인화 — 모델·학습 작업 상태 조회 구현
 - `GET /api/v1/personalization/model`: 사용자 개인화 모델 상태 조회
 - `GET /api/v1/personalization/train/{jobId}`: 학습 작업 상태 조회
@@ -123,6 +129,7 @@ graph TB
 | 11 | `POST /api/v1/tts` | JWT 필요 | 확인된 텍스트로 TTS 요청(무효화된 확인으로는 요청 불가). 비동기로 CLOVA Voice 합성 후 완료 |
 | 12 | `GET /api/v1/tts/{ttsId}` | JWT 필요 | TTS 요청 상태 조회 |
 | 13 | `POST /api/v1/recognitions` | JWT 필요 | `audioFile` multipart 업로드 → 인식·저장 결과 (`200`) |
+| 14 | `POST /api/v1/users/me/recommendations` | JWT 필요 | 개인화 등록용 추천 문장. 문장은 AI가 고르고, 보여준 문장을 기록한다. 본문 `{ "count": 10 }`(생략 가능, 1~50) |
 
 > `/api/v1/auth/**`를 제외한 모든 API는 JWT 인증이 필요합니다(`POST /api/v1/auth/login`으로 발급, `Authorization: Bearer {token}` 헤더로 호출).
 

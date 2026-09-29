@@ -2,7 +2,7 @@
 
 > 매 작업이 끝날 때마다 이 문서를 갱신한다. 새 대화를 시작할 때 이 문서부터 읽으면 이전 지시사항이 어떻게 끝났는지 복사-붙여넣기 없이 파악할 수 있다.
 
-마지막 업데이트: 2026-09-27
+마지막 업데이트: 2026-09-28
 
 ## 최신 작업 — 네이버 클로바 보이스 TTS 엔진 연동 (2026-09-26)
 
@@ -331,6 +331,19 @@
   - 명세서와 달랐던 나머지(`201`→`202`, `UPLOADED`→`PROCESSING`)는 PR #24 리뷰에서 승인된 설계라 코드가 아니라 명세서를 고쳤다. 완료 세션 업로드 차단(409)은 세션이 `ANALYZED`로 바뀌는 코드가 생기는 자모 오류 통계 작업에서 함께 구현한다.
   - 테스트 전체 206건 통과.
 
+### 22. 추천 문장 (feature/recommendations) — 진행 중
+
+- `POST /api/v1/users/me/recommendations`. AI 계약(§1, §3.6)을 확인해 보니 **문장 선택은 AI(`/v1/enroll/next-prompts`)가 하고, 백엔드는 보여준 문장을 전략·버전·seed와 함께 기록**(`shown_prompts`)해 전달하는 역할이었다. 문장은 우리 `sentences` 테이블이 아니라 AI 문장 풀(가이드라인 낭독 스크립트 1,807문장)의 `promptId`를 쓴다. 우리 자모 오류 통계에는 의존하지 않는다(오류 기반 선택도 AI 몫).
+  - **명세서 3.1과 달라진 계약 4가지**(팀장 확인 요청): `GET` → `POST`(호출마다 기록이 생기고 결과가 매번 다름), `sessionId` 삭제(AI가 사용자 단위로 고름), `sentenceId` → `promptId`, `targetPhonemes` 삭제(AI v1은 `random`만 있어 노린 자모가 없음). 유스케이스 이름도 기록을 만드는 동작이라 `GetRecommendedSentencesUseCase` → `RecommendSentencesUseCase`.
+  - **seed를 호출마다 새로 뽑는다.** AI는 seed와 제외 목록이 같으면 같은 문장을 돌려준다(실제 데모 서버로 확인). 고정하면 처음 추천받는 사용자들이 모두 같은 문장을 받는다. 이미 보여준 문장은 `exclude_prompt_ids`로 뺀다.
+  - `ShownPrompt`는 전략·버전이 없으면 만들 수 없다. 이 값이 빠진 기록은 어떤 추천 방식이 나았는지 비교할 수 없어서다(AI 계약이 가장 강조한 부분).
+  - 개수 규칙(기본 10, 1~50)은 도메인 `RecommendationCount`에만 두고 요청 DTO에는 두지 않았다(SSOT).
+  - `shown_prompts`에 (user_id, prompt_id) 유일 제약을 걸지 않았다. 같은 사용자의 동시 요청이면 같은 문장이 두 번 기록될 수 있지만 이력이라 해가 없고, 제약을 걸면 그 경우 추천 요청 자체가 실패한다.
+  - AI 어댑터는 처음부터 요청 본문을 버퍼링해 `Content-Length`를 붙인다. 데모 서버가 chunked 본문을 읽지 못한다(자모 오류 통계 작업에서 발견).
+  - 실제 AI 데모 서버로 확인: 요청·응답 연결, 제외 목록, 같은 seed로 다시 요청하면 같은 결과, 문장 풀 파일이 없을 때 503 → `AI_INFERENCE_UNAVAILABLE`.
+  - 로컬 스텁은 전략 버전을 `stub-random-v1`로 실제와 다르게 두어, 로컬에서 쌓인 기록이 실제 AI 추천 기록으로 오인되지 않게 했다.
+  - 테스트 27건(AI 어댑터 4, 프로파일 연결 3, 도메인 6, 영속성 3, 서비스 7, 통합 4). 전체 230건 통과.
+
 ## 알려진 이슈 / 확인 필요 사항
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.
@@ -338,16 +351,15 @@
 - **`AsyncConfig`에 커스텀 Executor가 없다.** `@EnableAsync`만 선언해 둔 상태라 기본 실행기를 쓰며, 스레드 풀 크기·큐 용량·거부 정책을 제어하지 못한다. 업로드가 몰리면 스레드가 무제한으로 늘어날 수 있다. 시연 규모에서는 문제가 되지 않아 의도적으로 미루지만, 운영 전에는 `ThreadPoolTaskExecutor`를 명시하고 AI 추론 동시 실행 수를 제한해야 한다.
 - **비동기 인식 중 서버가 죽으면 해당 녹음이 `PROCESSING`에 갇힌다.** 재시도 경로가 없어 세션이 완료 불가 상태가 된다(취약 음소 분석은 모든 녹음이 종료 상태여야 함). 복구 수단(재시도 API 또는 오래된 `PROCESSING` 정리 스케줄러)을 만들지는 취약 음소 분석 착수 전에 결정한다.
 - **`S3StorageAdapter`는 실제로 검증하지 못했다.** 버킷과 크레덴셜이 없어 로컬 파일 어댑터로만 확인했다. 인프라 쪽에 프로비저닝 요청이 등록돼 있다.
-
-- **`AsyncConfig`에 커스텀 Executor가 없다.** `@EnableAsync`만 선언해 둔 상태라 기본 실행기를 쓰며, 스레드 풀 크기·큐 용량·거부 정책을 제어하지 못한다. 업로드가 몰리면 스레드가 무제한으로 늘어날 수 있다. 시연 규모에서는 문제가 되지 않아 의도적으로 미루지만, 운영 전에는 `ThreadPoolTaskExecutor`를 명시하고 AI 추론 동시 실행 수를 제한해야 한다.
-- **비동기 인식 중 서버가 죽으면 해당 녹음이 `PROCESSING`에 갇힌다.** 재시도 경로가 없어 세션이 완료 불가 상태가 된다(취약 음소 분석은 모든 녹음이 종료 상태여야 함). 복구 수단(재시도 API 또는 오래된 `PROCESSING` 정리 스케줄러)을 만들지는 취약 음소 분석 착수 전에 결정한다.
+- **AI 서버에 문장 풀 파일(`data/script_pool.json`)이 없으면 추천이 항상 503이다.** AI 레포에 이 파일이 없다(AI-Hub 낭독 스크립트라 레포에 올리지 않은 것으로 보임). 서버에 넣는 방법(`PROMPT_POOL` 환경변수로 경로 지정 가능)을 AI 담당과 맞춰야 한다.
+- **운영 DB에 `shown_prompts` 테이블을 직접 만들어야 한다.** prod는 `ddl-auto: validate`이고 저장소에 스키마 관리 도구가 없다(기존 테이블도 같은 상황). DDL은 PR 본문 참고.
+- 개인화 녹음(FR-7)이 받은 `promptId`를 검증하려면 `ShownPromptRepositoryPort`에 "이 사용자에게 보여준 문장인가" 조회를 추가하면 된다. 아직 쓰는 곳이 없어 만들지 않았다.
 
 - 아키텍처 감사(12번)에서 발견된 남은 참고 사항: `SecurityConfig`의 CORS가 `allowedOriginPatterns("*")` + `allowCredentials(true)` 조합 — 감사 체크리스트 항목엔 없어 수정하지 않았음, 운영 배포 전 재검토 필요.
 - 인식 유스케이스(녹음 업로드 → 실제 인식 → 결과 조회)가 아직 없어서 `JPyRustAiInferenceClient`(PR #9)는 인프라 배선만 완료된 상태 — API 레벨에서는 아직 아무 효과가 없음.
 - 테스트 커버리지 19% → 42.1%(PR #13) → **48.6%**(PR #18 기준, `jacocoTestReport` 실측: 266/547 라인)로 계속 개선 중이지만 `adapter.in.web`/`adapter.in.web.dto`/`adapter.out.persistence`는 여전히 0% — `jacocoTestCoverageVerification`은 여전히 `build`/`check`에 묶여 있지 않음(warn-only 유지 중).
 - `docker-compose.yml`(PR #17)은 **로컬 개발 전용**이다 — MySQL `MYSQL_ALLOW_EMPTY_PASSWORD` 등 프로덕션에 쓰면 안 되는 설정이 포함되어 있음. 운영 배포용 compose/매니페스트는 별도로 준비해야 한다(스코프 밖).
 - PR #18부터 Redis가 로그인/refresh의 필수 인프라가 됨 — 운영 배포 시 Redis 프로비저닝을 반드시 함께 계획해야 한다(현재 운영 Redis 이중화/영속성 정책은 미정).
-
 ## 다음 단계 후보
 
 - 백엔드 A가 진단 세션 나머지 4개 유스케이스(세션 조회/녹음 업로드/결과 조회/취약 음소 분석)를 **엔드포인트별 브랜치로 나눠** 이어서 구현. PR #21(`Recording` 도메인) 병합 후 develop에서 분기하며, 다음은 **녹음 업로드**(`UploadDiagnosisRecordingUseCase`) 차례.
