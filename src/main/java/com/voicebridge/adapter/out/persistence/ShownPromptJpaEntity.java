@@ -12,9 +12,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// 조회는 "이 사용자에게 보여준 문장 ID"뿐이라 user_id에 인덱스를 둔다.
+// 조회는 "이 사용자에게 제안한 문장 ID"뿐이라 user_id에 인덱스를 둔다.
 // 같은 사용자의 추천이 동시에 두 번 요청되면 같은 문장이 두 번 기록될 수 있어 (user_id, prompt_id)에 유일 제약을 걸지 않는다.
-// 보여준 이력이라 중복이 생겨도 해가 없고, 제약을 걸면 그 경우 추천 요청 자체가 실패한다.
+// 제안 이력이라 중복이 생겨도 해가 없고, 제약을 걸면 그 경우 추천 요청 자체가 실패한다.
 @Entity
 @Table(
     name = "shown_prompts",

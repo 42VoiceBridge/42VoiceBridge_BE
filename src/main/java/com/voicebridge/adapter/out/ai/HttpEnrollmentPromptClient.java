@@ -70,7 +70,7 @@ public class HttpEnrollmentPromptClient implements EnrollmentPromptPort {
       throw new CustomException(ErrorCode.AI_INFERENCE_UNAVAILABLE, "추천 문장을 받지 못했습니다.");
     }
 
-    // 전략과 버전이 없으면 보여준 문장을 기록할 수 없다(ShownPrompt가 거절한다)
+    // 전략과 버전이 없으면 제안한 문장을 기록할 수 없다(ShownPrompt가 거절한다)
     if (response == null
         || response.prompts() == null
         || isBlank(response.strategy())

@@ -13,7 +13,7 @@ public interface EnrollmentPromptPort {
    */
   PromptBatch nextPrompts(UUID userId, int count, long seed, Collection<String> excludePromptIds);
 
-  /** strategy·strategyVersion·seed는 보여준 문장 기록에 그대로 남긴다. */
+  /** strategy·strategyVersion·seed는 제안한 문장 기록에 그대로 남긴다. */
   record PromptBatch(String strategy, String strategyVersion, long seed, List<Prompt> prompts) {}
 
   record Prompt(String promptId, String text) {}

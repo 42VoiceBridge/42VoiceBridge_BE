@@ -19,7 +19,7 @@ public class RecommendationController {
 
   private final RecommendSentencesUseCase recommendSentencesUseCase;
 
-  // 호출할 때마다 새 문장을 받아 보여준 기록을 남기므로 조회(GET)가 아니라 POST다.
+  // 호출할 때마다 새 문장을 받아 제안한 기록을 남기므로 조회(GET)가 아니라 POST다.
   @PostMapping("/recommendations")
   public ApiResponse<RecommendationResponse> recommend(
       @AuthenticationPrincipal UUID userId,

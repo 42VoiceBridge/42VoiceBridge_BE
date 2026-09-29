@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * API 명세서 3.1절. 문장 선택은 AI가 하고, 백엔드는 보여준 문장을 기록해 전달한다(AI 계약 §1, §3.6). 호출할 때마다 새 문장을 받아 기록을 남기므로 조회가
+ * API 명세서 3.1절. 문장 선택은 AI가 하고, 백엔드는 제안한 문장을 기록해 전달한다(AI 계약 §1, §3.6). 호출할 때마다 새 문장을 받아 기록을 남기므로 조회가
  * 아니라 생성이다.
  */
 public interface RecommendSentencesUseCase {
