@@ -311,7 +311,7 @@
   - 리뷰 요청으로 **비동기 핸들러 테스트 6건 추가**(`5f482ce`) — 예외를 삼키고 상태로만 남기는 구조라 테스트가 없으면 오동작이 드러나지 않음. AI 실패 → `FAILED`, 녹음 미존재 시 조기 리턴, 예외를 밖으로 던지지 않는지까지 검증.
   - **PR #24 병합 완료**(`d3378fe`).
 
-### 20. 진단 세션 조회 / 녹음 결과 조회 (feature/diagnosis-session-queries) — 진행 중
+### 20. 진단 세션 조회 / 녹음 결과 조회 (feature/diagnosis-session-queries) — 완료
 
 - `GET /{sessionId}`, `GET /{sessionId}/recordings/{recordingId}/result` 두 개를 한 브랜치에 담았다(팀장 가이드가 "단순 조회"로 묶어둔 단위).
   - 세션 조회는 **문장별 녹음 상태**를 함께 반환한다. 계약의 TODO가 "문장별 녹음 여부 등"이었고, 프론트가 이어하기를 구현하려면 필요하다. 같은 문장을 다시 녹음한 경우 **가장 최근 녹음**을 노출하며, 문장 순서는 세션에 정의된 낭독 순서를 유지한다(`@OrderColumn`으로 보존됨).
@@ -321,6 +321,15 @@
   - 400 vs 404 판단은 리뷰에서 400으로 확정(PR #24의 "세션에 속하지 않은 문장" 처리와 일관).
   - 최신 develop(PR #29~#34 반영)으로 리베이스. HTTP 전환(PR #29)으로 JPyRust 빈이 기본 비활성화되면서 이전에 develop에서도 실패하던 `@SpringBootTest` 계열 18건이 해소됐다.
   - 테스트: 세션 조회 6 / 결과 조회 8 / `RecognitionDiff` 9. 전체 203건 통과.
+  - **PR #28 병합 완료**(`6129983`).
+
+### 21. 녹음 업로드 요청 형식을 명세서에 맞춤 (fix/diagnosis-upload-contract) — 진행 중
+
+- 명세서 최신화(2026-09-27) 중 2.3절과 PR #24 구현을 대조하다 발견. multipart 파일 필드명이 명세서는 `audioFile`, 코드는 `file`이었다. 프론트가 명세서대로 보내면 **모든 업로드가 실패**한다. 계약이 먼저였으므로 코드를 명세서에 맞췄고, 명세서에 있던 응답의 `sentenceId`도 추가했다.
+  - 틀린 필드명 요청이 **500**으로 나가는 것도 확인했다. 전역 예외 핸들러에 필수 값 누락(`MissingServletRequestPartException`, `MissingServletRequestParameterException`) 처리가 없어 마지막 `Exception` 핸들러로 떨어지기 때문. 클라이언트 실수인데 서버 고장처럼 보이므로 400 `VALIDATION_FAILED`로 매핑하고, 빠진 필드 이름을 메시지에 담았다. 공통 코드라 모든 엔드포인트에 적용된다.
+  - 서비스 단위 테스트로는 요청 모양을 검증할 수 없어 MockMvc 통합 테스트(`DiagnosisRecordingUploadIntegrationTest`)를 추가: 필드명·상태 코드·응답 JSON, 필드명 오류와 `sentenceId` 누락 시 400.
+  - 명세서와 달랐던 나머지(`201`→`202`, `UPLOADED`→`PROCESSING`)는 PR #24 리뷰에서 승인된 설계라 코드가 아니라 명세서를 고쳤다. 완료 세션 업로드 차단(409)은 세션이 `ANALYZED`로 바뀌는 코드가 생기는 자모 오류 통계 작업에서 함께 구현한다.
+  - 테스트 전체 206건 통과.
 
 ## 알려진 이슈 / 확인 필요 사항
 

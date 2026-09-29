@@ -49,6 +49,6 @@ public class UploadDiagnosisRecordingService implements UploadDiagnosisRecording
     // 리스너는 AFTER_COMMIT에 걸려 있어 이 트랜잭션이 커밋된 뒤에 실행된다.
     eventPublisher.publishEvent(new RecordingUploadedEvent(saved.getId(), command.audioBytes()));
 
-    return new UploadResult(saved.getId(), saved.getStatus().name());
+    return new UploadResult(saved.getId(), saved.getSentenceId(), saved.getStatus().name());
   }
 }

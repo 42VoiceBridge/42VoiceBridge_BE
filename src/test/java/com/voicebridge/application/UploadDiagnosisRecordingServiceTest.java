@@ -72,6 +72,7 @@ class UploadDiagnosisRecordingServiceTest {
 
     assertThat(result.status()).isEqualTo("PROCESSING");
     assertThat(result.recordingId()).isNotNull();
+    assertThat(result.sentenceId()).isEqualTo(sentenceId);
 
     ArgumentCaptor<RecordingUploadedEvent> event =
         ArgumentCaptor.forClass(RecordingUploadedEvent.class);
