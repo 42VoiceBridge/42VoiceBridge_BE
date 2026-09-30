@@ -15,6 +15,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.voicebridge.domain.recognition.ModelType;
 import com.voicebridge.port.out.AiInferenceClient;
+import com.voicebridge.port.out.AudioNormalizationPort;
+import com.voicebridge.port.out.AudioProcessingException;
+import com.voicebridge.port.out.InvalidAudioException;
 import com.voicebridge.port.out.RecognitionRepositoryPort;
 import com.voicebridge.port.out.TokenProviderPort;
 import jakarta.persistence.EntityManager;
@@ -23,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -46,6 +50,51 @@ class RecognitionUploadIntegrationTest {
   @Autowired RecognitionRepositoryPort repository;
   @Autowired EntityManager entityManager;
   @MockitoBean AiInferenceClient aiInferenceClient;
+  @MockitoBean AudioNormalizationPort normalizer;
+
+  @BeforeEach
+  void normalizedAudioBoundary() {
+    when(normalizer.normalize(any()))
+        .thenAnswer(
+            i ->
+                new AudioNormalizationPort.NormalizedAudio(
+                    i.getArgument(0),
+                    new AudioNormalizationPort.Metadata(
+                        "wav",
+                        "pcm_s16le",
+                        16000,
+                        1,
+                        8000,
+                        "source",
+                        "result",
+                        "audio-ingest-v1-mono")));
+  }
+
+  @Test
+  void invalidAudioReturns400WithoutInferenceOrStorage() throws Exception {
+    UUID userId = UUID.randomUUID();
+    org.mockito.Mockito.doThrow(new InvalidAudioException("bad audio"))
+        .when(normalizer)
+        .normalize(any());
+    mvc.perform(multipart(URL).file(wav("audioFile")).header("Authorization", token(userId)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    verifyNoInteractions(aiInferenceClient);
+    assertThat(repository.findByUserId(userId, 0, 20).totalElements()).isZero();
+  }
+
+  @Test
+  void converterFailureIs500RatherThanAiUnavailable() throws Exception {
+    UUID userId = UUID.randomUUID();
+    org.mockito.Mockito.doThrow(new AudioProcessingException("converter unavailable"))
+        .when(normalizer)
+        .normalize(any());
+    mvc.perform(multipart(URL).file(wav("audioFile")).header("Authorization", token(userId)))
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.error.code").value("INTERNAL_SERVER_ERROR"));
+    verifyNoInteractions(aiInferenceClient);
+    assertThat(repository.findByUserId(userId, 0, 20).totalElements()).isZero();
+  }
 
   @Test
   void uploadPersistsResultForAuthenticatedUserAndExposesItThroughQueries() throws Exception {

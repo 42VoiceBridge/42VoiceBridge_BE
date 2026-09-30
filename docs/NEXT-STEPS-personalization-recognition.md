@@ -28,8 +28,9 @@
 
 - `POST /api/v1/recognitions`: JWT 인증 + multipart `audioFile` → 기존 인식 서비스 호출·저장 → `200`.
 - `GET /api/v1/recognitions`, `GET /api/v1/recognitions/{id}`로 저장 결과 조회.
-- HTTP/DB 통합 테스트는 AI 포트만 대체한다. 실제 AI 서버 왕복은 별도 검증 대상.
-- 규격 WAV 파일로 호출한다. 브라우저 WebM 변환·오디오 내용 검증 및 모델 메타데이터 보존은 후속 작업.
+- 일반 업로드 테스트는 정규화/AI 포트를 대체하고, `audioIntegrationTest`는 실제 FFmpeg와 AI 대역으로 검증한다. 실제 AI 서버 왕복은 별도 검증 대상.
+- 실사용 경로는 PCM WAV·WebM(Opus/Vorbis)·오디오 전용 M4A/MP4(AAC)를 정규화한다. 스테레오는 평균 다운믹스하며 0.3~30초를 검사한다. 실행 환경/오류는 README 참고.
+- 변환 이력은 인식 ID와 로그로 연결한다. DB 메타데이터 보존 및 실제 브라우저 샘플 검증은 후속 작업.
 
 ## Confirmation/TTS 게이트 — 신규 도메인, 구현 완료 (PR #31, 2026-09-26)
 
@@ -49,7 +50,7 @@
 1. `TrainPersonalizationModelUseCase` — `PersonalizationJobRepositoryPort`가 이미 완성돼 있어서 바로 시작 가능
 2. `UploadPersonalizationRecordingUseCase` — S3 업로드 필요. 민수가 diagnosis-session에서
    StoragePort를 먼저 만들면 그거 재사용, 아직 없으면 서로 맞춰서 같이 설계할 것
-3. 인식 업로드 다음 단계: 오디오 변환·검증, 실제 HTTP AI 연결 검증, 인식 메타데이터 보존.
+3. 인식 업로드 다음 단계: 실제 HTTP AI 연결·브라우저 샘플 검증, 인식 메타데이터 보존.
 
 ## 주의
 

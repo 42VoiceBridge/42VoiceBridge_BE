@@ -16,12 +16,19 @@ spring:
     multipart:
       # 기본값 1MB는 녹음 파일에 부족하다. 동시에 과도한 업로드를 막는 상한 역할도 한다.
       max-file-size: 10MB
-      max-request-size: 10MB
+      max-request-size: 11MB
 
 server:
   port: 8080
 
 voicebridge:
+  audio:
+    ffmpeg: ${FFMPEG_PATH:ffmpeg}
+    ffprobe: ${FFPROBE_PATH:ffprobe}
+    timeout: 20s
+    max-concurrent: 2
+    max-source-bytes: 10485760
+    downmix-stereo: true
   jwt:
     secret: ${JWT_SECRET:local-dev-secret-key-change-me-please-32chars-min}
     access-token-expire-seconds: 3600

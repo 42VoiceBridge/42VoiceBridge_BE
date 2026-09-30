@@ -2,6 +2,7 @@ package com.voicebridge.common.exception;
 
 import com.voicebridge.common.response.ApiResponse;
 import com.voicebridge.domain.personalization.InsufficientRecordingException;
+import com.voicebridge.port.out.InvalidAudioException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -9,12 +10,25 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 /** 모든 Controller에 공통으로 적용되는 예외 처리기. 도메인 예외 → API 명세서 0.3/0.6절 포맷으로 변환하는 그러지점은 여기 하나로 고정한다. */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+  @ExceptionHandler(InvalidAudioException.class)
+  public ResponseEntity<ApiResponse<Void>> handleInvalidAudio(InvalidAudioException e) {
+    return ResponseEntity.badRequest()
+        .body(ApiResponse.error(ErrorCode.VALIDATION_FAILED.name(), e.getMessage()));
+  }
+
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<ApiResponse<Void>> handleUploadTooLarge(MaxUploadSizeExceededException e) {
+    return ResponseEntity.badRequest()
+        .body(ApiResponse.error(ErrorCode.VALIDATION_FAILED.name(), "녹음 업로드 크기 제한을 초과했습니다."));
+  }
 
   @ExceptionHandler(CustomException.class)
   public ResponseEntity<ApiResponse<Void>> handleCustomException(CustomException e) {

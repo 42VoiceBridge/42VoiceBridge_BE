@@ -23,13 +23,28 @@ class RecognizeSpeechServiceTest {
   @Mock PersonalizationJobRepositoryPort jobs;
   @Mock AiInferenceClient ai;
   @Mock RecognitionRepositoryPort recordings;
+  @Mock AudioNormalizationPort normalizer;
   RecognizeSpeechService service;
   final UUID userId = UUID.randomUUID();
   final byte[] audio = {1, 2, 3};
 
   @BeforeEach
   void setUp() {
-    service = new RecognizeSpeechService(jobs, ai, recordings);
+    service = new RecognizeSpeechService(jobs, ai, recordings, normalizer);
+    lenient()
+        .when(normalizer.normalize(audio))
+        .thenReturn(
+            new AudioNormalizationPort.NormalizedAudio(
+                audio,
+                new AudioNormalizationPort.Metadata(
+                    "wav",
+                    "pcm_s16le",
+                    16000,
+                    1,
+                    8000,
+                    "source-hash",
+                    "wav-hash",
+                    "audio-ingest-v1-mono")));
   }
 
   /*
@@ -139,6 +154,44 @@ class RecognizeSpeechServiceTest {
         .isInstanceOf(CustomException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.VALIDATION_FAILED);
+    verifyNoInteractions(jobs, ai, recordings, normalizer);
+  }
+
+  @Test
+  void normalizesBeforeInferenceAndPassesOnlyNormalizedBytes() {
+    byte[] decoded = {4, 5, 6};
+    when(normalizer.normalize(audio))
+        .thenReturn(
+            new AudioNormalizationPort.NormalizedAudio(
+                decoded,
+                new AudioNormalizationPort.Metadata(
+                    "matroska,webm",
+                    "opus",
+                    48000,
+                    2,
+                    8000,
+                    "source",
+                    "result",
+                    "audio-ingest-v1-stereo-average")));
+    when(ai.recognize(eq(decoded), any(), eq(userId)))
+        .thenReturn(new AiInferenceClient.RecognitionResult("text", null));
+    when(recordings.save(any())).thenAnswer(i -> i.getArgument(0));
+    service.recognize(userId, audio, "misleading.wav");
+    var order = inOrder(normalizer, ai, recordings);
+    order.verify(normalizer).normalize(audio);
+    order.verify(ai).recognize(eq(decoded), any(), eq(userId));
+    order.verify(recordings).save(any());
+  }
+
+  @Test
+  void inputAndConversionFailuresAreNotMisreportedAsAiFailures() {
+    for (RuntimeException failure :
+        new RuntimeException[] {
+          new InvalidAudioException("bad audio"), new AudioProcessingException("missing decoder")
+        }) {
+      org.mockito.Mockito.doThrow(failure).when(normalizer).normalize(audio);
+      assertThatThrownBy(() -> service.recognize(userId, audio, "voice.wav")).isSameAs(failure);
+    }
     verifyNoInteractions(jobs, ai, recordings);
   }
 
