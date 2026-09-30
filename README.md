@@ -81,7 +81,7 @@ graph TB
 ### AI 음성 인식 연동 — HTTP 어댑터로 배선 완료
 - `AiInferenceClient` 포트의 기본(v1) 구현체는 HTTP(`RestClient`) 기반 `HttpAiInferenceClient` — AI팀이 제공하는 `POST /v1/asr/transcribe`(raw WAV body, `user_id` 쿼리 파라미터)를 호출
 - AI 서버 계약(v1)상 `score`(신뢰도)는 항상 `null` — `AiInferenceClient.RecognitionResult.confidence`는 `Double`(nullable)로 정의되어 있고, 도메인/영속성 계층까지 nullable로 반영됨
-- 진단 녹음 업로드 후 비동기로 이 어댑터를 호출해 인식 결과를 반영하는 흐름(`RecordingRecognitionHandler`)이 실제로 배선되어 있음. `RecognizeSpeechUseCase`/`RecognizeSpeechService`(실사용 인식)도 구현은 완료됐으나 아직 컨트롤러로 노출되지 않음
+- 진단 녹음 업로드 후 비동기로 이 어댑터를 호출해 인식 결과를 반영하는 흐름(`RecordingRecognitionHandler`)이 실제로 배선되어 있음. 실사용 인식은 `POST /api/v1/recognitions`에서 `RecognizeSpeechUseCase`를 호출해 동기적으로 인식·저장 후 `200 OK`를 반환
 - [JPyRust](https://github.com/farmer0010/JPyRust)(PyO3) in-process 브릿지 구현체(`JPyRustAiInferenceClient`)는 삭제되지 않고 `jpyrust-experiment` 프로파일로 실험적으로 보존 중 — 기본 프로파일에서는 비활성화됨
 - 로컬(`local` 프로파일)에서는 실제 AI 서버 대신 `StubAiInferenceClient`가 고정 응답을 돌려줌. HTTP 어댑터를 실제로 띄워보려면 AI팀 mock 서버(`ASR_ENGINE=mock python3 demo/server.py`, 42VoiceBridge_AI 레포)가 `voicebridge.ai.http.base-url`(기본 `http://127.0.0.1:8000`)에 떠 있어야 함
 
@@ -94,9 +94,10 @@ graph TB
 - `Recording` 도메인은 상태 전이 `UPLOADED → PROCESSING → DONE | FAILED`를 직접 소유한다. 무음·비언어 오디오의 빈 인식 결과(`""`)는 **정상 완료**로 처리한다 — 구음장애 발화 특성상 인식 실패가 흔하고 그 패턴 자체가 분석 데이터이기 때문. `FAILED`는 AI 호출이 실패한 경우로, 비동기라 HTTP 응답으로 알릴 수 없어 상태로 남긴다
 - 음성 저장은 `StoragePort` 뒤에 있다. 로컬 프로파일은 파일시스템, 그 외에는 S3를 쓰므로 **AWS 크레덴셜 없이도 개발할 수 있다**. 사용자가 보낸 파일명은 저장 키에 쓰지 않고 허용 목록의 확장자만 추출한다
 
-### 개인화 — 모델 상태 조회만 구현
+### 개인화 — 모델·학습 작업 상태 조회 구현
 - `GET /api/v1/personalization/model`: 사용자 개인화 모델 상태 조회
-- 녹음 업로드 / 학습 트리거 / 학습 상태 조회 / 실사용 인식은 포트만 정의된 상태 — [`docs/NEXT-STEPS-personalization-recognition.md`](./docs/NEXT-STEPS-personalization-recognition.md) 참고
+- `GET /api/v1/personalization/train/{jobId}`: 학습 작업 상태 조회
+- 개인화 녹음 업로드 / 학습 트리거는 포트만 정의된 상태 — [`docs/NEXT-STEPS-personalization-recognition.md`](./docs/NEXT-STEPS-personalization-recognition.md) 참고
 
 ### Confirmation/TTS 게이트 — 구현 완료
 - 인식 결과를 사용자가 최종 확정(Confirmation)하고, 그 확정된 텍스트만으로 TTS를 요청할 수 있게 하는 게이트. 같은 인식 결과에 재확인이 들어오면 이전 확인은 무효화되고, **무효화된 확인으로는 TTS 요청이 거부됨** — TTS는 AI가 인식한 원문이 아니라 사용자가 확정한 텍스트만 신뢰한다는 불변조건
@@ -121,8 +122,31 @@ graph TB
 | 10 | `POST /api/v1/recognitions/{recognitionId}/confirm` | JWT 필요 | 인식 결과 확인(같은 인식 결과 재확인 시 이전 확인 무효화) |
 | 11 | `POST /api/v1/tts` | JWT 필요 | 확인된 텍스트로 TTS 요청(무효화된 확인으로는 요청 불가). 비동기로 CLOVA Voice 합성 후 완료 |
 | 12 | `GET /api/v1/tts/{ttsId}` | JWT 필요 | TTS 요청 상태 조회 |
+| 13 | `POST /api/v1/recognitions` | JWT 필요 | `audioFile` multipart 업로드 → 인식·저장 결과 (`200`) |
 
 > `/api/v1/auth/**`를 제외한 모든 API는 JWT 인증이 필요합니다(`POST /api/v1/auth/login`으로 발급, `Authorization: Bearer {token}` 헤더로 호출).
+
+## 실사용 인식 업로드
+
+`POST /api/v1/recognitions`는 `multipart/form-data`의 필수 `audioFile`을 받습니다.
+인증된 사용자의 인식 결과를 저장한 뒤 `200 OK`와 기존 `RecognitionResponse`를 반환합니다.
+`userId`는 요청 필드가 아니라 JWT에서 가져옵니다.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/recognitions \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -F 'audioFile=@speech.wav;type=audio/wav'
+```
+
+응답 `data` 필드: `recognitionId`, `recognizedText`, `modelUsed`, `confidence`.
+결과는 `GET /api/v1/recognitions` 및 `GET /api/v1/recognitions/{recognitionId}`로 조회합니다.
+필수 파일 누락·빈 파일은 `400 VALIDATION_FAILED`, AI 호출 실패는 기존 서비스 계약대로
+`503 AI_INFERENCE_UNAVAILABLE`입니다. 빈 인식 문자열과 `confidence: null`은 정상 결과입니다.
+
+현재 단계에서는 AI 규격인 **WAV PCM16·모노·16kHz·0.3~30초** 파일로 호출해야 합니다.
+이 엔드포인트는 아직 포맷 변환이나 WAV 내용 검증을 수행하지 않으며, WebM 변환·오디오 검증은 후속 작업입니다.
+기본 `local` 프로파일은 AI 스텁을 사용합니다. 업로드 통합 테스트도 AI 포트만 대체하므로
+실제 HTTP AI 추론까지 검증한 것은 아닙니다.
 
 ## 로컬 실행 방법
 

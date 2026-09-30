@@ -1,6 +1,6 @@
 # 개인화·인식(personalization/recognition) 다음 구현 가이드 — 백엔드 B
 
-현재는 계약(7개 API)과 모델 상태 조회·학습 작업 상태 조회 2개가 구현되어 있어.
+현재 모델·학습 작업 상태 조회와 실사용 인식 업로드·이력·상세 조회가 구현되어 있어.
 
 ## 학습 작업 상태 조회 — 구현 완료 (2026-09-18)
 
@@ -23,9 +23,13 @@
 |---|---|---|
 | POST /personalization/recordings | `UploadPersonalizationRecordingUseCase` | feature/diagnosis-session의 업로드 패턴 참고 |
 | POST /personalization/train | `TrainPersonalizationModelUseCase` | 최소 녹음 수 미달 시 INSUFFICIENT_RECORDINGS, 중복 실행 시 INVALID_STATE_TRANSITION — findInProgressByUserId() 사용 |
-| POST /recognitions | `RecognizeSpeechUseCase` | 개인화 모델 있으면 우선 사용, 없으면 기본 모델 폴백. findLatestCompletedByUserId()로 확인 |
-| GET /recognitions | `GetRecognitionHistoryUseCase` | 페이지네이션. `Recognition` 리포지토리 포트/어댑터 아직 없음 — 새로 정의할 것 |
-| GET /recognitions/{id} | `GetRecognitionDetailUseCase` | 본인 소유 체크는 `Recognition.isOwnedBy()` |
+
+## 실사용 인식 업로드·조회 — 구현 완료
+
+- `POST /api/v1/recognitions`: JWT 인증 + multipart `audioFile` → 기존 인식 서비스 호출·저장 → `200`.
+- `GET /api/v1/recognitions`, `GET /api/v1/recognitions/{id}`로 저장 결과 조회.
+- HTTP/DB 통합 테스트는 AI 포트만 대체한다. 실제 AI 서버 왕복은 별도 검증 대상.
+- 규격 WAV 파일로 호출한다. 브라우저 WebM 변환·오디오 내용 검증 및 모델 메타데이터 보존은 후속 작업.
 
 ## Confirmation/TTS 게이트 — 신규 도메인, 구현 완료 (PR #31, 2026-09-26)
 
@@ -45,8 +49,7 @@
 1. `TrainPersonalizationModelUseCase` — `PersonalizationJobRepositoryPort`가 이미 완성돼 있어서 바로 시작 가능
 2. `UploadPersonalizationRecordingUseCase` — S3 업로드 필요. 민수가 diagnosis-session에서
    StoragePort를 먼저 만들면 그거 재사용, 아직 없으면 서로 맞춰서 같이 설계할 것
-3. `RecognizeSpeechUseCase` + 이력 조회 2개 — `Recognition` 리포지토리 포트/어댑터부터 새로 설계
-   (`DiagnosisSessionPersistenceAdapter` 스타일 그대로 따라 하면 됨)
+3. 인식 업로드 다음 단계: 오디오 변환·검증, 실제 HTTP AI 연결 검증, 인식 메타데이터 보존.
 
 ## 주의
 
