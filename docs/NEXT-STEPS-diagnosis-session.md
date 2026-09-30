@@ -44,7 +44,10 @@
 
 설계 결정과 이유는 PROGRESS 23번에 있다. 여기에는 **이 코드를 건드릴 사람이 알아야 할 것**만 적는다.
 
-- 세션은 "문장마다 `DONE` 녹음이 하나씩" 생기면 `ANALYZED`가 된다. 판단은 인식 트랜잭션이 **커밋된 뒤** 별도 빈(`DiagnosisSessionAnalysisTrigger`)에서 한다. 이걸 인식 핸들러 안으로 옮기면 동시에 끝난 녹음끼리 서로의 결과를 못 봐서 세션이 영원히 끝나지 않는다.
+- 세션은 "문장마다 **가장 최근 녹음**이 `DONE`"이면 `ANALYZED`가 된다. 판단은 인식 트랜잭션이 **커밋된 뒤** 별도 빈(`DiagnosisSessionAnalysisTrigger`)에서 한다. 이걸 인식 핸들러 안으로 옮기면 동시에 끝난 녹음끼리 서로의 결과를 못 봐서 세션이 영원히 끝나지 않는다.
+- "문장마다 가장 최근 녹음"은 `Recording.latestPerSentence` 하나로 정한다. 세션 완료 판단, 자모 통계의 쌍, 세션 조회가 같이 쓴다. 한 곳만 규칙을 바꾸면 분석이 끝난 세션의 통계 재료가 나중에 바뀔 수 있다.
+- 녹음 등록(`DiagnosisRecordingRegistrar.register`)과 완료 판단은 **세션 행을 잠근다**(`findByIdForUpdate`). 한쪽에서 잠금을 빼면 분석이 끝난 세션에 녹음이 들어간다(`DiagnosisRecordingRaceTest`가 막음). S3 업로드는 잠금 밖에 둘 것 — 업로드 서비스에 `@Transactional`을 다시 걸면 S3를 기다리는 동안 세션이 잠긴다.
+- 잠금·동시성 테스트는 H2가 아니라 MySQL 컨테이너(`support/MySqlContainerTest`)로 돌린다. H2는 잠금 경합에서 MySQL과 다르게 실패한다.
 - 통계는 조회 시점에 스냅샷이 낡았는지(`isStale`) 보고 필요하면 다시 계산한다. 서비스에 `@Transactional`을 걸지 말 것 — AI 응답을 기다리는 동안 DB 연결을 붙잡게 된다.
 - 쌍은 **(세션, 문장)** 기준으로 묶는다. 문장 ID로만 묶으면 누적해도 표본이 늘지 않는다.
 - 무음 녹음은 뺀다(9/29 결정). 정답 텍스트는 반드시 문장 원문.
