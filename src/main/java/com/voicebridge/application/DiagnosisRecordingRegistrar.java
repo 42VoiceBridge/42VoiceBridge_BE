@@ -56,6 +56,7 @@ public class DiagnosisRecordingRegistrar {
         diagnosisSessionRepositoryPort
             .findByIdForUpdate(command.sessionId())
             .orElseThrow(DiagnosisRecordingRegistrar::sessionNotFound);
+    // 소유자와 문장 목록은 세션이 생긴 뒤 바뀌지 않아 verifyUploadable의 확인으로 충분하다. 그 사이 바뀔 수 있는 건 상태뿐이다.
     session.ensureRecordable();
 
     Recording recording =

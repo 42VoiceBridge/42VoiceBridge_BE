@@ -3,6 +3,8 @@ package com.voicebridge.domain.diagnosis;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -160,5 +162,45 @@ class RecordingTest {
     silent.markProcessing();
     silent.markProcessed("", null);
     assertThat(silent.isUsableForJamoStats()).isFalse();
+  }
+
+  private static final LocalDateTime T0 = LocalDateTime.of(2026, 9, 30, 10, 0);
+
+  private Recording recordedAt(UUID sessionId, UUID sentenceId, LocalDateTime createdAt) {
+    return Recording.reconstitute(
+        UUID.randomUUID(),
+        sessionId,
+        sentenceId,
+        UUID.randomUUID(),
+        "recordings/a.wav",
+        RecordingStatus.DONE,
+        "인식 결과",
+        null,
+        createdAt);
+  }
+
+  @Test
+  void 문장마다_가장_늦게_만든_녹음만_남기고_세션이_다르면_따로_남긴다() {
+    UUID session = UUID.randomUUID();
+    UUID otherSession = UUID.randomUUID();
+    UUID sentence = UUID.randomUUID();
+    Recording first = recordedAt(session, sentence, T0);
+    Recording retake = recordedAt(session, sentence, T0.plusMinutes(1));
+    Recording inOtherSession = recordedAt(otherSession, sentence, T0);
+
+    assertThat(Recording.latestPerSentence(List.of(retake, first, inOtherSession)))
+        .containsExactlyInAnyOrder(retake, inOtherSession);
+  }
+
+  @Test
+  void 생성_시각이_같아도_조회_순서와_상관없이_같은_녹음을_고른다() {
+    UUID session = UUID.randomUUID();
+    UUID sentence = UUID.randomUUID();
+    Recording a = recordedAt(session, sentence, T0);
+    Recording b = recordedAt(session, sentence, T0);
+
+    // 세션 완료 판단과 통계는 서로 다른 쿼리로 녹음을 읽는다. 순서가 달라도 같은 답이어야 한다.
+    assertThat(Recording.latestPerSentence(List.of(a, b)))
+        .isEqualTo(Recording.latestPerSentence(List.of(b, a)));
   }
 }

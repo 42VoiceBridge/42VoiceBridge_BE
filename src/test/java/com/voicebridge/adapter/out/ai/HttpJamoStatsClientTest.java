@@ -140,6 +140,23 @@ class HttpJamoStatsClientTest {
         Arguments.of(
             "계약에 없는 position",
             "{" + head + ", \"tokens\": [" + token.replace("initial", "onset") + "]}"),
+        // 빠진 것과 명시적 null을 따로 둔다. Map.of로 만든 표는 null을 물으면 예외를 던져서, 검사보다 먼저 막아야 한다.
+        Arguments.of(
+            "position이 없음",
+            "{"
+                + head
+                + ", \"tokens\": ["
+                + token.replace(" \"position\": \"initial\",", "")
+                + "]}"),
+        Arguments.of(
+            "position이 null",
+            "{" + head + ", \"tokens\": [" + token.replace("\"initial\"", "null") + "]}"),
+        Arguments.of(
+            "status가 없음",
+            "{" + head + ", \"tokens\": [" + token.replace(", \"status\": \"ok\"", "") + "]}"),
+        Arguments.of(
+            "status가 null",
+            "{" + head + ", \"tokens\": [" + token.replace("\"ok\"", "null") + "]}"),
         Arguments.of(
             "OK인데 오류율이 null",
             "{" + head + ", \"tokens\": [" + token.replace("0.05", "null") + "]}"),

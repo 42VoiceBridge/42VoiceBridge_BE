@@ -10,7 +10,7 @@
 | GET /diagnosis-sessions/{id} | 완료 |
 | POST /diagnosis-sessions/{id}/recordings | 완료 (PR #24) |
 | GET .../recordings/{rid}/result | 완료 |
-| ~~GET .../weak-phonemes~~ → `GET /users/me/jamo-error-stats` | 완료 (PR 대기) — 세션 단위에서 사용자 단위 누적으로 계약 변경 |
+| ~~GET .../weak-phonemes~~ → `GET /users/me/jamo-error-stats` | 완료 (PR #38 리뷰 중) — 세션 단위에서 사용자 단위 누적으로 계약 변경 |
 
 ## 이미 갖춰진 기반
 

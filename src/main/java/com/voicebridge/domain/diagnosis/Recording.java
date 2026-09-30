@@ -2,8 +2,10 @@ package com.voicebridge.domain.diagnosis;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -121,9 +123,13 @@ public class Recording {
                 Collectors.toMap(
                     r -> new SessionSentence(r.sessionId, r.sentenceId),
                     Function.identity(),
-                    (a, b) -> a.createdAt.isAfter(b.createdAt) ? a : b))
+                    BinaryOperator.maxBy(RECENCY)))
             .values());
   }
+
+  // 생성 시각이 같으면 ID로 정한다. 조회 순서에 따라 답이 달라지면 세션 완료 판단과 통계가 서로 다른 녹음을 고를 수 있다.
+  private static final Comparator<Recording> RECENCY =
+      Comparator.comparing((Recording r) -> r.createdAt).thenComparing(r -> r.id);
 
   // 같은 문장이 다른 세션에서 또 나올 수 있다. 문장 ID만으로 묶으면 세션을 누적해도 하나로 합쳐져 자모 통계의 표본이 늘지 않는다.
   private record SessionSentence(UUID sessionId, UUID sentenceId) {}

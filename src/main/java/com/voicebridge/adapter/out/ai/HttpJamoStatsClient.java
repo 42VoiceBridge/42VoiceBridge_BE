@@ -123,6 +123,10 @@ public class HttpJamoStatsClient implements JamoStatsPort {
     if (token.errors() == null || token.sampleCount() == null) {
       return "errors나 sample_count가 빈 항목";
     }
+    // Map.of로 만든 표는 null을 물으면 false가 아니라 NullPointerException을 던진다. 빠진 값을 먼저 걸러야 503으로 간다.
+    if (token.position() == null || token.status() == null) {
+      return "position이나 status가 빈 항목";
+    }
     // 위 표로 바꿀 수 없는 값(계약에 없는 값)
     if (!POSITIONS.containsKey(token.position()) || !STATUSES.containsKey(token.status())) {
       return "알 수 없는 position이나 status";

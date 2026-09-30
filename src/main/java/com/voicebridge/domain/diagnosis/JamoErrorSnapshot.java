@@ -81,6 +81,9 @@ public class JamoErrorSnapshot {
   /**
    * 이 스냅샷을 만든 뒤 분석 완료 세션이 늘었거나 기준 표본 수가 바뀌었으면 다시 계산해야 한다. 조회할 때마다 이걸 확인하므로, 계산이 한 번 실패해도 다음 조회에서
    * 자연히 다시 시도된다.
+   *
+   * <p>세션 수만 봐도 되는 이유: 분석이 끝난(ANALYZED) 세션의 통계 재료는 더 바뀌지 않는다. 세션은 문장마다 가장 최근 녹음이 끝나야 ANALYZED가 되고,
+   * 그 뒤로는 녹음을 받지 않으며, 통계도 같은 가장 최근 녹음만 쓴다({@link Recording#latestPerSentence}).
    */
   public boolean isStale(int analyzedSessionCount, int minSupport) {
     return sessionsUsed != analyzedSessionCount || this.minSupport != minSupport;
