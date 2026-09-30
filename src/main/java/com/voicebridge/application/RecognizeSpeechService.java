@@ -6,48 +6,49 @@ import com.voicebridge.domain.recognition.ModelType;
 import com.voicebridge.domain.recognition.Recognition;
 import com.voicebridge.port.in.RecognizeSpeechUseCase;
 import com.voicebridge.port.out.AiInferenceClient;
+import com.voicebridge.port.out.AudioNormalizationPort;
 import com.voicebridge.port.out.PersonalizationJobRepositoryPort;
 import com.voicebridge.port.out.RecognitionRepositoryPort;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /*
  실 사용 인식 파트
- AI 모델 호출 시 userId로 모델 타입 결정하고
  AIInferenceClient.recognize 호출,
  호출 실패시 - 503 error
 */
 
-// 서비스 빈으로 스프링에 해당 클래스 등록 및 롬복으로 생성자 코드 생성
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RecognizeSpeechService implements RecognizeSpeechUseCase {
 
   private final PersonalizationJobRepositoryPort personalizationJobRepositoryPort;
   private final AiInferenceClient aiInferenceClient;
   private final RecognitionRepositoryPort recognitionRepositoryPort;
+  // 스프링에서 생성한 객체를 주입받아서 사용하기 위함
+  private final AudioNormalizationPort audioNormalizationPort;
 
   @Override
   public RecognizeResult recognize(UUID userId, byte[] audioBytes, String fileName) {
     if (userId == null || audioBytes == null || audioBytes.length == 0) {
       throw new CustomException(ErrorCode.VALIDATION_FAILED);
     }
-    /*
-      모델 타입 결정시 personalizationJobRepositoryPort의 조회 기능 사용해서
-      최신 완료 학습 작업이 있으면 확인하고 그 모델 타입 쓰고 없으면 기본 모델로 타입 설정
-    */
+    // AI 호출 전 브라우저에서 온 업로드 음성을 정규화한다.
+    var normalized = audioNormalizationPort.normalize(audioBytes);
+
     ModelType modelType =
         personalizationJobRepositoryPort.findLatestCompletedByUserId(userId).isPresent()
             ? ModelType.PERSONALIZED
             : ModelType.BASE_ADAPTED;
 
     AiInferenceClient.RecognitionResult result;
-    /*
-     음성, 모델 타입, 유저아이디를 넣어서 인식결과 생성 시도하고, 생성 실패하면 503 에러 전파
-    */
+
     try {
-      result = aiInferenceClient.recognize(audioBytes, modelType, userId);
+      // AI 입력 규격을 맞추기 위해 정규화된 레코드의 값을 전달한다.
+      result = aiInferenceClient.recognize(normalized.wavBytes(), modelType, userId);
     } catch (RuntimeException e) {
       throw new CustomException(ErrorCode.AI_INFERENCE_UNAVAILABLE);
     }
@@ -72,7 +73,12 @@ public class RecognizeSpeechService implements RecognizeSpeechUseCase {
     Recognition saved =
         recognitionRepositoryPort.save(
             Recognition.create(userId, result.recognizedText(), modelType, result.confidence()));
-    // 결과에서 필요한 값만 record로 꺼내서 리턴한다.
+    // save()가 성공하면, 인식 ID와 변환 정보를 로그로 연결한다.
+    // Id는 DB에 남지만 메타데이터는 버려진다. 그 메타 데이터를 로그에 남기기 위해서 로그에 값 남긴다.
+    log.info(
+        "Recognition audio provenance: recognitionId={}, metadata={}",
+        saved.getId(),
+        normalized.metadata());
     return new RecognizeResult(
         saved.getId(),
         saved.getRecognizedText(),

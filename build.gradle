@@ -72,8 +72,18 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform { excludeTags 'ffmpeg' }
     systemProperty 'file.encoding', 'UTF-8'
+}
+
+tasks.register('audioIntegrationTest', Test) {
+    description = 'Runs real ffmpeg/ffprobe conversion and HTTP integration tests.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'ffmpeg' }
+    systemProperty 'file.encoding', 'UTF-8'
+    shouldRunAfter tasks.named('test')
 }
 
 spotless {

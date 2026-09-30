@@ -16,6 +16,7 @@ public enum ErrorCode {
   INVALID_STATE_TRANSITION(HttpStatus.CONFLICT, "현재 상태에서는 처리할 수 없는 요청입니다."),
   INSUFFICIENT_RECORDINGS(HttpStatus.UNPROCESSABLE_ENTITY, "개인화 학습에 필요한 녹음 수가 부족합니다."),
   AI_INFERENCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI 추론 서버를 사용할 수 없습니다."),
+  AUDIO_PROCESSING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "음성 변환을 잠시 처리할 수 없습니다."),
   INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
   private final HttpStatus status;
