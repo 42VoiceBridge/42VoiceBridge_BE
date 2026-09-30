@@ -44,6 +44,7 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
       String ffprobe,
       Path temporaryDirectory,
       Duration timeout,
+      Duration queueTimeout,
       int maxConcurrent,
       int maxSourceBytes,
       boolean downmixStereo) {
@@ -57,6 +58,10 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
           || timeout.isNegative()
           || timeout.isZero()
           || timeout.compareTo(Duration.ofMinutes(5)) > 0
+          || queueTimeout == null
+          || queueTimeout.isNegative()
+          || queueTimeout.isZero()
+          || queueTimeout.compareTo(Duration.ofSeconds(10)) > 0
           || maxConcurrent < 1
           || maxSourceBytes < 1) {
         throw new IllegalArgumentException("Invalid audio normalization settings");
@@ -69,7 +74,7 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
   public FfmpegAudioNormalizer(ObjectMapper mapper, Settings settings) {
     this.mapper = mapper;
     this.settings = settings;
-    this.permits = new Semaphore(settings.maxConcurrent());
+    this.permits = new Semaphore(settings.maxConcurrent(), true);
   }
 
   // 입력 검사 - 변환 - 결과 생성 및 정리를 한 요청 단위로 묶어줌
@@ -85,8 +90,15 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
     if (!hasSupportedContainerSignature(source)) {
       throw new InvalidAudioException(Reason.INVALID, "Unsupported or damaged audio container");
     }
-    if (!permits.tryAcquire()) {
-      throw new AudioProcessingException("Audio conversion capacity exhausted");
+    try {
+      if (!permits.tryAcquire(settings.queueTimeout().toNanos(), TimeUnit.NANOSECONDS)) {
+        throw new AudioProcessingException(
+            AudioProcessingException.Reason.CAPACITY, "Audio conversion capacity exhausted");
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new AudioProcessingException(
+          AudioProcessingException.Reason.INFRASTRUCTURE, "Audio capacity wait interrupted", e);
     }
     long deadline = System.nanoTime() + settings.timeout().toNanos();
     // 이번 요청 전용 임시 디렉터리와 파일 경로 묶음
@@ -177,7 +189,8 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
           metadata.normalizationVersion());
       return new NormalizedAudio(wav, metadata);
     } catch (IOException e) {
-      throw new AudioProcessingException("Audio processing I/O failed", e);
+      throw new AudioProcessingException(
+          AudioProcessingException.Reason.INFRASTRUCTURE, "Audio processing I/O failed", e);
     } finally {
       permits.release();
     }
@@ -272,7 +285,8 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
   private void run(List<String> command, Path output, Path error, long maxOutput, long deadline)
       throws IOException {
     if (System.nanoTime() >= deadline) {
-      throw new AudioProcessingException("Audio processing deadline exceeded");
+      throw new AudioProcessingException(
+          AudioProcessingException.Reason.TIMEOUT, "Audio processing deadline exceeded");
     }
     Process process =
         new ProcessBuilder(command)
@@ -283,14 +297,17 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
       process.getOutputStream().close();
       while (!process.waitFor(50, TimeUnit.MILLISECONDS)) {
         if (System.nanoTime() >= deadline) {
-          throw new AudioProcessingException("Audio processing deadline exceeded");
+          throw new AudioProcessingException(
+              AudioProcessingException.Reason.TIMEOUT, "Audio processing deadline exceeded");
         }
         if (Files.size(output) > maxOutput) {
           throw new InvalidAudioException(
               Reason.INVALID, "Audio metadata exceeds the processing limit");
         }
         if (Files.size(error) > 8192) {
-          throw new AudioProcessingException("Audio converter diagnostics exceeded the limit");
+          throw new AudioProcessingException(
+              AudioProcessingException.Reason.INFRASTRUCTURE,
+              "Audio converter diagnostics exceeded the limit");
         }
       }
       if (Files.size(output) > maxOutput) {
@@ -298,10 +315,13 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
             Reason.INVALID, "Audio metadata exceeds the processing limit");
       }
       if (Files.size(error) > 8192) {
-        throw new AudioProcessingException("Audio converter diagnostics exceeded the limit");
+        throw new AudioProcessingException(
+            AudioProcessingException.Reason.INFRASTRUCTURE,
+            "Audio converter diagnostics exceeded the limit");
       }
       if (System.nanoTime() >= deadline) {
-        throw new AudioProcessingException("Audio processing deadline exceeded");
+        throw new AudioProcessingException(
+            AudioProcessingException.Reason.TIMEOUT, "Audio processing deadline exceeded");
       }
       if (process.exitValue() != 0) {
         String diagnostic = Files.readString(error, StandardCharsets.UTF_8);
@@ -312,11 +332,14 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
         if (isKnownInputFailure(diagnostic)) {
           throw new InvalidAudioException(Reason.INVALID, "Audio could not be decoded");
         }
-        throw new AudioProcessingException("Audio converter failed; check server diagnostics");
+        throw new AudioProcessingException(
+            AudioProcessingException.Reason.INFRASTRUCTURE,
+            "Audio converter failed; check server diagnostics");
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new AudioProcessingException("Audio processing interrupted", e);
+      throw new AudioProcessingException(
+          AudioProcessingException.Reason.INFRASTRUCTURE, "Audio processing interrupted", e);
     } finally {
       if (process.isAlive()) {
         process.descendants().forEach(ProcessHandle::destroyForcibly);

@@ -29,6 +29,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -87,12 +88,32 @@ class RecognitionUploadIntegrationTest {
   @Test
   void converterFailureIs500RatherThanAiUnavailable() throws Exception {
     UUID userId = UUID.randomUUID();
-    org.mockito.Mockito.doThrow(new AudioProcessingException("converter unavailable"))
+    org.mockito.Mockito.doThrow(
+            new AudioProcessingException(
+                AudioProcessingException.Reason.INFRASTRUCTURE, "converter unavailable"))
         .when(normalizer)
         .normalize(any());
     mvc.perform(multipart(URL).file(wav("audioFile")).header("Authorization", token(userId)))
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.error.code").value("INTERNAL_SERVER_ERROR"));
+    verifyNoInteractions(aiInferenceClient);
+    assertThat(repository.findByUserId(userId, 0, 20).totalElements()).isZero();
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = AudioProcessingException.Reason.class,
+      names = {"CAPACITY", "TIMEOUT"})
+  void retryableAudioProcessingFailureReturns503(AudioProcessingException.Reason reason)
+      throws Exception {
+    UUID userId = UUID.randomUUID();
+    org.mockito.Mockito.doThrow(new AudioProcessingException(reason, "retry later"))
+        .when(normalizer)
+        .normalize(any());
+
+    mvc.perform(multipart(URL).file(wav("audioFile")).header("Authorization", token(userId)))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.error.code").value("AUDIO_PROCESSING_UNAVAILABLE"));
     verifyNoInteractions(aiInferenceClient);
     assertThat(repository.findByUserId(userId, 0, 20).totalElements()).isZero();
   }

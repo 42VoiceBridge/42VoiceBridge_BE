@@ -188,7 +188,8 @@ class RecognizeSpeechServiceTest {
     for (RuntimeException failure :
         new RuntimeException[] {
           new InvalidAudioException(InvalidAudioException.Reason.INVALID, "bad audio"),
-          new AudioProcessingException("missing decoder")
+          new AudioProcessingException(
+              AudioProcessingException.Reason.INFRASTRUCTURE, "missing decoder")
         }) {
       org.mockito.Mockito.doThrow(failure).when(normalizer).normalize(audio);
       assertThatThrownBy(() -> service.recognize(userId, audio, "voice.wav")).isSameAs(failure);

@@ -13,6 +13,8 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -34,7 +36,14 @@ class FfmpegAudioNormalizerIntegrationTest {
         new FfmpegAudioNormalizer(
             new ObjectMapper(),
             new FfmpegAudioNormalizer.Settings(
-                "ffmpeg", "ffprobe", work, Duration.ofSeconds(10), 2, 10 * 1024 * 1024, true));
+                "ffmpeg",
+                "ffprobe",
+                work,
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(2),
+                2,
+                10 * 1024 * 1024,
+                true));
   }
 
   @Test
@@ -49,6 +58,45 @@ class FfmpegAudioNormalizerIntegrationTest {
     assertThat(result.metadata().sourceSha256()).isEqualTo(hash(input));
     assertThat(result.metadata().wavSha256()).isEqualTo(hash(result.wavBytes()));
     assertClean();
+  }
+
+  @Test
+  void waitsBrieflyForBusyConverterAndProcessesNextUpload() throws Exception {
+    Path started = directory.resolve("probe-started");
+    Path slowProbe = directory.resolve("slow-ffprobe");
+    Files.writeString(
+        slowProbe,
+        "#!/bin/sh\n" + "touch '" + started + "'\n" + "sleep 0.3\n" + "exec ffprobe \"$@\"\n");
+    assertThat(slowProbe.toFile().setExecutable(true)).isTrue();
+    var serialNormalizer =
+        new FfmpegAudioNormalizer(
+            new ObjectMapper(),
+            new FfmpegAudioNormalizer.Settings(
+                "ffmpeg",
+                slowProbe.toString(),
+                work,
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(2),
+                1,
+                10 * 1024 * 1024,
+                true));
+    byte[] audio = AudioFixtures.wav(16000, 1, 8000);
+    var executor = Executors.newSingleThreadExecutor();
+    try {
+      var first = executor.submit(() -> serialNormalizer.normalize(audio));
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+      while (!Files.exists(started) && System.nanoTime() < deadline) Thread.sleep(10);
+      assertThat(started).exists();
+
+      var second = serialNormalizer.normalize(audio);
+      assertThat(AudioFixtures.assertCanonicalWav(second.wavBytes())).isEqualTo(8000);
+      assertThat(AudioFixtures.assertCanonicalWav(first.get(5, TimeUnit.SECONDS).wavBytes()))
+          .isEqualTo(8000);
+      assertClean();
+    } finally {
+      executor.shutdownNow();
+      assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+    }
   }
 
   @Test
@@ -70,6 +118,7 @@ class FfmpegAudioNormalizerIntegrationTest {
                 "ffprobe",
                 work,
                 Duration.ofSeconds(10),
+                Duration.ofSeconds(2),
                 2,
                 10 * 1024 * 1024,
                 true));

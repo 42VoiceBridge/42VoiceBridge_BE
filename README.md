@@ -160,12 +160,13 @@ M4A/MP4(AAC)를 **WAV PCM16·모노·16kHz·0.3~30초**로 변환합니다.
 
 실행 환경에 `ffmpeg`와 `ffprobe`가 필요합니다(macOS: `brew install ffmpeg`).
 `FFMPEG_PATH`와 `FFPROBE_PATH`로 실행 파일 경로를 지정할 수 있습니다.
-기본 제한은 파일 10MiB, 전체 multipart 11MiB, 변환 20초, 프로세스당 동시 변환 2건입니다.
-`voicebridge.audio` 설정으로 조정하며 동시 변환 슬롯이 없으면 즉시 실패합니다.
-손상·미지원·길이/업로드 초과는 `400 VALIDATION_FAILED`, 변환기 미설치·시간초과·용량 부족은
+기본 제한은 파일 10MiB, 전체 multipart 11MiB, 변환 20초, 앱 인스턴스당 동시 변환 2건입니다.
+`voicebridge.audio.queue-timeout`(기본 2초) 동안 슬롯을 기다린 후에도 없으면 실패합니다.
+손상·미지원·길이/업로드 초과는 `400 VALIDATION_FAILED`, 변환 대기 초과·처리 시간 초과는
+`503 AUDIO_PROCESSING_UNAVAILABLE`, 변환기 미설치 등 서버 설정 문제는
 `500 INTERNAL_SERVER_ERROR`입니다. AI 호출 실패의 기존 503 응답은 유지합니다.
 
-원본과 중간 파일은 처리 중 임시 파일로만 사용하고 성공·실패 시 정리합니다.
+원본과 중간 파일은 처리 중 임시 파일로만 사용하고 성공·실패 시 정리를 시도하며, 정리 실패는 로그로 남깁니다.
 원본 형식·코덱·채널·샘플레이트, 변환 버전과 전후 SHA-256을 인식 ID와 연결하여 로그에 남깁니다.
 DB 메타데이터 영구 보존은 후속 작업입니다. 이 변환은 실사용 인식에 적용하며 진단 업로드는 별도입니다.
 

@@ -23,7 +23,11 @@ class AudioProcessLifecycleTest {
     for (int i = 0; i < 2; i++) {
       assertThatThrownBy(() -> normalizer.normalize(probeInput()))
           .isInstanceOf(AudioProcessingException.class)
-          .hasMessageContaining("I/O");
+          .hasMessageContaining("I/O")
+          .satisfies(
+              failure ->
+                  assertThat(((AudioProcessingException) failure).reason())
+                      .isEqualTo(AudioProcessingException.Reason.INFRASTRUCTURE));
       assertThat(work).isEmptyDirectory();
     }
   }
@@ -45,9 +49,17 @@ class AudioProcessLifecycleTest {
       long pid = Long.parseLong(Files.readString(pidFile).trim());
       assertThatThrownBy(() -> normalizer.normalize(probeInput()))
           .isInstanceOf(AudioProcessingException.class)
-          .hasMessageContaining("capacity");
+          .hasMessageContaining("capacity")
+          .satisfies(
+              failure ->
+                  assertThat(((AudioProcessingException) failure).reason())
+                      .isEqualTo(AudioProcessingException.Reason.CAPACITY));
       assertThatThrownBy(() -> first.get(5, TimeUnit.SECONDS))
-          .hasCauseInstanceOf(AudioProcessingException.class);
+          .hasCauseInstanceOf(AudioProcessingException.class)
+          .satisfies(
+              failure ->
+                  assertThat(((AudioProcessingException) failure.getCause()).reason())
+                      .isEqualTo(AudioProcessingException.Reason.TIMEOUT));
       assertThat(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)).isFalse();
       assertThat(work).isEmptyDirectory();
     } finally {
@@ -90,6 +102,7 @@ class AudioProcessLifecycleTest {
   private FfmpegAudioNormalizer normalizer(Path work, String probe, Duration timeout) {
     return new FfmpegAudioNormalizer(
         new ObjectMapper(),
-        new FfmpegAudioNormalizer.Settings("unused-ffmpeg", probe, work, timeout, 1, 1024, true));
+        new FfmpegAudioNormalizer.Settings(
+            "unused-ffmpeg", probe, work, timeout, Duration.ofMillis(100), 1, 1024, true));
   }
 }

@@ -2,6 +2,7 @@ package com.voicebridge.common.exception;
 
 import com.voicebridge.common.response.ApiResponse;
 import com.voicebridge.domain.personalization.InsufficientRecordingException;
+import com.voicebridge.port.out.AudioProcessingException;
 import com.voicebridge.port.out.InvalidAudioException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,25 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiResponse<Void>> handleInvalidAudio(InvalidAudioException e) {
     return ResponseEntity.badRequest()
         .body(ApiResponse.error(ErrorCode.VALIDATION_FAILED.name(), e.getMessage()));
+  }
+
+  @ExceptionHandler(AudioProcessingException.class)
+  public ResponseEntity<ApiResponse<Void>> handleAudioProcessing(AudioProcessingException e) {
+    if (e.reason() == AudioProcessingException.Reason.CAPACITY
+        || e.reason() == AudioProcessingException.Reason.TIMEOUT) {
+      log.warn("Audio processing temporarily unavailable: reason={}", e.reason());
+      return ResponseEntity.status(ErrorCode.AUDIO_PROCESSING_UNAVAILABLE.getStatus())
+          .body(
+              ApiResponse.error(
+                  ErrorCode.AUDIO_PROCESSING_UNAVAILABLE.name(),
+                  ErrorCode.AUDIO_PROCESSING_UNAVAILABLE.getMessage()));
+    }
+    log.error("Audio processing infrastructure failure", e);
+    return ResponseEntity.internalServerError()
+        .body(
+            ApiResponse.error(
+                ErrorCode.INTERNAL_SERVER_ERROR.name(),
+                ErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
   }
 
   @ExceptionHandler(MaxUploadSizeExceededException.class)

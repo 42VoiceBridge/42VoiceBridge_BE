@@ -26,6 +26,7 @@ voicebridge:
     ffmpeg: ${FFMPEG_PATH:ffmpeg}
     ffprobe: ${FFPROBE_PATH:ffprobe}
     timeout: 20s
+    queue-timeout: 2s
     max-concurrent: 2
     max-source-bytes: 10485760
     downmix-stereo: true
