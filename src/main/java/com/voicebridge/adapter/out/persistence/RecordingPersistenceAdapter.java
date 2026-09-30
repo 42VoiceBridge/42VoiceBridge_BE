@@ -4,6 +4,7 @@ import com.voicebridge.common.exception.CustomException;
 import com.voicebridge.common.exception.ErrorCode;
 import com.voicebridge.domain.diagnosis.Recording;
 import com.voicebridge.port.out.RecordingRepositoryPort;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +36,13 @@ public class RecordingPersistenceAdapter implements RecordingRepositoryPort {
   @Override
   public List<Recording> findBySessionId(UUID sessionId) {
     return jpaRepository.findBySessionId(sessionId).stream()
+        .map(RecordingPersistenceAdapter::toDomain)
+        .toList();
+  }
+
+  @Override
+  public List<Recording> findBySessionIdIn(Collection<UUID> sessionIds) {
+    return jpaRepository.findBySessionIdIn(sessionIds).stream()
         .map(RecordingPersistenceAdapter::toDomain)
         .toList();
   }
