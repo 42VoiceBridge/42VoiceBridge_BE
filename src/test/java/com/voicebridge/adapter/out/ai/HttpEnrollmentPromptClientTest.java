@@ -16,10 +16,14 @@ import com.voicebridge.port.out.EnrollmentPromptPort.Prompt;
 import com.voicebridge.port.out.EnrollmentPromptPort.PromptBatch;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.web.client.RestClient;
 
 class HttpEnrollmentPromptClientTest {
@@ -114,6 +118,37 @@ class HttpEnrollmentPromptClientTest {
         {"strategy": "random", "seed": 42, "prompts": [{"prompt_id": "02-03-0001", "text": "가"}]}
         """);
 
+    assertThatThrownBy(() -> client.nextPrompts(userId, 10, 42L, List.of()))
+        .isInstanceOf(CustomException.class)
+        .extracting(e -> ((CustomException) e).getErrorCode())
+        .isEqualTo(ErrorCode.AI_INFERENCE_UNAVAILABLE);
+  }
+
+  // 요청 seed는 42. 각 응답은 한 군데만 계약을 어긴다
+  static Stream<Arguments> 계약을_어긴_응답() {
+    String ok = "\"strategy\": \"random\", \"strategy_version\": \"prompt-random-v1\"";
+    return Stream.of(
+        Arguments.of(
+            "문장 원문(text)이 없음",
+            "{" + ok + ", \"seed\": 42, \"prompts\": [{\"prompt_id\": \"02-03-0001\"}]}"),
+        Arguments.of(
+            "문장 ID가 공백",
+            "{" + ok + ", \"seed\": 42, \"prompts\": [{\"prompt_id\": \" \", \"text\": \"가\"}]}"),
+        Arguments.of("문장 항목이 null", "{" + ok + ", \"seed\": 42, \"prompts\": [null]}"),
+        Arguments.of("seed가 없음", "{" + ok + ", \"prompts\": []}"),
+        Arguments.of("요청과 다른 seed", "{" + ok + ", \"seed\": 7, \"prompts\": []}"),
+        Arguments.of(
+            "요청하지 않은 전략",
+            "{\"strategy\": \"error_based\", \"strategy_version\": \"v1\", \"seed\": 42,"
+                + " \"prompts\": []}"));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("계약을_어긴_응답")
+  void 계약을_어긴_응답은_사용자_오류가_아니라_AI_사용_불가로_바꾼다(String 경우, String json) {
+    aiResponds(json);
+
+    // 그대로 넘기면 ShownPrompt가 IllegalArgumentException을 던져 400(사용자 요청 오류)이 된다
     assertThatThrownBy(() -> client.nextPrompts(userId, 10, 42L, List.of()))
         .isInstanceOf(CustomException.class)
         .extracting(e -> ((CustomException) e).getErrorCode())
