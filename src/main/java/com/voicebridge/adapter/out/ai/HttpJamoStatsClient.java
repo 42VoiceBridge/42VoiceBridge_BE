@@ -31,8 +31,9 @@ public class HttpJamoStatsClient implements JamoStatsPort {
   // 시작했을 때 그 값이 그대로 프론트까지 흘러가지 않고 여기서 멈추게 하기 위해서다.
   private static final Map<String, String> POSITIONS =
       Map.of("initial", "INITIAL", "medial", "MEDIAL", "final", "FINAL");
+  private static final String STATUS_OK = "ok";
   private static final Map<String, String> STATUSES =
-      Map.of("ok", "OK", "insufficient_data", "INSUFFICIENT_DATA");
+      Map.of(STATUS_OK, "OK", "insufficient_data", "INSUFFICIENT_DATA");
 
   private final RestClient restClient;
   private final String baseUrl;
@@ -72,32 +73,79 @@ public class HttpJamoStatsClient implements JamoStatsPort {
       throw new CustomException(ErrorCode.AI_INFERENCE_UNAVAILABLE, "자모 오류 통계를 계산하지 못했습니다.");
     }
 
-    if (response == null || response.tokens() == null) {
-      throw contractViolation("tokens가 없습니다");
+    String violation = findContractViolation(response, minSupport);
+    if (violation != null) {
+      // IllegalStateException을 쓰지 않는 이유: 전역 핸들러가 그것을 409(상태 전이 위반)로 바꾸므로, 요청 흐름에서 터지면
+      // 프론트는 AI 문제를 자기 요청의 상태 문제로 오해하게 된다. AI를 제대로 쓸 수 없다는 뜻이니 통신 실패와 같은 503으로 보낸다.
+      log.error("[자모 통계] AI 응답이 계약(jamo-err-v1)과 다릅니다: {}", violation);
+      throw new CustomException(ErrorCode.AI_INFERENCE_UNAVAILABLE, "자모 오류 통계를 계산하지 못했습니다.");
     }
     return new JamoStatsResult(
         response.metricVersion(),
         response.minSupport(),
         response.pairsUsed(),
-        response.tokens().stream().map(this::toJamoErrorStat).toList());
+        response.tokens().stream().map(HttpJamoStatsClient::toJamoErrorStat).toList());
   }
 
-  private JamoErrorStat toJamoErrorStat(Token token) {
-    String position = POSITIONS.get(token.position());
-    String status = STATUSES.get(token.status());
-    if (position == null || status == null) {
-      throw contractViolation(
-          "알 수 없는 값 position=" + token.position() + " status=" + token.status());
+  /**
+   * 계약을 어긴 곳을 설명으로 돌려준다. 문제가 없으면 null. 여기서 걸러야 하는 이유: 빈 값이 도메인까지 가면 도메인 검증이
+   * IllegalArgumentException을 던지고, 전역 핸들러가 그것을 사용자 요청 오류(400)로 바꾼다.
+   */
+  private static String findContractViolation(
+      JamoErrorsResponse response, int requestedMinSupport) {
+    if (response == null || response.tokens() == null) {
+      return "tokens 없음";
     }
-    return new JamoErrorStat(
-        token.token(), position, token.errors(), token.sampleCount(), token.errorRate(), status);
+    if (isBlank(response.metricVersion())) {
+      return "metric_version 없음";
+    }
+    // 스냅샷에 그대로 저장되는 값이다. 빠져서 0이 되면 설정값과 늘 달라 보여서, 조회할 때마다 AI를 다시 부른다.
+    if (response.minSupport() == null || response.minSupport() != requestedMinSupport) {
+      return "min_support 불일치 요청=" + requestedMinSupport + " 응답=" + response.minSupport();
+    }
+    if (response.pairsUsed() == null) {
+      return "pairs_used 없음";
+    }
+    for (Token token : response.tokens()) {
+      String violation = findContractViolation(token);
+      if (violation != null) {
+        return violation + " " + token;
+      }
+    }
+    return null;
   }
 
-  // IllegalStateException을 쓰지 않는 이유: 전역 핸들러가 그것을 409(상태 전이 위반)로 바꾸므로, 요청 흐름에서 터지면
-  // 프론트는 AI 문제를 자기 요청의 상태 문제로 오해하게 된다. AI를 제대로 쓸 수 없다는 뜻이니 통신 실패와 같은 503으로 보낸다.
-  private CustomException contractViolation(String detail) {
-    log.error("[자모 통계] AI 응답이 계약(jamo-err-v1)과 다릅니다: {}", detail);
-    return new CustomException(ErrorCode.AI_INFERENCE_UNAVAILABLE, "자모 오류 통계를 계산하지 못했습니다.");
+  private static String findContractViolation(Token token) {
+    if (token == null || isBlank(token.token())) {
+      return "자모가 빈 항목";
+    }
+    // 원시 타입으로 받으면 빠진 값이 조용히 0이 되어 "표본 0개"로 보인다
+    if (token.errors() == null || token.sampleCount() == null) {
+      return "errors나 sample_count가 빈 항목";
+    }
+    // 위 표로 바꿀 수 없는 값(계약에 없는 값)
+    if (!POSITIONS.containsKey(token.position()) || !STATUSES.containsKey(token.status())) {
+      return "알 수 없는 position이나 status";
+    }
+    // 프론트는 OK면 오류율을 보여주고 표본 부족이면 null을 기대한다. 둘이 어긋나면 화면이 깨진다.
+    if (STATUS_OK.equals(token.status()) != (token.errorRate() != null)) {
+      return "status와 error_rate가 맞지 않는 항목";
+    }
+    return null;
+  }
+
+  private static JamoErrorStat toJamoErrorStat(Token token) {
+    return new JamoErrorStat(
+        token.token(),
+        POSITIONS.get(token.position()),
+        token.errors(),
+        token.sampleCount(),
+        token.errorRate(),
+        STATUSES.get(token.status()));
+  }
+
+  private static boolean isBlank(String value) {
+    return value == null || value.isBlank();
   }
 
   private record JamoErrorsRequest(List<Pair> pairs, @JsonProperty("min_support") int minSupport) {
@@ -114,16 +162,16 @@ public class HttpJamoStatsClient implements JamoStatsPort {
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record JamoErrorsResponse(
       @JsonProperty("metric_version") String metricVersion,
-      @JsonProperty("min_support") int minSupport,
-      @JsonProperty("pairs_used") int pairsUsed,
+      @JsonProperty("min_support") Integer minSupport,
+      @JsonProperty("pairs_used") Integer pairsUsed,
       List<Token> tokens) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record Token(
       String token,
       String position,
-      int errors,
-      @JsonProperty("sample_count") int sampleCount,
+      Integer errors,
+      @JsonProperty("sample_count") Integer sampleCount,
       @JsonProperty("error_rate") Double errorRate,
       String status) {}
 }

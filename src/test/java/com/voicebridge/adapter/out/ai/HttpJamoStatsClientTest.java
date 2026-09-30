@@ -16,10 +16,14 @@ import com.voicebridge.domain.diagnosis.JamoErrorStat;
 import com.voicebridge.port.out.JamoStatsPort.JamoStatsResult;
 import com.voicebridge.port.out.JamoStatsPort.TextPair;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.web.client.RestClient;
 
 class HttpJamoStatsClientTest {
@@ -110,15 +114,50 @@ class HttpJamoStatsClientTest {
         .isEqualTo(ErrorCode.AI_INFERENCE_UNAVAILABLE);
   }
 
-  @Test
-  void 계약에_없는_값이_오면_그대로_넘기지_않고_멈춘다() {
-    aiResponds(
-        """
-        {"metric_version": "jamo-err-v1", "min_support": 20, "pairs_used": 1,
-         "tokens": [{"token": "ㅈ", "position": "onset", "errors": 1, "sample_count": 20,
-                     "error_rate": 0.05, "status": "ok"}]}
-        """);
+  static Stream<Arguments> 계약을_어긴_응답() {
+    String head = "\"metric_version\": \"jamo-err-v1\", \"min_support\": 20, \"pairs_used\": 1";
+    String token =
+        "{\"token\": \"ㅈ\", \"position\": \"initial\", \"errors\": 1, \"sample_count\": 20,"
+            + " \"error_rate\": 0.05, \"status\": \"ok\"}";
+    return Stream.of(
+        Arguments.of(
+            "계산 버전(metric_version)이 없음",
+            "{\"min_support\": 20, \"pairs_used\": 1, \"tokens\": []}"),
+        Arguments.of(
+            "min_support가 없음",
+            "{\"metric_version\": \"jamo-err-v1\", \"pairs_used\": 1, \"tokens\": []}"),
+        Arguments.of(
+            "요청과 다른 min_support",
+            "{\"metric_version\": \"jamo-err-v1\", \"min_support\": 5, \"pairs_used\": 1,"
+                + " \"tokens\": []}"),
+        Arguments.of(
+            "pairs_used가 없음",
+            "{\"metric_version\": \"jamo-err-v1\", \"min_support\": 20, \"tokens\": []}"),
+        Arguments.of("자모 항목이 null", "{" + head + ", \"tokens\": [null]}"),
+        Arguments.of(
+            "sample_count가 없음",
+            "{" + head + ", \"tokens\": [" + token.replace(" \"sample_count\": 20,", "") + "]}"),
+        Arguments.of(
+            "계약에 없는 position",
+            "{" + head + ", \"tokens\": [" + token.replace("initial", "onset") + "]}"),
+        Arguments.of(
+            "OK인데 오류율이 null",
+            "{" + head + ", \"tokens\": [" + token.replace("0.05", "null") + "]}"),
+        Arguments.of(
+            "표본 부족인데 오류율이 있음",
+            "{"
+                + head
+                + ", \"tokens\": ["
+                + token.replace("\"ok\"", "\"insufficient_data\"")
+                + "]}"));
+  }
 
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("계약을_어긴_응답")
+  void 계약을_어긴_응답은_사용자_오류가_아니라_AI_사용_불가로_바꾼다(String 경우, String json) {
+    aiResponds(json);
+
+    // 그대로 넘기면 JamoErrorSnapshot이 IllegalArgumentException을 던져 400(사용자 요청 오류)이 되거나, 빈 값이 0으로 저장된다
     assertThatThrownBy(() -> client.analyze(PAIRS, 20))
         .isInstanceOf(CustomException.class)
         .extracting(e -> ((CustomException) e).getErrorCode())
