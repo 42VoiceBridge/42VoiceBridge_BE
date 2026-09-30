@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.voicebridge.port.out.AudioNormalizationPort;
 import com.voicebridge.port.out.AudioProcessingException;
 import com.voicebridge.port.out.InvalidAudioException;
+import com.voicebridge.port.out.InvalidAudioException.Reason;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -76,13 +77,13 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
   public NormalizedAudio normalize(byte[] source) {
     // 입력 파라미터 유효성 검사
     if (source == null || source.length == 0) {
-      throw new InvalidAudioException("Audio is empty");
+      throw new InvalidAudioException(Reason.INVALID, "Audio is empty");
     }
     if (source.length > settings.maxSourceBytes()) {
-      throw new InvalidAudioException("Audio upload exceeds the size limit");
+      throw new InvalidAudioException(Reason.INVALID, "Audio upload exceeds the size limit");
     }
     if (!hasSupportedContainerSignature(source)) {
-      throw new InvalidAudioException("Unsupported or damaged audio container");
+      throw new InvalidAudioException(Reason.INVALID, "Unsupported or damaged audio container");
     }
     if (!permits.tryAcquire()) {
       throw new AudioProcessingException("Audio conversion capacity exhausted");
@@ -154,7 +155,7 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
       run(command, workspace.processOutput, workspace.processError, 1024, deadline);
       long length = Files.size(workspace.decoded);
       if (length > MAX_DECODED_BYTES || length % Float.BYTES != 0) {
-        throw new InvalidAudioException("Invalid decoded audio length");
+        throw new InvalidAudioException(Reason.INVALID, "Invalid decoded audio length");
       }
       byte[] wav = encodeWav(Files.readAllBytes(workspace.decoded));
       Metadata metadata =
@@ -188,7 +189,7 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
     if (!streams.isArray()
         || streams.size() != 1
         || !"audio".equals(streams.get(0).path("codec_type").asText())) {
-      throw new InvalidAudioException("Exactly one audio stream is required");
+      throw new InvalidAudioException(Reason.INVALID, "Exactly one audio stream is required");
     }
     JsonNode stream = streams.get(0);
     String format = root.path("format").path("format_name").asText();
@@ -198,15 +199,16 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
             || (format.equals("matroska,webm") && Set.of("opus", "vorbis").contains(codec))
             || (format.equals("mov,mp4,m4a,3gp,3g2,mj2") && codec.equals("aac"));
     if (!supported) {
-      throw new InvalidAudioException("Supported audio: PCM WAV, WebM Opus/Vorbis, M4A AAC");
+      throw new InvalidAudioException(
+          Reason.INVALID, "Supported audio: PCM WAV, WebM Opus/Vorbis, M4A AAC");
     }
     int channels = stream.path("channels").asInt();
     if (channels != 1 && !(channels == 2 && settings.downmixStereo())) {
-      throw new InvalidAudioException("Unsupported audio channel count");
+      throw new InvalidAudioException(Reason.INVALID, "Unsupported audio channel count");
     }
     int sampleRate = stream.path("sample_rate").asInt();
     if (sampleRate < 1 || sampleRate > 192000) {
-      throw new InvalidAudioException("Unsupported audio sample rate");
+      throw new InvalidAudioException(Reason.INVALID, "Unsupported audio sample rate");
     }
     return new SourceInfo(format, codec, sampleRate, channels);
   }
@@ -234,8 +236,11 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
   // 디코딩된 샘플의 길이 및 유효성을 검사하고 최종 PCM16 WAV만듬
   private byte[] encodeWav(byte[] decoded) {
     int samples = decoded.length / Float.BYTES;
-    if (samples < MIN_SAMPLES || samples > MAX_SAMPLES) {
-      throw new InvalidAudioException("Audio duration must be between 0.3 and 30 seconds");
+    if (samples < MIN_SAMPLES) {
+      throw new InvalidAudioException(Reason.TOO_SHORT, "Audio is shorter than 0.3 seconds");
+    }
+    if (samples > MAX_SAMPLES) {
+      throw new InvalidAudioException(Reason.TOO_LONG, "Audio is longer than 30 seconds");
     }
     int size = samples * Short.BYTES;
     ByteBuffer wav = ByteBuffer.allocate(44 + size).order(ByteOrder.LITTLE_ENDIAN);
@@ -255,7 +260,7 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
     while (floats.hasRemaining()) {
       float sample = floats.getFloat();
       if (!Float.isFinite(sample)) {
-        throw new InvalidAudioException("Audio contains non-finite samples");
+        throw new InvalidAudioException(Reason.INVALID, "Audio contains non-finite samples");
       }
       int value = Math.round(Math.max(-1f, Math.min(1f, sample)) * 32768f);
       wav.putShort((short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, value)));
@@ -281,14 +286,16 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
           throw new AudioProcessingException("Audio processing deadline exceeded");
         }
         if (Files.size(output) > maxOutput) {
-          throw new InvalidAudioException("Audio metadata exceeds the processing limit");
+          throw new InvalidAudioException(
+              Reason.INVALID, "Audio metadata exceeds the processing limit");
         }
         if (Files.size(error) > 8192) {
           throw new AudioProcessingException("Audio converter diagnostics exceeded the limit");
         }
       }
       if (Files.size(output) > maxOutput) {
-        throw new InvalidAudioException("Audio metadata exceeds the processing limit");
+        throw new InvalidAudioException(
+            Reason.INVALID, "Audio metadata exceeds the processing limit");
       }
       if (Files.size(error) > 8192) {
         throw new AudioProcessingException("Audio converter diagnostics exceeded the limit");
@@ -303,7 +310,7 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
             process.exitValue(),
             diagnostic);
         if (isKnownInputFailure(diagnostic)) {
-          throw new InvalidAudioException("Audio could not be decoded");
+          throw new InvalidAudioException(Reason.INVALID, "Audio could not be decoded");
         }
         throw new AudioProcessingException("Audio converter failed; check server diagnostics");
       }
@@ -352,7 +359,7 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() {
       IOException failure = null;
       for (Path path : List.of(input, probe, decoded, processOutput, processError, directory)) {
         try {
@@ -362,7 +369,9 @@ public final class FfmpegAudioNormalizer implements AudioNormalizationPort {
           else failure.addSuppressed(e);
         }
       }
-      if (failure != null) throw failure;
+      if (failure != null) {
+        log.warn("Audio temporary workspace cleanup failed: directory={}", directory, failure);
+      }
     }
   }
 }

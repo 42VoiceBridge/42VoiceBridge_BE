@@ -52,6 +52,46 @@ class FfmpegAudioNormalizerIntegrationTest {
   }
 
   @Test
+  void cleanupFailureDoesNotDiscardSuccessfulConversion() throws Exception {
+    Path wrapper = directory.resolve("ffmpeg-with-leftover");
+    Files.writeString(
+        wrapper,
+        "#!/bin/sh\n"
+            + "output=''\n"
+            + "for arg in \"$@\"; do output=\"$arg\"; done\n"
+            + "ffmpeg \"$@\" || exit $?\n"
+            + "touch \"$(dirname \"$output\")/leftover\"\n");
+    assertThat(wrapper.toFile().setExecutable(true)).isTrue();
+    var withLeftover =
+        new FfmpegAudioNormalizer(
+            new ObjectMapper(),
+            new FfmpegAudioNormalizer.Settings(
+                wrapper.toString(),
+                "ffprobe",
+                work,
+                Duration.ofSeconds(10),
+                2,
+                10 * 1024 * 1024,
+                true));
+
+    var result = withLeftover.normalize(AudioFixtures.wav(16000, 1, 8000));
+    assertThat(AudioFixtures.assertCanonicalWav(result.wavBytes())).isEqualTo(8000);
+
+    Path workspace;
+    try (var entries = Files.list(work)) {
+      var directories = entries.toList();
+      assertThat(directories).hasSize(1);
+      workspace = directories.get(0);
+    }
+    assertThat(workspace.resolve("leftover")).exists();
+    assertThat(workspace.resolve("input")).doesNotExist();
+    assertThat(workspace.resolve("decoded.f32")).doesNotExist();
+    Files.delete(workspace.resolve("leftover"));
+    Files.delete(workspace);
+    assertClean();
+  }
+
+  @Test
   void stereoMixIsTheExplicitAverageOfBothChannels() {
     byte[] input = AudioFixtures.wav(16000, 2, 8000);
     ByteBuffer source = ByteBuffer.wrap(input).order(ByteOrder.LITTLE_ENDIAN);
@@ -83,10 +123,14 @@ class FfmpegAudioNormalizerIntegrationTest {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {4799, 480001, 640000})
-  void rejectsOutOfRangeDurationRatherThanReturningTruncatedAudio(int samples) {
+  @CsvSource({"4799, TOO_SHORT", "480001, TOO_LONG", "640000, TOO_LONG"})
+  void rejectsOutOfRangeDurationRatherThanReturningTruncatedAudio(
+      int samples, InvalidAudioException.Reason expectedReason) {
     assertThatThrownBy(() -> normalizer.normalize(AudioFixtures.wav(16000, 1, samples)))
-        .isInstanceOf(InvalidAudioException.class);
+        .isInstanceOf(InvalidAudioException.class)
+        .satisfies(
+            failure ->
+                assertThat(((InvalidAudioException) failure).reason()).isEqualTo(expectedReason));
     assertClean();
   }
 

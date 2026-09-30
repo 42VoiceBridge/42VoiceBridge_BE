@@ -73,7 +73,8 @@ class RecognitionUploadIntegrationTest {
   @Test
   void invalidAudioReturns400WithoutInferenceOrStorage() throws Exception {
     UUID userId = UUID.randomUUID();
-    org.mockito.Mockito.doThrow(new InvalidAudioException("bad audio"))
+    org.mockito.Mockito.doThrow(
+            new InvalidAudioException(InvalidAudioException.Reason.INVALID, "bad audio"))
         .when(normalizer)
         .normalize(any());
     mvc.perform(multipart(URL).file(wav("audioFile")).header("Authorization", token(userId)))
