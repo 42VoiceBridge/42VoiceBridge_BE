@@ -150,9 +150,7 @@ class GetJamoErrorStatsServiceTest {
     givenRecordings(
         recording(session, sentenceA, RecordingStatus.DONE, "오늘 날씨가 조습니다", t0),
         recording(session, sentenceA, RecordingStatus.DONE, "오늘 날씨가 좋습니다", t0.plusMinutes(1)),
-        recording(session, sentenceB, RecordingStatus.DONE, "바라미 붑니다", t0),
-        // 더 늦게 녹음했어도 실패한 녹음은 쓰지 않는다
-        recording(session, sentenceB, RecordingStatus.FAILED, null, t0.plusMinutes(2)));
+        recording(session, sentenceB, RecordingStatus.DONE, "바라미 붑니다", t0));
     givenSentences();
     givenSaveReturnsInput();
     when(jamoStatsPort.analyze(anyList(), eq(MIN_SUPPORT)))
@@ -207,6 +205,26 @@ class GetJamoErrorStatsServiceTest {
 
     service.getStats(userId);
 
+    assertThat(capturePairs()).containsExactly(new TextPair("바람이 붑니다", "바라미 붑니다"));
+  }
+
+  @Test
+  void 가장_최근_녹음이_무음이면_예전_녹음으로_대신하지_않는다() {
+    DiagnosisSession session = analyzedSession();
+    givenSessions(session);
+    givenNoSnapshot();
+    givenRecordings(
+        recording(session, sentenceA, RecordingStatus.DONE, "오늘 날씨가 조습니다", t0),
+        recording(session, sentenceA, RecordingStatus.DONE, "", t0.plusMinutes(1)),
+        recording(session, sentenceB, RecordingStatus.DONE, "바라미 붑니다", t0));
+    givenSentences();
+    givenSaveReturnsInput();
+    when(jamoStatsPort.analyze(anyList(), eq(MIN_SUPPORT)))
+        .thenReturn(new JamoStatsResult("jamo-err-v1", MIN_SUPPORT, 1, List.of(stat)));
+
+    service.getStats(userId);
+
+    // 세션 완료 판단도 가장 최근 녹음만 본다. 여기서 예전 녹음을 쓰면 두 판단이 서로 다른 녹음을 보게 된다.
     assertThat(capturePairs()).containsExactly(new TextPair("바람이 붑니다", "바라미 붑니다"));
   }
 

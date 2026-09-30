@@ -3,6 +3,7 @@ package com.voicebridge.domain.diagnosis;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,22 @@ class DiagnosisSessionTest {
         Recording.create(session.getId(), sentenceId, session.getUserId(), "recordings/a.wav");
     recording.markProcessing();
     return recording;
+  }
+
+  // 같은 문장의 녹음 순서가 중요한 테스트용. 연달아 만든 녹음은 생성 시각이 같을 수 있어 시각을 직접 정한다.
+  private static final LocalDateTime T0 = LocalDateTime.of(2026, 9, 30, 10, 0);
+
+  private Recording recordedAt(Recording recording, int minute) {
+    return Recording.reconstitute(
+        recording.getId(),
+        recording.getSessionId(),
+        recording.getSentenceId(),
+        recording.getUserId(),
+        recording.getS3Path(),
+        recording.getStatus(),
+        recording.getRecognizedText(),
+        recording.getConfidence(),
+        T0.plusMinutes(minute));
   }
 
   @Test
@@ -91,9 +108,41 @@ class DiagnosisSessionTest {
     boolean changed =
         session.markAnalyzedIfAllSentencesDone(
             List.of(
-                failed(session, sentenceA), done(session, sentenceA), done(session, sentenceB)));
+                recordedAt(failed(session, sentenceA), 0),
+                recordedAt(done(session, sentenceA), 1),
+                done(session, sentenceB)));
 
     assertThat(changed).isTrue();
+  }
+
+  @Test
+  void 다시_녹음한_것이_아직_인식_중이면_예전_DONE이_있어도_전이하지_않는다() {
+    DiagnosisSession session = sessionWithTwoSentences();
+
+    // 여기서 끝내면, 분석이 끝난 뒤에 다시 녹음한 것의 결과가 들어와 통계의 재료가 바뀐다
+    boolean changed =
+        session.markAnalyzedIfAllSentencesDone(
+            List.of(
+                recordedAt(done(session, sentenceA), 0),
+                recordedAt(processing(session, sentenceA), 1),
+                done(session, sentenceB)));
+
+    assertThat(changed).isFalse();
+  }
+
+  @Test
+  void 다시_녹음한_것이_실패했으면_예전_DONE이_있어도_전이하지_않는다() {
+    DiagnosisSession session = sessionWithTwoSentences();
+
+    // 화면에는 문장마다 가장 최근 녹음이 보인다. FAILED로 보이는 문장이 있는데 세션이 끝나면 안 된다.
+    boolean changed =
+        session.markAnalyzedIfAllSentencesDone(
+            List.of(
+                recordedAt(done(session, sentenceA), 0),
+                recordedAt(failed(session, sentenceA), 1),
+                done(session, sentenceB)));
+
+    assertThat(changed).isFalse();
   }
 
   @Test

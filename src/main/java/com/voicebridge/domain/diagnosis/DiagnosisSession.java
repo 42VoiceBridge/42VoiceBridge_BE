@@ -67,17 +67,20 @@ public class DiagnosisSession {
   }
 
   /**
-   * 문장마다 인식이 끝난(DONE) 녹음이 하나 이상 있으면 ANALYZED로 전이하고 true를 돌려준다. 이미 전이된 세션이면 아무것도 하지 않고 false.
+   * 문장마다 가장 최근 녹음이 인식을 마쳤으면(DONE) ANALYZED로 전이하고 true를 돌려준다. 이미 전이된 세션이면 아무것도 하지 않고 false.
    *
-   * <p>"모든 녹음이 DONE"이 아니라 "문장마다 DONE 하나"로 보는 이유: 인식에 실패(FAILED)한 녹음은 같은 문장을 다시 녹음하면 되는데, 실패한 녹음이 남아
-   * 있다는 이유로 세션이 영영 끝나지 못하면 안 된다.
+   * <p>"모든 녹음"이 아니라 "문장마다 가장 최근 녹음"으로 보는 이유: 인식에 실패(FAILED)한 녹음은 같은 문장을 다시 녹음하면 되고, 다시 녹음한 것이 가장
+   * 최근이 된다. 실패한 녹음이 남아 있다는 이유로 세션이 영영 끝나지 못하면 안 된다.
+   *
+   * <p>"문장마다 DONE 하나라도"로 보지 않는 이유: 다시 녹음한 것이 아직 인식 중인데 예전 DONE으로 세션을 끝내면, 분석이 끝난 뒤에 그 녹음의 결과가 들어와
+   * 이미 계산한 통계의 재료가 바뀐다. 세션 조회 API도 문장마다 가장 최근 녹음을 보여주므로, 화면에 모든 문장이 DONE으로 보일 때가 곧 ANALYZED가 될 때다.
    */
   public boolean markAnalyzedIfAllSentencesDone(Collection<Recording> recordings) {
     if (status != DiagnosisSessionStatus.IN_PROGRESS) {
       return false;
     }
     Set<UUID> doneSentenceIds =
-        recordings.stream()
+        Recording.latestPerSentence(recordings).stream()
             .filter(recording -> recording.getSessionId().equals(id))
             .filter(Recording::isDone)
             .map(Recording::getSentenceId)

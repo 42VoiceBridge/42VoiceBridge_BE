@@ -41,7 +41,8 @@ class DiagnosisSessionAnalysisTriggerTest {
   }
 
   private void givenRecordings(Recording... recordings) {
-    when(diagnosisSessionRepositoryPort.findById(session.getId())).thenReturn(Optional.of(session));
+    when(diagnosisSessionRepositoryPort.findByIdForUpdate(session.getId()))
+        .thenReturn(Optional.of(session));
     when(recordingRepositoryPort.findBySessionId(session.getId())).thenReturn(List.of(recordings));
   }
 
@@ -77,7 +78,7 @@ class DiagnosisSessionAnalysisTriggerTest {
   @Test
   void 세션을_찾지_못하면_아무것도_하지_않는다() {
     UUID unknown = UUID.randomUUID();
-    when(diagnosisSessionRepositoryPort.findById(unknown)).thenReturn(Optional.empty());
+    when(diagnosisSessionRepositoryPort.findByIdForUpdate(unknown)).thenReturn(Optional.empty());
 
     trigger.onRecordingRecognized(new RecordingRecognizedEvent(unknown));
 

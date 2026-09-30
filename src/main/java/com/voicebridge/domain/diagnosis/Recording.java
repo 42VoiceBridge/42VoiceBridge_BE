@@ -1,7 +1,11 @@
 package com.voicebridge.domain.diagnosis;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class Recording {
 
@@ -104,6 +108,25 @@ public class Recording {
     }
     this.status = RecordingStatus.FAILED;
   }
+
+  /**
+   * 문장마다 가장 최근 녹음 하나만 남긴다(같은 문장이라도 세션이 다르면 따로 본다). 한 문장을 여러 번 녹음했으면 마지막 것이 그 문장의 결과다.
+   *
+   * <p>세션 완료 판단과 자모 통계가 이 규칙 하나를 같이 쓴다. 둘이 다른 녹음을 보면, 분석이 끝난 세션인데도 통계 재료가 나중에 바뀔 수 있다.
+   */
+  public static List<Recording> latestPerSentence(Collection<Recording> recordings) {
+    return List.copyOf(
+        recordings.stream()
+            .collect(
+                Collectors.toMap(
+                    r -> new SessionSentence(r.sessionId, r.sentenceId),
+                    Function.identity(),
+                    (a, b) -> a.createdAt.isAfter(b.createdAt) ? a : b))
+            .values());
+  }
+
+  // 같은 문장이 다른 세션에서 또 나올 수 있다. 문장 ID만으로 묶으면 세션을 누적해도 하나로 합쳐져 자모 통계의 표본이 늘지 않는다.
+  private record SessionSentence(UUID sessionId, UUID sentenceId) {}
 
   public boolean isOwnedBy(UUID userId) {
     return this.userId.equals(userId);

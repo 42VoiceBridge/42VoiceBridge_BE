@@ -43,9 +43,12 @@ class UploadDiagnosisRecordingServiceTest {
 
   @BeforeEach
   void setUp() {
+    // 트랜잭션은 여기서 보지 않는다(프록시 없이 직접 만든다). 잠금으로 줄 세우는 것은 DiagnosisRecordingRaceTest가 실제 DB로 확인한다.
     service =
         new UploadDiagnosisRecordingService(
-            diagnosisSessionRepositoryPort, recordingRepositoryPort, storagePort, eventPublisher);
+            new DiagnosisRecordingRegistrar(
+                diagnosisSessionRepositoryPort, recordingRepositoryPort, eventPublisher),
+            storagePort);
   }
 
   private DiagnosisSession sessionOwnedBy(UUID ownerId) {
@@ -64,6 +67,8 @@ class UploadDiagnosisRecordingServiceTest {
   @Test
   void 업로드하면_PROCESSING_상태로_저장하고_인식_이벤트를_발행한다() {
     when(diagnosisSessionRepositoryPort.findById(sessionId))
+        .thenReturn(Optional.of(sessionOwnedBy(userId)));
+    when(diagnosisSessionRepositoryPort.findByIdForUpdate(sessionId))
         .thenReturn(Optional.of(sessionOwnedBy(userId)));
     when(storagePort.upload(any(), any())).thenReturn("recordings/abc.wav");
     when(recordingRepositoryPort.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -114,6 +119,22 @@ class UploadDiagnosisRecordingServiceTest {
     assertThatThrownBy(() -> service.upload(command())).isInstanceOf(IllegalStateException.class);
 
     verify(storagePort, never()).upload(any(), any());
+  }
+
+  @Test
+  void 파일을_올리는_사이_세션이_분석을_마쳤으면_녹음을_등록하지_않는다() {
+    DiagnosisSession analyzedMeanwhile = sessionOwnedBy(userId);
+    analyzedMeanwhile.markAnalyzed();
+    when(diagnosisSessionRepositoryPort.findById(sessionId))
+        .thenReturn(Optional.of(sessionOwnedBy(userId)));
+    when(storagePort.upload(any(), any())).thenReturn("recordings/abc.wav");
+    when(diagnosisSessionRepositoryPort.findByIdForUpdate(sessionId))
+        .thenReturn(Optional.of(analyzedMeanwhile));
+
+    assertThatThrownBy(() -> service.upload(command())).isInstanceOf(IllegalStateException.class);
+
+    verify(recordingRepositoryPort, never()).save(any());
+    verify(eventPublisher, never()).publishEvent(any(RecordingUploadedEvent.class));
   }
 
   @Test

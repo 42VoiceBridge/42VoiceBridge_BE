@@ -13,11 +13,9 @@ import com.voicebridge.port.out.JamoStatsPort.JamoStatsResult;
 import com.voicebridge.port.out.JamoStatsPort.TextPair;
 import com.voicebridge.port.out.RecordingRepositoryPort;
 import com.voicebridge.port.out.SentenceRepositoryPort;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -88,8 +86,9 @@ public class GetJamoErrorStatsService implements GetJamoErrorStatsUseCase {
   }
 
   /**
-   * 세션의 문장마다 가장 최근에 쓸 수 있는 녹음 하나를 고른다. 한 문장을 여러 번 녹음했으면 마지막 것이 사용자의 현재 발화에 가깝다. 정답은 등록 문장의 원문을 쓴다.
-   * 모델 출력을 정답 자리에 넣으면 모델이 틀린 것을 맞았다고 세게 된다.
+   * 세션의 문장마다 가장 최근 녹음 하나를 쓰고, 그게 무음이면 그 문장은 뺀다. 세션 완료 판단과 같은 녹음을 봐야 분석이 끝난 세션의 재료가 바뀌지 않는다(그래서 낡음
+   * 검사가 세션 수만 봐도 된다). 예전 녹음으로 대신 채우지 않는 것도 같은 이유다. 정답은 등록 문장의 원문을 쓴다. 모델 출력을 정답 자리에 넣으면 모델이 틀린 것을
+   * 맞았다고 세게 된다.
    */
   private List<TextPair> pairsFrom(List<DiagnosisSession> sessions) {
     if (sessions.isEmpty()) {
@@ -97,15 +96,10 @@ public class GetJamoErrorStatsService implements GetJamoErrorStatsUseCase {
     }
     List<UUID> sessionIds = sessions.stream().map(DiagnosisSession::getId).toList();
 
-    Collection<Recording> latest =
-        recordingRepositoryPort.findBySessionIdIn(sessionIds).stream()
+    List<Recording> latest =
+        Recording.latestPerSentence(recordingRepositoryPort.findBySessionIdIn(sessionIds)).stream()
             .filter(Recording::isUsableForJamoStats)
-            .collect(
-                Collectors.toMap(
-                    r -> new SessionSentence(r.getSessionId(), r.getSentenceId()),
-                    Function.identity(),
-                    (a, b) -> a.getCreatedAt().isAfter(b.getCreatedAt()) ? a : b))
-            .values();
+            .toList();
     if (latest.isEmpty()) {
       return List.of();
     }
@@ -122,7 +116,4 @@ public class GetJamoErrorStatsService implements GetJamoErrorStatsUseCase {
         .map(r -> new TextPair(answerById.get(r.getSentenceId()), r.getRecognizedText()))
         .toList();
   }
-
-  // 같은 문장이 다른 세션에서 또 나올 수 있다. 문장 ID만으로 묶으면 세션을 누적해도 쌍이 합쳐져 표본이 늘지 않는다.
-  private record SessionSentence(UUID sessionId, UUID sentenceId) {}
 }

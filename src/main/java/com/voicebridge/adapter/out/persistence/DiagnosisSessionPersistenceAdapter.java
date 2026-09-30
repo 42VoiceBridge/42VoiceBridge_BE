@@ -36,6 +36,11 @@ public class DiagnosisSessionPersistenceAdapter implements DiagnosisSessionRepos
   }
 
   @Override
+  public Optional<DiagnosisSession> findByIdForUpdate(UUID id) {
+    return jpaRepository.findByIdForUpdate(id).map(DiagnosisSessionPersistenceAdapter::toDomain);
+  }
+
+  @Override
   public List<DiagnosisSession> findByUserIdAndStatusIn(
       UUID userId, Collection<DiagnosisSessionStatus> statuses) {
     return jpaRepository.findByUserIdAndStatusIn(userId, statuses).stream()

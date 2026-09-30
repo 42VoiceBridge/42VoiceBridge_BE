@@ -32,8 +32,10 @@ public class DiagnosisSessionAnalysisTrigger {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onRecordingRecognized(RecordingRecognizedEvent event) {
+    // 세션을 잠근 뒤에 녹음을 읽는다. 녹음 등록(DiagnosisRecordingRegistrar)도 같은 잠금을 잡으므로, 등록이 진행 중이면 끝날 때까지 기다렸다가 그
+    // 녹음까지 보고 판단한다. 잠그지 않으면 아직 커밋되지 않은 새 녹음을 못 보고 세션을 끝내, 분석이 끝난 세션에 녹음이 들어간다.
     DiagnosisSession session =
-        diagnosisSessionRepositoryPort.findById(event.sessionId()).orElse(null);
+        diagnosisSessionRepositoryPort.findByIdForUpdate(event.sessionId()).orElse(null);
     if (session == null) {
       log.warn("[세션 분석] 세션을 찾을 수 없어 건너뜀 sessionId={}", event.sessionId());
       return;
