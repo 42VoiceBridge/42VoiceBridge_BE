@@ -21,7 +21,7 @@ concurrency:
 jobs:
   build-and-publish:
     # Match the runtime image's Ubuntu release and FFmpeg packages.
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       IMAGE: ghcr.io/42voicebridge/42voicebridge_be

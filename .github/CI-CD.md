@@ -35,7 +35,9 @@
 
 ## 오디오와 이미지 검증
 
-P02 오디오 변환이 포함된 현재 `develop`에 맞춰 러너와 런타임 이미지는 Ubuntu 22.04(Jammy)의 FFmpeg 패키지를 사용한다. CI는 `audioIntegrationTest`를 통과한 러너와 이미지의 FFmpeg 패키지 버전이 같은지 확인한다. 버전이 다르면 게시 전에 실패하므로 두 환경의 패키지 공급 상태를 확인한다.
+Ubuntu 22.04의 FFmpeg 4.4에서는 잘린 WAV가 정상 입력으로 처리되어 기존 오류 검증 테스트가 실패했다. Ubuntu 24.04의 FFmpeg 6.1 환경에서 오디오 통합 테스트 17개와 이미지 변환 검증을 통과해 이 버전을 기준으로 사용한다.
+
+P02 오디오 변환이 포함된 현재 `develop`에 맞춰 러너와 런타임 이미지는 Ubuntu 24.04(Noble)의 FFmpeg 패키지를 사용한다. CI는 `audioIntegrationTest`를 통과한 러너와 이미지의 FFmpeg 패키지 버전이 같은지 확인한다. 버전이 다르면 게시 전에 실패하므로 두 환경의 패키지 공급 상태를 확인한다.
 
 이미지는 기본 비루트 사용자(uid 10001)로 JAR 읽기, Java 실행, FFmpeg/ffprobe 실행, WebM → PCM16·16kHz·mono WAV 변환을 검증한다. 이 검증을 통과한 동일한 로컬 이미지를 push하며 GHCR 로그인과 게시는 push 이벤트에서만 수행한다. PR에는 앱 런타임 비밀값이나 GHCR 로그인 정보가 필요하지 않다.
 
