@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
@@ -19,7 +20,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "diagnosis_sessions")
+// 자모 오류 통계가 "사용자의 분석 완료 세션"을 찾는 조회 패턴에 맞춘 인덱스
+@Table(
+    name = "diagnosis_sessions",
+    indexes = @Index(name = "idx_diagnosis_sessions_user_status", columnList = "user_id, status"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DiagnosisSessionJpaEntity {

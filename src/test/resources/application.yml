@@ -7,6 +7,9 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+  task:
+    execution:
+      mode: force
 
 voicebridge:
   jwt:
@@ -20,6 +23,12 @@ voicebridge:
       base-url: http://127.0.0.1:8000
       connect-timeout-ms: 3000
       read-timeout-ms: 10000
+    jamo-stats:
+      min-support: 10
+  diagnosis:
+    recognition:
+      threads: 2
+      queue-capacity: 200
   s3:
     bucket: test-bucket
     region: ap-northeast-2

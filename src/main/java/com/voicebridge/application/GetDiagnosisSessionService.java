@@ -43,13 +43,10 @@ public class GetDiagnosisSessionService implements GetDiagnosisSessionUseCase {
         sentenceRepositoryPort.findAllByIds(session.getSentenceIds()).stream()
             .collect(Collectors.toMap(Sentence::id, Sentence::text));
 
+    // 세션 완료 판단과 같은 규칙으로 고른다. 그래야 화면에 모든 문장이 DONE으로 보일 때 세션도 ANALYZED가 된다.
     Map<UUID, Recording> latestBySentenceId =
-        recordingRepositoryPort.findBySessionId(sessionId).stream()
-            .collect(
-                Collectors.toMap(
-                    Recording::getSentenceId,
-                    Function.identity(),
-                    (a, b) -> a.getCreatedAt().isAfter(b.getCreatedAt()) ? a : b));
+        Recording.latestPerSentence(recordingRepositoryPort.findBySessionId(sessionId)).stream()
+            .collect(Collectors.toMap(Recording::getSentenceId, Function.identity()));
 
     // 세션의 문장 순서가 곧 낭독 순서다(OrderColumn으로 보존됨). 그 순서를 그대로 유지한다.
     List<SentenceView> sentences =
