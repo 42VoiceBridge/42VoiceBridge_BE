@@ -17,7 +17,11 @@ voicebridge:
     access-token-expire-seconds: 3600
     refresh-token-expire-seconds: 1209600
   kakao:
+    token-uri: https://kauth.kakao.com/oauth/token
     user-info-uri: https://kapi.kakao.com/v2/user/me
+    client-id: test-kakao-client-id
+    redirect-uri: http://localhost:5173/oauth/kakao/callback
+    client-secret:
   ai:
     http:
       base-url: http://127.0.0.1:8000

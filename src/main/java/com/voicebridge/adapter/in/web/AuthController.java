@@ -48,7 +48,7 @@ public class AuthController {
   @PostMapping("/kakao")
   public ResponseEntity<ApiResponse<TokenResponse>> loginWithKakao(
       @Valid @RequestBody KakaoLoginRequest request) {
-    var result = kakaoLoginUseCase.loginWithKakao(request.kakaoAccessToken());
+    var result = kakaoLoginUseCase.loginWithKakao(request.authorizationCode());
     return ResponseEntity.ok(ApiResponse.success(TokenResponse.from(result)));
   }
 

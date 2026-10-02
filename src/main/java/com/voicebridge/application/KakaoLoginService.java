@@ -22,10 +22,10 @@ public class KakaoLoginService implements KakaoLoginUseCase {
   private final TokenIssuer tokenIssuer;
 
   @Override
-  public TokenResult loginWithKakao(String kakaoAccessToken) {
+  public TokenResult loginWithKakao(String authorizationCode) {
     KakaoUserInfoPort.KakaoUserInfo info;
     try {
-      info = kakaoUserInfoPort.fetchUserInfo(kakaoAccessToken);
+      info = kakaoUserInfoPort.fetchUserInfo(authorizationCode);
     } catch (RuntimeException e) {
       throw new CustomException(ErrorCode.KAKAO_AUTH_FAILED);
     }

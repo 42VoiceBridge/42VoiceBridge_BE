@@ -20,6 +20,7 @@ graph LR
     subgraph manual["Terraform 범위 밖 — 수동 준비"]
         NCP["NCP 콘솔<br/>(CLOVA Voice 키 발급)"]
         AITEAM["AI팀<br/>(서버 주소 확인)"]
+        KAKAO["카카오 개발자 콘솔<br/>(REST API 키 · Redirect URI · Client Secret)"]
         OPENSSL["openssl rand -base64 32"]
     end
 
@@ -35,6 +36,7 @@ graph LR
     L2 -- "s3_bucket_name → S3_BUCKET" --> ENV
     NCP -- "NCP_TTS_API_KEY(_ID)" --> ENV
     AITEAM -- "AI_SERVER_BASE_URL" --> ENV
+    KAKAO -- "KAKAO_CLIENT_ID / KAKAO_REDIRECT_URI / KAKAO_CLIENT_SECRET" --> ENV
     OPENSSL -- "JWT_SECRET" --> ENV
 ```
 
@@ -60,6 +62,9 @@ graph LR
 | `AWS_REGION` | S3 클라이언트 리전 | Infra 각 레이어에 `apply`할 때 쓴 `aws_region` 입력값과 동일(기본 `ap-northeast-2`) — Terraform output이 아니라 배포 시 동일하게 맞추기만 하면 됨 | 🟢 리전을 바꾸지 않았다면 로컬 기본값 그대로 둬도 됨 |
 | `NCP_TTS_API_KEY_ID` | 네이버 클라우드 CLOVA Voice 인증 키 ID | NCP 콘솔에서 수동 발급(Infra/Terraform 범위 밖) | 🔴 배포 필수(로컬 기본값은 빈 문자열 — TTS 기능을 실제로 테스트하려면 로컬에서도 값 필요) |
 | `NCP_TTS_API_KEY` | 네이버 클라우드 CLOVA Voice 인증 키 | NCP 콘솔에서 수동 발급(Infra/Terraform 범위 밖) | 🔴 배포 필수(위와 동일) |
+| `KAKAO_CLIENT_ID` | 카카오 로그인 토큰 교환에 쓰는 앱 키 | 카카오 개발자 콘솔 [앱] > [플랫폼 키] > **REST API 키**(JavaScript 키 아님) | 🔴 배포 필수(기본값 없음 — 비어 있으면 카카오 로그인이 실패) |
+| `KAKAO_REDIRECT_URI` | 카카오 인가 코드를 받는 프론트 주소 | 프론트가 `Kakao.Auth.authorize({ redirectUri })`에 넘기는 값과 **정확히 같아야 함**(다르면 카카오가 KOE303으로 거절). 카카오 콘솔의 Redirect URI에도 등록 | 🔴 배포 필수(로컬과 배포 주소가 다르므로 환경마다 따로 지정) |
+| `KAKAO_CLIENT_SECRET` | 카카오 토큰 교환용 클라이언트 시크릿 | 카카오 개발자 콘솔에서 Client Secret을 **사용함**으로 켠 경우에만 발급값 입력 | 🟢 선택(콘솔에서 켰다면 필수 — 빠지면 KOE010으로 모든 카카오 로그인 실패. 켤 때는 이 값을 먼저 넣은 뒤 콘솔에서 켤 것) |
 
 ### 참고 — `docker-compose.yml`의 `DB_PASSWORD`
 
