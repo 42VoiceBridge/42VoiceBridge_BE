@@ -1,6 +1,7 @@
 package com.voicebridge.adapter.out.persistence;
 
 import com.voicebridge.domain.personalization.PersonalizationRecording;
+import com.voicebridge.domain.personalization.PersonalizationRecordingStatus;
 import com.voicebridge.port.out.PersonalizationRecordingRepositoryPort;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,12 +24,14 @@ public class PersonalizationRecordingPersistenceAdapter
   @Override
   @Transactional
   public void markDeletionPending(UUID id) {
-    repository.findById(id).ifPresent(PersonalizationRecordingJpaEntity::markDeletionPending);
+    transitionIfPresent(id, PersonalizationRecordingStatus.DELETION_PENDING);
   }
 
   @Override
   public List<PersonalizationRecording> findExpiredUploaded(LocalDateTime cutoff) {
-    return repository.findByStatusAndCreatedAtBefore("UPLOADED", cutoff).stream()
+    return repository
+        .findByStatusAndCreatedAtBefore(PersonalizationRecordingStatus.UPLOADED.name(), cutoff)
+        .stream()
         .map(PersonalizationRecordingJpaEntity::toDomain)
         .toList();
   }
@@ -41,7 +44,7 @@ public class PersonalizationRecordingPersistenceAdapter
     }
     return repository
         .findByUserIdAndStatusAndUseForTrainingTrueAndCreatedAtAfter(
-            userId, "UPLOADED", now.minusDays(retentionDays))
+            userId, PersonalizationRecordingStatus.UPLOADED.name(), now.minusDays(retentionDays))
         .stream()
         .map(PersonalizationRecordingJpaEntity::toDomain)
         .filter(recording -> recording.isTrainingCandidate(now, retentionDays))
@@ -56,7 +59,10 @@ public class PersonalizationRecordingPersistenceAdapter
   @Override
   @Transactional
   public void markUploaded(UUID id) {
-    if (repository.markUploadedIfPreparing(id) != 1) {
+    var next = PersonalizationRecordingStatus.UPLOADED;
+    if (repository.transitionIfAllowed(
+            id, next.name(), PersonalizationRecordingStatus.allowedSourceNames(next))
+        != 1) {
       throw new IllegalStateException("Recording upload was already removed");
     }
   }
@@ -64,13 +70,16 @@ public class PersonalizationRecordingPersistenceAdapter
   @Override
   @Transactional
   public void markCleanupPending(UUID id) {
-    repository.findById(id).ifPresent(PersonalizationRecordingJpaEntity::markCleanupPending);
+    transitionIfPresent(id, PersonalizationRecordingStatus.CLEANUP_PENDING);
   }
 
   @Override
   @Transactional
   public boolean claimPendingForCleanup(UUID id, LocalDateTime cutoff) {
-    return repository.claimPendingForCleanup(id, cutoff) == 1;
+    var next = PersonalizationRecordingStatus.CLEANUP_PENDING;
+    return repository.transitionIfAllowedBefore(
+            id, cutoff, next.name(), PersonalizationRecordingStatus.allowedSourceNames(next))
+        == 1;
   }
 
   @Override
@@ -78,7 +87,7 @@ public class PersonalizationRecordingPersistenceAdapter
   public void deletePending(UUID id) {
     repository
         .findById(id)
-        .filter(r -> !"UPLOADED".equals(r.getStatus()))
+        .filter(r -> !PersonalizationRecordingStatus.UPLOADED.name().equals(r.getStatus()))
         .ifPresent(repository::delete);
   }
 
@@ -86,9 +95,21 @@ public class PersonalizationRecordingPersistenceAdapter
   public List<PersonalizationRecording> findPendingBefore(LocalDateTime cutoff) {
     return repository
         .findByStatusInAndCreatedAtBefore(
-            List.of("PREPARING", "CLEANUP_PENDING", "DELETION_PENDING"), cutoff)
+            PersonalizationRecordingStatus.allowedSourceNames(
+                PersonalizationRecordingStatus.CLEANUP_PENDING),
+            cutoff)
         .stream()
         .map(PersonalizationRecordingJpaEntity::toDomain)
         .toList();
+  }
+
+  private void transitionIfPresent(UUID id, PersonalizationRecordingStatus next) {
+    repository
+        .findById(id)
+        .ifPresent(
+            entity -> {
+              PersonalizationRecordingStatus.valueOf(entity.getStatus()).requireTransitionTo(next);
+              entity.setPersistenceStatus(next.name());
+            });
   }
 }

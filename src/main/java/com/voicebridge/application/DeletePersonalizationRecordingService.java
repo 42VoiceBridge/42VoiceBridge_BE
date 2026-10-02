@@ -2,6 +2,7 @@ package com.voicebridge.application;
 
 import com.voicebridge.common.exception.CustomException;
 import com.voicebridge.common.exception.ErrorCode;
+import com.voicebridge.port.in.DeletePersonalizationRecordingUseCase;
 import com.voicebridge.port.out.PersonalizationRecordingRepositoryPort;
 import com.voicebridge.port.out.StoragePort;
 import java.util.UUID;
@@ -12,10 +13,12 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class DeletePersonalizationRecordingService {
+public class DeletePersonalizationRecordingService
+    implements DeletePersonalizationRecordingUseCase {
   private final PersonalizationRecordingRepositoryPort recordings;
   private final StoragePort storage;
 
+  @Override
   public void delete(UUID userId, UUID recordingId) {
     var recording =
         recordings

@@ -61,6 +61,8 @@ public class RecognizeSpeechService implements RecognizeSpeechUseCase {
 
     if (result == null
         || result.recognizedText() == null
+        || (modelType == ModelType.BASE_ADAPTED
+            && result.actualModelType() == ModelType.PERSONALIZED)
         || (result.confidence() != null
             && (!Double.isFinite(result.confidence())
                 || result.confidence() < 0
@@ -72,7 +74,11 @@ public class RecognizeSpeechService implements RecognizeSpeechUseCase {
     // 결과 saved에는 저장 후 어댑터가 반환한 Recognition 객체 저장된다.
     Recognition saved =
         recognitionRepositoryPort.save(
-            Recognition.create(userId, result.recognizedText(), modelType, result.confidence()));
+            Recognition.create(
+                userId,
+                result.recognizedText(),
+                result.actualModelType() == null ? modelType : result.actualModelType(),
+                result.confidence()));
     // save()가 성공하면, 인식 ID와 변환 정보를 로그로 연결한다.
     // Id는 DB에 남지만 메타데이터는 버려진다. 그 메타 데이터를 로그에 남기기 위해서 로그에 값 남긴다.
     log.info(

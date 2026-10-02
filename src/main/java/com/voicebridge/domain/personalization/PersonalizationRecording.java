@@ -1,6 +1,5 @@
 package com.voicebridge.domain.personalization;
 
-import com.voicebridge.port.out.AudioNormalizationPort.Metadata;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -36,7 +35,7 @@ public record PersonalizationRecording(
       String promptText,
       boolean useForTraining,
       String consentVersion,
-      Metadata metadata) {
+      AudioProvenance metadata) {
     UUID id = UUID.randomUUID();
     LocalDateTime now = LocalDateTime.now();
     return new PersonalizationRecording(

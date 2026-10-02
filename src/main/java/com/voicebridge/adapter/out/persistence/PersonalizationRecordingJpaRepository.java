@@ -11,13 +11,14 @@ public interface PersonalizationRecordingJpaRepository
     extends JpaRepository<PersonalizationRecordingJpaEntity, UUID> {
   @Modifying
   @Query(
-      "update PersonalizationRecordingJpaEntity r set r.status = 'UPLOADED' where r.id = :id and r.status = 'PREPARING'")
-  int markUploadedIfPreparing(UUID id);
+      "update PersonalizationRecordingJpaEntity r set r.status = :next where r.id = :id and r.status in :allowedSources")
+  int transitionIfAllowed(UUID id, String next, List<String> allowedSources);
 
   @Modifying
   @Query(
-      "update PersonalizationRecordingJpaEntity r set r.status = 'CLEANUP_PENDING' where r.id = :id and r.createdAt < :cutoff and r.status in ('PREPARING', 'CLEANUP_PENDING', 'DELETION_PENDING')")
-  int claimPendingForCleanup(UUID id, LocalDateTime cutoff);
+      "update PersonalizationRecordingJpaEntity r set r.status = :next where r.id = :id and r.createdAt < :cutoff and r.status in :allowedSources")
+  int transitionIfAllowedBefore(
+      UUID id, LocalDateTime cutoff, String next, List<String> allowedSources);
 
   List<PersonalizationRecordingJpaEntity> findByStatusAndCreatedAtBefore(
       String status, LocalDateTime cutoff);

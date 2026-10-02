@@ -6,10 +6,10 @@ import com.voicebridge.adapter.in.web.dto.PersonalizationModelResponse;
 import com.voicebridge.adapter.in.web.dto.PersonalizationTrainingStatusResponse;
 import com.voicebridge.adapter.in.web.dto.TrainPersonalizationResponse;
 import com.voicebridge.adapter.in.web.dto.UploadPersonalizationRecordingResponse;
-import com.voicebridge.application.DeletePersonalizationRecordingService;
 import com.voicebridge.common.exception.CustomException;
 import com.voicebridge.common.exception.ErrorCode;
 import com.voicebridge.common.response.ApiResponse;
+import com.voicebridge.port.in.DeletePersonalizationRecordingUseCase;
 import com.voicebridge.port.in.GetPersonalizationModelUseCase;
 import com.voicebridge.port.in.GetPersonalizationTrainingStatusUseCase;
 import com.voicebridge.port.in.TrainPersonalizationModelUseCase;
@@ -36,7 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class PersonalizationController {
 
   private final ObjectMapper objectMapper;
-  private final DeletePersonalizationRecordingService deleteRecording;
+  private final DeletePersonalizationRecordingUseCase deleteRecording;
   private final UploadPersonalizationRecordingUseCase uploadRecording;
   private final TrainPersonalizationModelUseCase trainModel;
   private final GetPersonalizationModelUseCase getPersonalizationModelUseCase;

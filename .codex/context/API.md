@@ -516,7 +516,7 @@ Request:
 | --- | --- | --- |
 | `audioFile` | file | 자유 발화 음성 |
 
-처리 로직: serving 확인을 마친 활성 개인화 adapter가 있으면 우선 사용하고, 없으면 기본(적응) 모델을 사용한다. 활성화 확인 전의 완료 job은 개인화 모델로 표시하지 않는다.
+처리 로직: serving 확인을 마친 활성 개인화 adapter가 있으면 우선 요청하고, 없으면 AI에 `use_adapter=false`를 보내 기본 모델을 강제한다. 활성화 확인 전의 완료 job은 개인화 모델로 표시하지 않는다. `modelUsed`는 AI 응답의 `model.adapter_id`가 null이면 `BASE_ADAPTED`, 값이 있으면 `PERSONALIZED`로 기록한다. 개인화를 요청했더라도 AI가 기본 모델을 반환하면 실제 사용 모델을 표시한다. 기본 모델을 강제했는데 adapter가 반환되면 계약 위반으로 503 `AI_INFERENCE_UNAVAILABLE`을 반환하고 인식 결과를 저장하지 않는다. `BASE_ADAPTED`는 기존 공개 값으로 남아 있으나 실제 의미는 기본 모델이며 명칭 정리는 별도 호환 변경으로 진행한다.
 
 Response (200):
 
@@ -625,7 +625,7 @@ Response (200):
 
 ## 7. 내부 연동 API — Backend ↔︎ AI 추론 계층
 
-> 이 절은 Spring Boot 백엔드의 `adapter/out/ai` 구현체가 호출하는 인터페이스 스펙이다. **v1은 HTTP(RestClient)로 확정되었다** — 실제 AI 서버 계약(엔드포인트, 요청/응답 형식)은 요구사항명세서 5.4절과 AI팀 `AI_BACKEND_CONTRACT_v1_EN.md`를 따른다(아래 7.1~7.4는 초기 설계 시점의 추상 스펙으로, 실제 필드명·엔드포인트와 다를 수 있음 — 실제 구현은 `HttpAiInferenceClient.java` 참고). `port/out`의 `AiInferenceClient` 인터페이스 자체는 고정.
+> **v1은 HTTP(RestClient)로 확정되었다.** 실제 AI 서버 계약은 AI팀 `AI_BACKEND_CONTRACT_v1_EN.md`와 OpenAPI를 따른다. 아래 7.1·7.4는 초기 설계 시점의 추상 스펙으로 현재 구현 계약이 아니다. 7.2·7.3의 개인화 학습은 현재 지원 여부를 명시한다.
 >
 
 ### 7.1 인식 요청
@@ -644,23 +644,11 @@ Response (200):
 
 ### 7.2 개인화 학습 트리거
 
-```
-호출: trainPersonalizedModel(userId: UUID, recordingS3Urls: string[])
-응답: { "jobId": "uuid" }
-```
+현재 AI `POST /v1/adapters/train`은 501 `not_implemented_in_demo`만 정의·제공한다. BE는 AI 학습 요청을 보내거나 job을 만들지 않으며 공개 `POST /api/v1/personalization/train`에 503 `TRAINING_UNAVAILABLE`을 반환한다. 성공 요청·응답 형식과 녹음 전달 방식은 미확정이다(4.2절).
 
 ### 7.3 학습 상태 조회
 
-```
-호출: getTrainingStatus(jobId: uuid)
-응답:
-{
-  "status": "PENDING|IN_PROGRESS|COMPLETED|FAILED",
-  "progress": 0.0~1.0,
-  "modelArtifactPath": "string | null",
-  "failureReason": "string | null"
-}
-```
+AI `GET /v1/adapters/jobs/{job_id}` 경로는 현재 없다(404). BE 공개 `GET /api/v1/personalization/train/{jobId}`는 본인의 BE DB job만 읽는다. 응답의 `progress`는 실측값이 없어 `null`이며, 외부 worker의 진행이나 활성 adapter를 뜻하지 않는다(4.3절).
 
 ### 7.4 (2차 목표) TTS 변환
 
@@ -742,3 +730,5 @@ POST /v1/enroll/next-prompts
 | 2026-09-30 | 0.5, 0.6, 5.1 | 오디오 변환 용량·시간 초과 시 `AUDIO_PROCESSING_UNAVAILABLE`(503) 추가 (PR #39). 진단 업로드 변환에도 동일 코드 사용 |
 | 2026-10-02 | 0.6, 3.1, 4.1~4.2 | 추천 기록 ID, 개인화 WAV 업로드·삭제·30일 보관 계약 추가; 학습 API는 외부 계약 미지원으로 503 반환 |
 | 2026-10-02 | 4.3~4.4, 5.1 | 진행률 미지원 시 `progress: null` 명시; 완료 job과 활성 adapter를 분리해 모델 보유·인식 표시 기준 수정 |
+| 2026-10-02 | 7.2~7.3 | 초기 학습 성공 예시를 현재 AI 501/job 경로 부재 및 BE 503·DB 조회 계약으로 정정 |
+| 2026-10-02 | 5.1 | 기본 모델 요청 시 `use_adapter=false` 전달, AI 응답의 adapter ID로 `modelUsed` 판정 및 요청·응답 불일치 503 처리 명시 |

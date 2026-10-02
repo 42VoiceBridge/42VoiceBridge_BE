@@ -82,16 +82,8 @@ public class PersonalizationRecordingJpaEntity {
     reviewedAt = r.reviewedAt();
   }
 
-  public void markUploaded() {
-    status = "UPLOADED";
-  }
-
-  public void markCleanupPending() {
-    status = "CLEANUP_PENDING";
-  }
-
-  public void markDeletionPending() {
-    status = "DELETION_PENDING";
+  public void setPersistenceStatus(String status) {
+    this.status = status;
   }
 
   public com.voicebridge.domain.personalization.PersonalizationRecording toDomain() {

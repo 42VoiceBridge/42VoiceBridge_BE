@@ -207,6 +207,32 @@ class RecognizeSpeechServiceTest {
         .isEqualTo(ErrorCode.INTERNAL_SERVER_ERROR);
   }
 
+  @Test
+  void 개인화를_요청했어도_AI가_base를_사용했다면_base로_기록한다() {
+    when(adapters.findActiveByUserId(userId)).thenReturn(Optional.of(activeAdapter()));
+    when(ai.recognize(audio, ModelType.PERSONALIZED, userId))
+        .thenReturn(new AiInferenceClient.RecognitionResult("텍스트", null, ModelType.BASE_ADAPTED));
+    when(recordings.save(any())).thenAnswer(i -> i.getArgument(0));
+
+    var result = service.recognize(userId, audio, "voice.wav");
+
+    assertThat(result.modelUsed()).isEqualTo(ModelType.BASE_ADAPTED.name());
+    verify(recordings).save(argThat(r -> r.getModelUsed() == ModelType.BASE_ADAPTED));
+  }
+
+  @Test
+  void base를_강제했는데_AI가_adapter를_사용하면_저장하지_않는다() {
+    when(adapters.findActiveByUserId(userId)).thenReturn(Optional.empty());
+    when(ai.recognize(audio, ModelType.BASE_ADAPTED, userId))
+        .thenReturn(new AiInferenceClient.RecognitionResult("텍스트", null, ModelType.PERSONALIZED));
+
+    assertThatThrownBy(() -> service.recognize(userId, audio, "voice.wav"))
+        .isInstanceOf(CustomException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.AI_INFERENCE_UNAVAILABLE);
+    verifyNoInteractions(recordings);
+  }
+
   private PersonalizationAdapter activeAdapter() {
     return new PersonalizationAdapter(
         UUID.randomUUID(),

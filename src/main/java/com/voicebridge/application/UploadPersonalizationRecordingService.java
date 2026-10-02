@@ -2,6 +2,7 @@ package com.voicebridge.application;
 
 import com.voicebridge.common.exception.CustomException;
 import com.voicebridge.common.exception.ErrorCode;
+import com.voicebridge.domain.personalization.AudioProvenance;
 import com.voicebridge.domain.personalization.PersonalizationRecording;
 import com.voicebridge.port.in.UploadPersonalizationRecordingUseCase;
 import com.voicebridge.port.out.AudioNormalizationPort;
@@ -53,7 +54,15 @@ public class UploadPersonalizationRecordingService
             prompt.getText(),
             command.useForTraining(),
             CONSENT_VERSION,
-            normalized.metadata());
+            new AudioProvenance(
+                normalized.metadata().sourceFormat(),
+                normalized.metadata().sourceCodec(),
+                normalized.metadata().sourceSampleRate(),
+                normalized.metadata().sourceChannels(),
+                normalized.metadata().sampleCount(),
+                normalized.metadata().sourceSha256(),
+                normalized.metadata().wavSha256(),
+                normalized.metadata().normalizationVersion()));
     recordings.prepare(recording);
     try {
       storage.uploadAt(recording.storageKey(), normalized.wavBytes());
