@@ -92,7 +92,10 @@ class PersonalizationLifecyclePersistenceTest {
     adapterJpa.save(new PersonalizationAdapterJpaEntity(active));
     entityManager.flush();
     entityManager.clear();
-    assertThat(adapters.findActiveByUserId(userId)).contains(active);
+    PersonalizationAdapter loaded = adapters.findActiveByUserId(userId).orElseThrow();
+    assertThat(loaded.id()).isEqualTo(active.id());
+    assertThat(loaded.status()).isEqualTo(PersonalizationAdapterStatus.ACTIVE);
+    assertThat(loaded.trainingRecordingCount()).isEqualTo(5);
   }
 
   @Test
