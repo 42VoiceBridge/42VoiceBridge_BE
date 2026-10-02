@@ -23,7 +23,12 @@ public record PersonalizationRecording(
     String wavSha256,
     String normalizationVersion,
     String status,
-    LocalDateTime createdAt) {
+    LocalDateTime createdAt,
+    String promptPoolVersion,
+    String reviewedSpokenText,
+    String reviewRevision,
+    UUID reviewedBy,
+    LocalDateTime reviewedAt) {
   public static PersonalizationRecording prepare(
       UUID userId,
       UUID shownPromptId,
@@ -53,6 +58,34 @@ public record PersonalizationRecording(
         metadata.wavSha256(),
         metadata.normalizationVersion(),
         "PREPARING",
-        now);
+        now,
+        null,
+        null,
+        null,
+        null,
+        null);
+  }
+
+  /** 후보 판정만 수행한다. 이 결과만으로 job 제출이나 train/dev 분할을 확정하지 않는다. */
+  public boolean isTrainingCandidate(LocalDateTime now, int retentionDays) {
+    return useForTraining
+        && "UPLOADED".equals(status)
+        && createdAt != null
+        && createdAt.plusDays(retentionDays).isAfter(now)
+        && consentedAt != null
+        && hasText(consentVersion)
+        && hasText(promptText)
+        && hasText(promptPoolVersion)
+        && hasText(reviewedSpokenText)
+        && hasText(reviewRevision)
+        && reviewedBy != null
+        && reviewedAt != null
+        && hasText(wavSha256)
+        && hasText(normalizationVersion)
+        && hasText(storageKey);
+  }
+
+  private static boolean hasText(String value) {
+    return value != null && !value.isBlank();
   }
 }

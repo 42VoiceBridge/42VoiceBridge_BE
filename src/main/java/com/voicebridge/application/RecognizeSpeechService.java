@@ -7,7 +7,7 @@ import com.voicebridge.domain.recognition.Recognition;
 import com.voicebridge.port.in.RecognizeSpeechUseCase;
 import com.voicebridge.port.out.AiInferenceClient;
 import com.voicebridge.port.out.AudioNormalizationPort;
-import com.voicebridge.port.out.PersonalizationJobRepositoryPort;
+import com.voicebridge.port.out.PersonalizationAdapterRepositoryPort;
 import com.voicebridge.port.out.RecognitionRepositoryPort;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class RecognizeSpeechService implements RecognizeSpeechUseCase {
 
-  private final PersonalizationJobRepositoryPort personalizationJobRepositoryPort;
+  private final PersonalizationAdapterRepositoryPort personalizationAdapterRepositoryPort;
   private final AiInferenceClient aiInferenceClient;
   private final RecognitionRepositoryPort recognitionRepositoryPort;
   // 스프링에서 생성한 객체를 주입받아서 사용하기 위함
@@ -40,7 +40,7 @@ public class RecognizeSpeechService implements RecognizeSpeechUseCase {
     var normalized = audioNormalizationPort.normalize(audioBytes);
 
     ModelType modelType =
-        personalizationJobRepositoryPort.findLatestCompletedByUserId(userId).isPresent()
+        personalizationAdapterRepositoryPort.findActiveByUserId(userId).isPresent()
             ? ModelType.PERSONALIZED
             : ModelType.BASE_ADAPTED;
 

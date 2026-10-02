@@ -34,6 +34,21 @@ public class PersonalizationRecordingPersistenceAdapter
   }
 
   @Override
+  public List<PersonalizationRecording> findTrainingCandidates(
+      UUID userId, LocalDateTime now, int retentionDays) {
+    if (userId == null || now == null || retentionDays <= 0) {
+      throw new IllegalArgumentException("User, current time and positive retention are required");
+    }
+    return repository
+        .findByUserIdAndStatusAndUseForTrainingTrueAndCreatedAtAfter(
+            userId, "UPLOADED", now.minusDays(retentionDays))
+        .stream()
+        .map(PersonalizationRecordingJpaEntity::toDomain)
+        .filter(recording -> recording.isTrainingCandidate(now, retentionDays))
+        .toList();
+  }
+
+  @Override
   public void prepare(PersonalizationRecording recording) {
     repository.saveAndFlush(new PersonalizationRecordingJpaEntity(recording));
   }

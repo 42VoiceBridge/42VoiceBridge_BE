@@ -470,7 +470,7 @@ Response (200):
   "data": {
     "jobId": "uuid",
     "status": "IN_PROGRESS",
-    "progress": 0.4,
+    "progress": null,
     "startedAt": "2026-09-14T09:00:00Z",
     "completedAt": null,
     "failureReason": null
@@ -479,6 +479,8 @@ Response (200):
 ```
 
 `status`: `PENDING` | `IN_PROGRESS` | `COMPLETED` | `FAILED`
+
+`progress`는 AI가 검증 가능한 진행률을 제공하기 전까지 항상 `null`이다. `COMPLETED`는 학습 job 종료를 뜻하며 모델 활성화를 뜻하지 않는다. 없는 job은 404 `RESOURCE_NOT_FOUND`, 타인 job은 403 `FORBIDDEN_ACCESS`다.
 
 ### 4.4 내 개인화 모델 상태 조회
 
@@ -498,6 +500,8 @@ Response (200):
 }
 ```
 
+`hasPersonalizedModel`은 실제 serving 확인을 마치고 `ACTIVE`로 기록된 adapter가 있을 때만 `true`다. `trainedAt`은 해당 adapter의 학습 완료 시각이다. 완료된 job이나 후보 adapter만 있으면 `false`이며 나머지 필드는 `null`이다.
+
 ---
 
 ## 5. 실사용 음성 인식 (담당: 백엔드 개발자 B)
@@ -512,7 +516,7 @@ Request:
 | --- | --- | --- |
 | `audioFile` | file | 자유 발화 음성 |
 
-처리 로직: 개인화 모델이 있으면 우선 사용, 없거나 개인화 모델 서버 장애 시 기본(적응) 모델로 폴백 (NFR-4)
+처리 로직: serving 확인을 마친 활성 개인화 adapter가 있으면 우선 사용하고, 없으면 기본(적응) 모델을 사용한다. 활성화 확인 전의 완료 job은 개인화 모델로 표시하지 않는다.
 
 Response (200):
 
@@ -737,3 +741,4 @@ POST /v1/enroll/next-prompts
 | 2026-09-30 | 7.5, 7.6 | 자모 오류 통계·추천 문장의 실제 AI 호출 추가 |
 | 2026-09-30 | 0.5, 0.6, 5.1 | 오디오 변환 용량·시간 초과 시 `AUDIO_PROCESSING_UNAVAILABLE`(503) 추가 (PR #39). 진단 업로드 변환에도 동일 코드 사용 |
 | 2026-10-02 | 0.6, 3.1, 4.1~4.2 | 추천 기록 ID, 개인화 WAV 업로드·삭제·30일 보관 계약 추가; 학습 API는 외부 계약 미지원으로 503 반환 |
+| 2026-10-02 | 4.3~4.4, 5.1 | 진행률 미지원 시 `progress: null` 명시; 완료 job과 활성 adapter를 분리해 모델 보유·인식 표시 기준 수정 |

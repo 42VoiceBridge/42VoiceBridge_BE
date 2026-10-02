@@ -12,5 +12,5 @@ public interface PersonalizationJobRepositoryPort {
 
   Optional<PersonalizationJob> findLatestCompletedByUserId(UUID userId);
 
-  Optional<PersonalizationJob> findInProgressByUserId(UUID userId);
+  Optional<PersonalizationJob> findActiveByUserId(UUID userId);
 }

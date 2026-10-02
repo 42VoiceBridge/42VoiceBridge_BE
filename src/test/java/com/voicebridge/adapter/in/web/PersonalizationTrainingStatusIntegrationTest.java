@@ -73,6 +73,7 @@ class PersonalizationTrainingStatusIntegrationTest {
             .andExpect(jsonPath("$.error").value(nullValue()))
             .andExpect(jsonPath("$.data.jobId").value(jobId.toString()))
             .andExpect(jsonPath("$.data.status").value(jobStatus.name()))
+            .andExpect(jsonPath("$.data.progress").value(nullValue()))
             .andExpect(jsonPath("$.data.startedAt").value("2026-09-18T12:00:00"))
             .andExpect(jsonPath("$.data.userId").doesNotExist())
             .andExpect(jsonPath("$.data.modelArtifactPath").doesNotExist());

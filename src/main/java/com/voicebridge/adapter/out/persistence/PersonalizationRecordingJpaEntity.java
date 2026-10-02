@@ -45,6 +45,14 @@ public class PersonalizationRecordingJpaEntity {
   private String normalizationVersion;
   private String status;
   private LocalDateTime createdAt;
+  private String promptPoolVersion;
+
+  @Column(length = 500)
+  private String reviewedSpokenText;
+
+  private String reviewRevision;
+  private UUID reviewedBy;
+  private LocalDateTime reviewedAt;
 
   public PersonalizationRecordingJpaEntity(
       com.voicebridge.domain.personalization.PersonalizationRecording r) {
@@ -67,6 +75,11 @@ public class PersonalizationRecordingJpaEntity {
     normalizationVersion = r.normalizationVersion();
     status = r.status();
     createdAt = r.createdAt();
+    promptPoolVersion = r.promptPoolVersion();
+    reviewedSpokenText = r.reviewedSpokenText();
+    reviewRevision = r.reviewRevision();
+    reviewedBy = r.reviewedBy();
+    reviewedAt = r.reviewedAt();
   }
 
   public void markUploaded() {
@@ -101,6 +114,11 @@ public class PersonalizationRecordingJpaEntity {
         wavSha256,
         normalizationVersion,
         status,
-        createdAt);
+        createdAt,
+        promptPoolVersion,
+        reviewedSpokenText,
+        reviewRevision,
+        reviewedBy,
+        reviewedAt);
   }
 }

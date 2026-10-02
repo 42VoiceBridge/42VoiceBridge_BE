@@ -22,6 +22,10 @@ public interface PersonalizationRecordingJpaRepository
   List<PersonalizationRecordingJpaEntity> findByStatusAndCreatedAtBefore(
       String status, LocalDateTime cutoff);
 
+  List<PersonalizationRecordingJpaEntity>
+      findByUserIdAndStatusAndUseForTrainingTrueAndCreatedAtAfter(
+          UUID userId, String status, LocalDateTime cutoff);
+
   List<PersonalizationRecordingJpaEntity> findByStatusInAndCreatedAtBefore(
       List<String> statuses, LocalDateTime cutoff);
 }

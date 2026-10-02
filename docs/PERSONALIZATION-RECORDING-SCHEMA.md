@@ -17,9 +17,22 @@ CREATE TABLE personalization_recordings (
   source_sample_rate INT NOT NULL, source_channels INT NOT NULL, sample_count INT NOT NULL,
   source_sha256 VARCHAR(255), wav_sha256 VARCHAR(255), normalization_version VARCHAR(255),
   status VARCHAR(255) NOT NULL, created_at DATETIME(6) NOT NULL,
+  prompt_pool_version VARCHAR(255), reviewed_spoken_text VARCHAR(500),
+  review_revision VARCHAR(255), reviewed_by BINARY(16), reviewed_at DATETIME(6),
   INDEX idx_personalization_recordings_user (user_id),
   INDEX idx_personalization_recordings_status_created (status, created_at)
 );
+```
+
+기존 `personalization_recordings` 테이블이 있으면 새 nullable 열 5개를 추가한다. 기존 업로드에는 검토된 정답과 풀 버전이 없으므로 자동으로 학습 후보로 승격하지 않는다. 검토 주체·입력 절차와 풀 버전 출처는 AI 계약과 운영 절차 합의 후 연결한다.
+
+```sql
+ALTER TABLE personalization_recordings
+  ADD COLUMN prompt_pool_version VARCHAR(255) NULL,
+  ADD COLUMN reviewed_spoken_text VARCHAR(500) NULL,
+  ADD COLUMN review_revision VARCHAR(255) NULL,
+  ADD COLUMN reviewed_by BINARY(16) NULL,
+  ADD COLUMN reviewed_at DATETIME(6) NULL;
 ```
 
 `PREPARING` 행을 먼저 커밋한 뒤 `personalization/{recordingId}.wav`를 저장한다. 저장 성공 시 `UPLOADED`로 변경한다. 실패나 재시작 후 남은 준비 행은 5분 뒤 주기적 작업이 삭제한다. 삭제 실패는 행을 남기고 다음 주기에 재시도한다. 기본 보관 기간은 30일이며 `voicebridge.personalization.retention-days`로 변경할 수 있다. `DELETE /api/v1/personalization/recordings/{id}`는 즉시 학습 자격을 없애고 삭제를 시도한다. 민감 음성 삭제가 지연되면 로그의 녹음 ID로 상태와 저장소 객체를 확인한다.

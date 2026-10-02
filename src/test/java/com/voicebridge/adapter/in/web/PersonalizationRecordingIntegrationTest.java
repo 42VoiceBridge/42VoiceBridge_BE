@@ -15,14 +15,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.voicebridge.adapter.out.persistence.PersonalizationRecordingJpaRepository;
 import com.voicebridge.domain.personalization.PersonalizationRecording;
-import com.voicebridge.port.out.PersonalizationRecordingRepositoryPort;
-import java.time.LocalDateTime;
 import com.voicebridge.domain.recommendation.ShownPrompt;
 import com.voicebridge.port.out.AudioNormalizationPort;
 import com.voicebridge.port.out.AudioNormalizationPort.Metadata;
 import com.voicebridge.port.out.AudioNormalizationPort.NormalizedAudio;
+import com.voicebridge.port.out.PersonalizationRecordingRepositoryPort;
 import com.voicebridge.port.out.ShownPromptRepositoryPort;
 import com.voicebridge.port.out.StoragePort;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -182,12 +182,37 @@ class PersonalizationRecordingIntegrationTest {
   void cleanupClaimPreventsLateUploadFromBecomingVisible() {
     UUID id = UUID.randomUUID();
     LocalDateTime old = LocalDateTime.now().minusMinutes(10);
-    var recording = new PersonalizationRecording(id, UUID.randomUUID(), UUID.randomUUID(),
-        "p-5", "문장", "personalization/" + id + ".wav", false, "v1", old,
-        "wav", "pcm_s16le", 16000, 1, 1000, "source", "wav", "v1", "PREPARING", old);
+    var recording =
+        new PersonalizationRecording(
+            id,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "p-5",
+            "문장",
+            "personalization/" + id + ".wav",
+            false,
+            "v1",
+            old,
+            "wav",
+            "pcm_s16le",
+            16000,
+            1,
+            1000,
+            "source",
+            "wav",
+            "v1",
+            "PREPARING",
+            old,
+            null,
+            null,
+            null,
+            null,
+            null);
     recordingPort.prepare(recording);
-    assertThat(recordingPort.claimPendingForCleanup(id, LocalDateTime.now().minusMinutes(5))).isTrue();
-    assertThatThrownBy(() -> recordingPort.markUploaded(id)).isInstanceOf(IllegalStateException.class);
+    assertThat(recordingPort.claimPendingForCleanup(id, LocalDateTime.now().minusMinutes(5)))
+        .isTrue();
+    assertThatThrownBy(() -> recordingPort.markUploaded(id))
+        .isInstanceOf(IllegalStateException.class);
     assertThat(recordings.findById(id).orElseThrow().getStatus()).isEqualTo("CLEANUP_PENDING");
   }
 

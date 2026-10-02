@@ -14,6 +14,10 @@ public interface PersonalizationRecordingRepositoryPort {
 
   List<PersonalizationRecording> findExpiredUploaded(LocalDateTime cutoff);
 
+  /** 동의와 저장 상태만으로는 충분하지 않으므로 검토 메타데이터까지 검사한다. */
+  List<PersonalizationRecording> findTrainingCandidates(
+      UUID userId, LocalDateTime now, int retentionDays);
+
   void markUploaded(UUID id);
 
   void markCleanupPending(UUID id);
