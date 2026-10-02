@@ -25,6 +25,33 @@ public class S3StorageAdapter implements StoragePort {
     this.bucket = bucket;
   }
 
+  private static void validateKey(String key) {
+    if (key == null || !key.matches("personalization/[0-9a-f-]{36}\\.wav")) {
+      throw new IllegalArgumentException("Invalid personalization storage key");
+    }
+  }
+
+  @Override
+  public void uploadAt(String key, byte[] bytes) {
+    validateKey(key);
+    try {
+      s3Client.putObject(
+          PutObjectRequest.builder().bucket(bucket).key(key).build(), RequestBody.fromBytes(bytes));
+    } catch (SdkException e) {
+      throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, "음성 파일 저장에 실패했습니다.");
+    }
+  }
+
+  @Override
+  public void delete(String key) {
+    validateKey(key);
+    try {
+      s3Client.deleteObject(builder -> builder.bucket(bucket).key(key));
+    } catch (SdkException e) {
+      throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, "음성 파일 삭제에 실패했습니다.");
+    }
+  }
+
   @Override
   public String upload(byte[] fileBytes, String fileName) {
     String key = StorageKeys.newKey(fileName);

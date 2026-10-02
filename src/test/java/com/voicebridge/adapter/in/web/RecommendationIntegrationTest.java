@@ -64,6 +64,7 @@ class RecommendationIntegrationTest {
                 .content("{\"count\": 1}")
                 .with(asUser(userId)))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.sentences[0].shownPromptId").isNotEmpty())
         .andExpect(jsonPath("$.data.sentences[0].promptId").value("02-03-0001"))
         .andExpect(jsonPath("$.data.sentences[0].text").value("식당이 어디예요?"));
 
