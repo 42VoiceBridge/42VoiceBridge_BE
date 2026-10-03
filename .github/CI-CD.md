@@ -6,6 +6,8 @@
 
 - `develop` 또는 `main` 대상 PR과 해당 브랜치 push에서 [`backend-ci.yml`](workflows/backend-ci.yml)이 Java 17로 `./gradlew --no-daemon clean build audioIntegrationTest`를 실행한다. `build`에는 Spotless 검사와 일반 테스트가 포함된다. MySQL 경합 테스트는 러너의 Docker에서 Testcontainers로 `mysql:8.0`을 실행하고, 오디오 테스트는 실제 FFmpeg/ffprobe를 사용한다. 테스트 보고서는 실패 시에도 14일간 artifact로 보관한다.
 - 테스트가 성공하면 실행 가능한 Spring Boot JAR를 FFmpeg/ffprobe가 포함된 Java 17 런타임 이미지에 넣어 EC2 `m5.large`에 맞는 `linux/amd64` 이미지로 빌드한다. PR에서는 이미지 검증까지 실행하고, `develop`·`main` push에서만 검증한 이미지를 GHCR에 게시한다. `sha-<commit SHA>`와 브랜치 태그를 붙이고 이미지 digest를 workflow summary에 남긴다.
+- `main` push에서는 이미지 게시가 성공한 뒤에만 `INFRA_DISPATCH_TOKEN`으로 Infra 저장소에 `repository_dispatch` 이벤트(`deploy-backend`)를 보낸다. payload는 `{ "ref": "refs/heads/main", "sha": "<40자리 BE 커밋 SHA>" }`이고, 이 SHA가 방금 게시한 `sha-<SHA>` 이미지의 태그다. `develop` push와 PR에서는 보내지 않는다(Infra가 `main`만 받는다). 호출이 실패하면 CI도 실패한다. 응답 204는 Infra가 요청을 받았다는 뜻이지 EC2 배포가 끝났다는 뜻이 아니다.
+- `INFRA_DISPATCH_TOKEN`은 Infra 저장소의 `repository_dispatch` 호출 전용(Infra에 `Contents: write`)이다. 이미지 게시용 `GITHUB_TOKEN`, EC2의 GHCR pull 자격증명, AWS 키와 다르며 BE 저장소에는 이 토큰만 둔다.
 - CD는 변경 가능한 브랜치 태그 대신 `ghcr.io/42voicebridge/42voicebridge_be@sha256:<digest>`를 배포 입력으로 사용한다. GitHub Release를 만들려면 별도 버전 태그/릴리즈 절차를 정한다. JAR·Dockerfile·Compose·환경변수 파일을 매 push마다 GitHub Release asset으로 올리지 않는다.
 - Dockerfile은 이미지 제작법으로 BE 저장소에 둔다. GHCR에는 Dockerfile이 아닌 완성된 이미지가 올라간다.
 
@@ -21,6 +23,7 @@
 | 구분 | 값 | 소유자 / 주입 방식 |
 |---|---|---|
 | BE CI | GitHub 기본 `GITHUB_TOKEN` | `contents: read`, `packages: write`로 GHCR에 게시. DB·JWT·NCP 비밀값을 CI에 주입하지 않는다. |
+| BE CI → Infra | `INFRA_DISPATCH_TOKEN` (BE 저장소 Secret) | `main` 이미지 게시 후 Infra에 `deploy-backend` 이벤트를 보낼 때만 사용. 값은 로그에 남기지 않는다. |
 | Infra CD 설정 | 이미지 digest, EC2 대상, AWS 리전·OIDC 역할 ARN | Infra 저장소의 변수 또는 Terraform output. 값 자체가 비밀은 아니다. |
 | Infra CD 인증 | 비공개 GHCR pull 자격증명 또는 선택한 배포 채널의 자격증명 | 필요한 경우에만 Infra 저장소 GitHub Secrets/단기 토큰에 보관. AWS는 OIDC 우선. |
 | 앱 런타임 비밀값 | `DB_PASSWORD`, `JWT_SECRET`, `NCP_TTS_API_KEY_ID`, `NCP_TTS_API_KEY` | DB 비밀번호는 이미 AWS Secrets Manager에 있다. 나머지도 런타임 비밀 저장소에 추가하는 방향. Spring Security는 `JWT_SECRET`을 소비할 뿐 저장하지 않는다. |
