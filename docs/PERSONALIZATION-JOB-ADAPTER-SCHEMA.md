@@ -1,5 +1,7 @@
 # 개인화 job과 adapter 저장 스키마
 
+> 2026-10-03부터 운영 DB의 이 테이블은 Flyway `src/main/resources/db/migration/V1__init.sql`이 만든다. 아래 SQL은 기록용이며 운영에 직접 실행하지 않는다.
+
 운영 프로필은 `ddl-auto: validate`다. 배포 전에 운영 MySQL에 다음 DDL을 적용한다. `personalization_jobs`가 이미 있다면 첫 `CREATE TABLE`을 건너뛰고 아래의 기존 테이블 변경문을 적용한다. 동일 사용자 `PENDING`/`IN_PROGRESS` 행이 둘 이상 있으면 먼저 이력을 정리해야 고유 제약을 추가할 수 있다.
 
 ```sql

@@ -40,6 +40,13 @@ git push -u origin feature/<기능명>
 
 예: `feat: 진단 세션 생성 API 추가`
 
+## DB 스키마 변경
+
+- 운영 DB 스키마는 Flyway가 `src/main/resources/db/migration`의 SQL로 만든다(운영 프로필에서만 실행).
+- 엔티티의 테이블·컬럼·인덱스를 바꾸면 **같은 PR에** `V{다음 번호}__설명.sql`(예: `V2__add_recording_model.sql`)을 추가한다. 이미 머지된 마이그레이션 파일은 고치지 않는다.
+- enum 필드는 `VARCHAR(255)`로 만든다. MySQL `enum` 타입은 값을 추가할 때마다 마이그레이션이 필요하고, 빠뜨려도 기동 검사로는 드러나지 않는다.
+- `FlywayMigrationTest`가 빈 MySQL에 마이그레이션을 적용하고 `validate`로 앱이 뜨는지 확인한다. 마이그레이션을 빠뜨리면 이 테스트가 깨진다.
+
 ## 코드리뷰
 
 - 모든 PR은 최소 1인 승인 필요, 백엔드는 최종적으로 팀장 승인.

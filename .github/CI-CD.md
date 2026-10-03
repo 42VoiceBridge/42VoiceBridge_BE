@@ -14,7 +14,7 @@
 ## Infra 저장소가 맡을 것
 
 - Terraform으로 생성한 EC2에 운영 Compose, 고정 이미지 digest, 일반 설정을 배치하고 이미지를 pull·재시작·검증한다. 현재 BE의 `docker-compose.yml`은 로컬 MySQL/Redis 전용이다.
-- 현재 인프라 `ec2.tf`는 Docker만 설치한다. `docker compose version` 확인/설치, 8080 앱과 80/443 사이의 프록시·TLS, DB 스키마 준비(`prod`는 `ddl-auto: validate`), 헬스 체크·롤백을 CD 전에 설계한다.
+- 현재 인프라 `ec2.tf`는 Docker만 설치한다. `docker compose version` 확인/설치, 8080 앱과 80/443 사이의 프록시·TLS, DB 스키마 준비(앱이 뜰 때 Flyway가 `db/migration`을 적용하고 `ddl-auto: validate`로 확인한다), 헬스 체크·롤백을 CD 전에 설계한다.
 - AWS 인증은 장기 액세스 키보다 GitHub OIDC와 제한된 역할을 우선한다. 현재 Terraform에는 이 역할과 CD 워크플로가 없다. SSH는 현재 개인 IP만 허용되므로 GitHub 호스티드 러너의 직접 SSH를 기본 배포 경로로 가정하지 않는다.
 - 비공개 GHCR 이미지를 pull할 경우 Infra 저장소/EC2의 package read 권한을 별도로 설정한다. 공개 이미지라면 인증 없이 pull할 수 있다.
 

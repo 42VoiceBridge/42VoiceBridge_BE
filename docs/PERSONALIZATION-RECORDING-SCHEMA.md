@@ -1,5 +1,7 @@
 # 개인화 녹음 저장·운영
 
+> 2026-10-03부터 운영 DB의 이 테이블은 Flyway `src/main/resources/db/migration/V1__init.sql`이 만든다. 아래 SQL은 기록용이며 운영에 직접 실행하지 않는다.
+
 로컬은 `ddl-auto: update`로 `personalization_recordings`를 생성한다. 운영은 배포 전에 다음 스키마를 적용하고 `ddl-auto: validate`로 확인한다.
 
 ```sql

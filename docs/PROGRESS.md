@@ -415,16 +415,22 @@
 - 본인 데이터가 아닐 때의 403(`FORBIDDEN_ACCESS`)은 그대로다.
 - **검증**: 토큰 없음·만료·다른 키로 서명·Bearer 형식 아님은 401, 유효한 토큰은 통과, 인증이 필요 없는 로그인 요청은 만료된 토큰을 붙여도 통과, CORS 사전 요청(OPTIONS)은 토큰 없이 통과. 기존에 403을 기대하던 미인증 테스트 4건을 401로 바꿨다.
 
+### 29. Flyway로 운영 DB 초기 스키마 관리 (feature/flyway-initial-schema) — PR 대기
+
+- 배경: Infra가 BE를 별도 EC2에 배포하기 시작했는데 운영 RDS가 비어 있다. prod는 `ddl-auto: validate`라 빈 DB에서는 `missing table`로 앱이 뜨지 않는다. 지금까지는 테이블 변경마다 PR 본문의 SQL을 사람이 직접 실행하는 방식이었다(#37·#38·#40·#45).
+- Flyway(11.7.2, `flyway-core` + `flyway-mysql`)를 넣고 운영(prod)에서만 켰다. 로컬은 `ddl-auto: update`로 이미 만든 테이블이 있어 Flyway가 시작을 거부하므로 끄고, 테스트(H2)도 끈다.
+- `V1__init.sql`: 현재 엔티티 기준 테이블 14개. 하이버네이트가 MySQL에 만드는 스키마를 뽑아 컬럼 순서만 읽기 좋게 정리했고, 문자셋 `utf8mb4`를 테이블마다 명시했다(RDS 기본값에 기대지 않음).
+  - **enum 필드는 MySQL `enum` 대신 `VARCHAR(255)`**로 뒀다. 자바 enum에 값을 추가하고 마이그레이션을 빠뜨리면 `validate`는 통과하지만(값 목록을 비교하지 않음) 그 값을 처음 저장할 때 실패한다. 개인화 스키마 문서(#40)도 VARCHAR였다.
+- **검증**: 같은 MySQL에서 하이버네이트가 만든 스키마와 V1이 만든 스키마를 컬럼·타입·NULL 여부·인덱스(DESC 포함)·외래 키·문자셋까지 비교해, 의도한 enum 7개 외에는 같음을 확인했다. 실패해야 할 때 실패하는지도 확인했다: 마이그레이션 없는 빈 DB는 `missing table`, 컬럼 하나를 지우면 `missing column`으로 기동 실패. 상시 테스트 `FlywayMigrationTest`(빈 MySQL → Flyway → validate 기동, 설정이 실제로 MySQL·validate로 적용됐는지 함께 확인, 전 테이블 utf8mb4).
+- **앞으로의 규칙**: 테이블·컬럼을 바꾸는 PR은 `V2__설명.sql`처럼 새 파일을 같은 PR에 넣는다. 이미 적용된 파일은 고치지 않는다(Flyway가 체크섬 불일치로 시작을 거부한다). `FlywayMigrationTest`가 엔티티와 마이그레이션이 어긋나면 깨진다.
+
 ## 알려진 이슈 / 확인 필요 사항
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.
 
 - **TTS 등 진단 외 `@Async`는 스프링 부트 기본 실행기(스레드 8개, 대기열 무제한)를 쓴다.** 스레드가 늘지는 않지만 대기열에 상한이 없어 작업이 몰리면 대기가 길어진다. 진단 인식은 전용 실행기로 분리했다(9/29, 작업 이력 23번). 나머지 설정은 담당자와 논의.
 - **비동기 인식 중 서버가 죽으면 해당 녹음이 `PROCESSING`에 갇힌다.** 재시도 경로가 없어, 사용자가 그 문장을 다시 녹음하기 전까지 세션이 끝나지 않는다(세션은 문장마다 가장 최근 녹음이 `DONE`이어야 `ANALYZED`가 됨). 같은 종류로, **세션 완료 판단(`DiagnosisSessionAnalysisTrigger`) 자체가 DB 오류 등으로 실패하면** 녹음은 이미 전부 `DONE`으로 커밋된 뒤라 다시 판단할 계기가 없어 세션이 `IN_PROGRESS`에 남는다. 둘을 묶어 복구 수단(재시도 API 또는 정리 스케줄러)을 만드는 것을 9/29 회의 안건으로 올렸다.
-- **배포 전 운영 DB에 직접 적용할 DDL이 있다.** prod는 `ddl-auto: validate`라 테이블·컬럼이 코드와 다르면 서버가 뜨지 않고, 저장소에 스키마 관리 도구가 없다.
-  - `jamo_error_snapshots`, `jamo_error_snapshot_tokens` 테이블과 `idx_diagnosis_sessions_user_status` 인덱스 — PR #38 본문
-  - `shown_prompts` 테이블 — PR #37 본문, 문장 풀 컬럼 `pool_version`·`pool_sha256` 추가 — PR #45 본문(작업 이력 27번)
-  - 개인화 테이블 — [`PERSONALIZATION-RECORDING-SCHEMA.md`](./PERSONALIZATION-RECORDING-SCHEMA.md), [`PERSONALIZATION-JOB-ADAPTER-SCHEMA.md`](./PERSONALIZATION-JOB-ADAPTER-SCHEMA.md) (PR #40)
+- **운영 DB 스키마는 Flyway가 만든다**(작업 이력 29번). 앱이 처음 뜰 때 `db/migration/V1__init.sql`이 빈 DB에 테이블 14개를 만들고, Hibernate가 `validate`로 엔티티와 맞는지 확인한다. 예전 PR 본문(#37·#38·#45)과 개인화 스키마 문서의 수동 DDL은 기록용이다. 이미 테이블이 있는 DB에는 Flyway가 적용되지 않으니(시작 거부) 운영 DB가 비어 있는지 먼저 확인한다.
 - **배포된 AI 서버가 없다**(10/3 AI 쪽 문서). 배포 환경에서는 진단 인식이 `FAILED`, 자모 통계·추천이 503이다. 로컬은 스텁으로 동작한다. 데모 방식은 팀장 결정 대기.
 - 자모 오류 통계: `min_support`는 진단 화면용으로 10으로 정했다(9/29). AI 쪽 답(10/3, R2): 탐색용 화면으로는 괜찮지만 사용자 발음 판정처럼 보이면 안 되고, 오류율은 횟수와 함께 보여줘야 한다(프론트에 전달). 진단을 기본 모델로 고정하는 `use_adapter=false`는 #40에서 반영됐다.
 - **`S3StorageAdapter`는 실제로 검증하지 못했다.** 버킷과 크레덴셜이 없어 로컬 파일 어댑터로만 확인했다. 인프라 쪽에 프로비저닝 요청이 등록돼 있다.

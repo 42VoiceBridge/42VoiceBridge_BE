@@ -5,6 +5,9 @@ spring:
     active: local
   jpa:
     open-in-view: false
+  flyway:
+    # 운영(prod)에서만 켠다. 로컬은 ddl-auto: update로 이미 만든 테이블이 있어서 Flyway가 시작을 거부한다.
+    enabled: false
   task:
     execution:
       # 진단 인식 전용 실행기(AsyncConfig)를 따로 등록해도 스프링 부트 기본 실행기를 그대로 만든다. 없으면 TTS 같은 다른 @Async까지 진단 실행기로 몰린다.
