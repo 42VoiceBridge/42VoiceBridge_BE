@@ -3,6 +3,9 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+  flyway:
+    # db/migration의 SQL을 적용한 뒤 Hibernate가 validate로 엔티티와 맞는지 확인한다.
+    enabled: true
   jpa:
     hibernate:
       ddl-auto: validate
