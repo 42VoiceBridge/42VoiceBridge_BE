@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
-/** 현재는 PersonalizationJobJpaEntity에 unique/FK 제약이 없어 발생 시나리오가 없는 방어 코드 — 제약 추가 시를 대비한 것. */
 @Component
 @RequiredArgsConstructor
 public class PersonalizationJobPersistenceAdapter implements PersonalizationJobRepositoryPort {
@@ -42,9 +41,9 @@ public class PersonalizationJobPersistenceAdapter implements PersonalizationJobR
   }
 
   @Override
-  public Optional<PersonalizationJob> findInProgressByUserId(UUID userId) {
+  public Optional<PersonalizationJob> findActiveByUserId(UUID userId) {
     return jpaRepository
-        .findFirstByUserIdAndStatus(userId, PersonalizationJobStatus.IN_PROGRESS)
+        .findByUserIdAndActiveSlot(userId, "ACTIVE")
         .map(PersonalizationJobPersistenceAdapter::toDomain);
   }
 

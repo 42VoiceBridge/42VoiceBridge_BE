@@ -5,7 +5,7 @@ import java.util.UUID;
 
 /**
  * 개인화 학습 작업 도메인 엔티티. 상태 전이(PENDING → IN_PROGRESS → COMPLETED/FAILED)를 이 클래스가 직접 소유한다(Rich Domain
- * Model). "내 개인화 모델 상태"는 별도 엔티티 없이 "이 유저의 최신 COMPLETED job"으로부터 파생한다(YAGNI).
+ * Model). COMPLETED는 학습 종료만 의미하며 adapter 활성화와는 별개다.
  */
 public class PersonalizationJob {
 

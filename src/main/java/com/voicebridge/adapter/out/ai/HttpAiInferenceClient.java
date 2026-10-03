@@ -1,6 +1,7 @@
 package com.voicebridge.adapter.out.ai;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.voicebridge.domain.recognition.ModelType;
 import com.voicebridge.port.out.AiInferenceClient;
 import java.util.UUID;
@@ -35,25 +36,40 @@ public class HttpAiInferenceClient implements AiInferenceClient {
 
   @Override
   public RecognitionResult recognize(byte[] audioBytes, ModelType modelType, UUID userId) {
+    if (modelType == null) {
+      throw new IllegalArgumentException("Requested model type is required");
+    }
     AsrTranscribeResponse response =
         restClient
             .post()
-            .uri(baseUrl + "/v1/asr/transcribe?user_id={userId}", userId)
+            .uri(
+                baseUrl + "/v1/asr/transcribe?user_id={userId}&use_adapter={useAdapter}",
+                userId,
+                modelType == ModelType.PERSONALIZED)
             .contentType(MediaType.valueOf("audio/wav"))
             .body(audioBytes)
             .retrieve()
             .body(AsrTranscribeResponse.class);
 
-    if (response == null || response.text() == null) {
-      throw new IllegalStateException("AI 서버 응답에 text가 없습니다 — 계약 위반입니다.");
+    if (response == null
+        || response.text() == null
+        || response.model() == null
+        || !response.model().isObject()
+        || !response.model().has("adapter_id")) {
+      throw new IllegalStateException("AI 서버 응답에 text 또는 model이 없습니다 — 계약 위반입니다.");
     }
     if (!STATUS_OK.equals(response.status()) && !STATUS_NO_SPEECH.equals(response.status())) {
       throw new IllegalStateException("AI 서버가 알 수 없는 status를 반환했습니다: " + response.status());
     }
 
-    return new RecognitionResult(response.text(), response.score());
+    JsonNode adapterId = response.model().get("adapter_id");
+    if (!adapterId.isNull() && (!adapterId.isTextual() || adapterId.asText().isBlank())) {
+      throw new IllegalStateException("AI 서버 응답의 adapter_id가 올바르지 않습니다 — 계약 위반입니다.");
+    }
+    ModelType actual = adapterId.isNull() ? ModelType.BASE_ADAPTED : ModelType.PERSONALIZED;
+    return new RecognitionResult(response.text(), response.score(), actual);
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
-  private record AsrTranscribeResponse(String status, String text, Double score) {}
+  private record AsrTranscribeResponse(String status, String text, Double score, JsonNode model) {}
 }

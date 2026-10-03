@@ -52,7 +52,7 @@ class HttpAiInferenceClientTest {
                     .withHeader("Content-Type", "application/json")
                     .withBody(
                         """
-                        {"status": "ok", "text": "물 좀 주세요", "score": null}
+                        {"status": "ok", "text": "물 좀 주세요", "score": null, "model": {"adapter_id": null}}
                         """)));
 
     AiInferenceClient.RecognitionResult result =
@@ -60,6 +60,7 @@ class HttpAiInferenceClientTest {
 
     assertThat(result.recognizedText()).isEqualTo("물 좀 주세요");
     assertThat(result.confidence()).isNull();
+    assertThat(result.actualModelType()).isEqualTo(ModelType.BASE_ADAPTED);
   }
 
   @Test
@@ -71,7 +72,7 @@ class HttpAiInferenceClientTest {
                     .withHeader("Content-Type", "application/json")
                     .withBody(
                         """
-                        {"status": "no_speech", "text": "", "score": null}
+                        {"status": "no_speech", "text": "", "score": null, "model": {"adapter_id": null}}
                         """)));
 
     AiInferenceClient.RecognitionResult result =
@@ -91,6 +92,38 @@ class HttpAiInferenceClientTest {
                     .withBody(
                         """
                         {"status": "ok"}
+                        """)));
+
+    assertThatThrownBy(() -> client.recognize(audioBytes, ModelType.BASE_ADAPTED, userId))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void 모델_식별자가_없으면_사용_모델을_추정하지_않는다() {
+    wireMock.stubFor(
+        post(urlPathEqualTo("/v1/asr/transcribe"))
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"status": "ok", "text": "테스트", "score": null}
+                        """)));
+
+    assertThatThrownBy(() -> client.recognize(audioBytes, ModelType.BASE_ADAPTED, userId))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void model_객체에_adapter_id가_없어도_계약_오류다() {
+    wireMock.stubFor(
+        post(urlPathEqualTo("/v1/asr/transcribe"))
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"status": "ok", "text": "테스트", "score": null, "model": {}}
                         """)));
 
     assertThatThrownBy(() -> client.recognize(audioBytes, ModelType.BASE_ADAPTED, userId))
@@ -123,7 +156,7 @@ class HttpAiInferenceClientTest {
                     .withHeader("Content-Type", "application/json")
                     .withBody(
                         """
-                        {"status": "ok", "text": "테스트", "score": null}
+                        {"status": "ok", "text": "테스트", "score": null, "model": {"adapter_id": null}}
                         """)));
 
     client.recognize(audioBytes, ModelType.BASE_ADAPTED, userId);
@@ -131,6 +164,28 @@ class HttpAiInferenceClientTest {
     wireMock.verify(
         postRequestedFor(urlPathEqualTo("/v1/asr/transcribe"))
             .withQueryParam("user_id", equalTo(userId.toString()))
+            .withQueryParam("use_adapter", equalTo("false"))
             .withHeader("Content-Type", containing("audio/wav")));
+  }
+
+  @Test
+  void 개인화_요청은_adapter를_요청하고_실제_선택된_모델을_반환한다() {
+    wireMock.stubFor(
+        post(urlPathEqualTo("/v1/asr/transcribe"))
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"status": "ok", "text": "테스트", "score": null,
+                         "model": {"adapter_id": "adapter-1", "adapter_revision": "rev-1"}}
+                        """)));
+
+    var result = client.recognize(audioBytes, ModelType.PERSONALIZED, userId);
+
+    assertThat(result.actualModelType()).isEqualTo(ModelType.PERSONALIZED);
+    wireMock.verify(
+        postRequestedFor(urlPathEqualTo("/v1/asr/transcribe"))
+            .withQueryParam("use_adapter", equalTo("true")));
   }
 }

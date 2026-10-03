@@ -2,12 +2,15 @@ package com.voicebridge.port.out;
 
 import com.voicebridge.domain.recommendation.ShownPrompt;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 public interface ShownPromptRepositoryPort {
 
   List<ShownPrompt> saveAll(List<ShownPrompt> prompts);
+
+  Optional<ShownPrompt> findById(UUID id);
 
   /**
    * 이 사용자에게 이미 제안한 문장 ID. 다음 추천에서 같은 문장이 다시 나오지 않게 뺀다. 제안만 하고 읽지 않은 문장(예: 새로고침)도 빠지는데, 녹음 여부를 알 수

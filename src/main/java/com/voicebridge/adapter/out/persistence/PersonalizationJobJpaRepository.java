@@ -11,6 +11,5 @@ public interface PersonalizationJobJpaRepository
   Optional<PersonalizationJobJpaEntity> findFirstByUserIdAndStatusOrderByCompletedAtDesc(
       UUID userId, PersonalizationJobStatus status);
 
-  Optional<PersonalizationJobJpaEntity> findFirstByUserIdAndStatus(
-      UUID userId, PersonalizationJobStatus status);
+  Optional<PersonalizationJobJpaEntity> findByUserIdAndActiveSlot(UUID userId, String activeSlot);
 }
