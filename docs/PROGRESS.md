@@ -393,6 +393,13 @@
   - 9/29에는 `FAILED`에 실패 사유 4가지를 붙이기로 했는데, 업로드할 때 변환하면 오디오 문제 3가지는 업로드 순간에 거절되고 `FAILED`는 AI 문제뿐이라 `failureReason` 필드는 만들지 않았다.
 - **검증**: 실제 FFmpeg를 쓰는 통합 테스트 4건(WebM → WAV로 저장되고 AI에도 같은 WAV가 감, 짧음·김·깨진 파일은 각 코드로 거절되고 저장하지 않음), 서비스 단위 테스트(이유별 코드, 503 전달, 거절할 요청에는 변환기를 쓰지 않음). 로컬 실제 구동: 스테레오 Opus WebM 5문장 → 202, 전부 `DONE`, 세션 `ANALYZED`, 저장 파일은 PCM16·16kHz·모노 WAV, 0.1초 녹음 400 `AUDIO_TOO_SHORT`, 깨진 파일 400 `AUDIO_INVALID`. 일반 테스트 335건, FFmpeg 테스트 21건 통과.
 
+### 26. 진단 세션 `COMPLETED` 상태 제거 (refactor/remove-diagnosis-completed) — PR 대기
+
+- 9/16 계약의 `IN_PROGRESS → ANALYZED → COMPLETED` 중 `COMPLETED`는 바꾸는 API도 호출하는 곳도 없어 도달할 수 없는 상태였다. 명세서에도 뜻이 없었다.
+- enum 값, `DiagnosisSession.complete()`, 명세서 2.2의 `COMPLETED`를 뺐다. 자모 오류 통계의 집계 대상은 `ANALYZED`만 남는다(실제 동작은 같음).
+- DB는 바꾸지 않아도 된다. 이 상태로 저장된 세션은 있을 수 없고, 운영의 스키마 검사(`ddl-auto: validate`)는 enum 컬럼의 값 목록을 비교하지 않는다. MySQL 컨테이너에서 `status` 컬럼에 `COMPLETED`를 남긴 채 `validate`로 기동되는 것을 확인했다.
+- "사용자가 결과를 확인함" 같은 다음 단계가 필요해지면 그때 의미와 API를 같이 정해 추가한다.
+
 ## 알려진 이슈 / 확인 필요 사항
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.

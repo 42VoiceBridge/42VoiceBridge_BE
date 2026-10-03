@@ -245,7 +245,7 @@ Response (200):
 - `sentences`는 낭독 순서대로 온다.
 - 아직 녹음하지 않은 문장은 `recordingId`, `recordingStatus`가 `null`이다.
 - 같은 문장을 여러 번 녹음했으면 가장 최근 녹음이 온다.
-- `status`: `IN_PROGRESS`(녹음 중) / `ANALYZED`(문장마다 가장 최근 녹음이 `DONE`이 되어 자모 오류 통계에 포함됨) / `COMPLETED`
+- `status`: `IN_PROGRESS`(녹음 중) / `ANALYZED`(문장마다 가장 최근 녹음이 `DONE`이 되어 자모 오류 통계에 포함됨)
 
 에러: `RESOURCE_NOT_FOUND`(404), `FORBIDDEN_ACCESS`(403)
 
@@ -750,3 +750,4 @@ POST /v1/enroll/next-prompts
 | 2026-10-02 | 5.1 | 기본 모델 요청 시 `use_adapter=false` 전달, AI 응답의 adapter ID로 `modelUsed` 판정 및 요청·응답 불일치 503 처리 명시 |
 | 2026-10-03 | 4.1 | JSON Content-Type 파라미터 허용, metadata 크기·문자열 타입 검증 및 원인별 오류 메시지·Blob 예시 추가; 보관 설정 기준 명시 (PR #40 리뷰 반영) |
 | 2026-10-03 | 0.6, 2.3, 2.4 | 진단 업로드 시 WAV 변환. 녹음 문제는 `AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`(400), 변환 지연은 `AUDIO_PROCESSING_UNAVAILABLE`(503). `FAILED`는 AI 쪽 문제뿐이라 `failureReason` 계획 취소 (PR #43) |
+| 2026-10-03 | 2.2 | 진단 세션 `status`에서 `COMPLETED` 삭제. 전환하는 API가 없어 도달할 수 없는 값이었다 |
