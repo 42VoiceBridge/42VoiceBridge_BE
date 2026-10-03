@@ -1,7 +1,11 @@
 package com.voicebridge.port.out;
 
 public interface StoragePort {
-
-  /** 파일을 저장하고 저장 경로를 반환한다. 반환값은 Recording.s3Path에 그대로 들어간다. */
   String upload(byte[] fileBytes, String fileName);
+
+  /** Persists a WAV under a previously reserved key. */
+  void uploadAt(String key, byte[] bytes);
+
+  /** Idempotent removal of an object owned by this service. */
+  void delete(String key);
 }

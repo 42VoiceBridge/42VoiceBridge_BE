@@ -15,5 +15,5 @@ public interface RecommendSentencesUseCase {
   record RecommendationResult(List<RecommendedSentence> sentences) {}
 
   /** promptId는 AI 문장 풀의 ID다. 개인화 녹음 업로드가 어떤 문장을 읽었는지 이 값으로 연결한다. */
-  record RecommendedSentence(String promptId, String text) {}
+  record RecommendedSentence(UUID shownPromptId, String promptId, String text) {}
 }

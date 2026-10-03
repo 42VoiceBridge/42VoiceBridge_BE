@@ -11,9 +11,8 @@ public interface GetPersonalizationTrainingStatusUseCase {
   record TrainingStatusResult(
       UUID jobId,
       String status,
+      Double progress,
       LocalDateTime startedAt,
       LocalDateTime completedAt,
-      String failureReason) {
-    // TODO(백엔드 B): progress(진행률) 필드는 학습 파이프라인 쪽 값 전달 방식이 정해지면 추가
-  }
+      String failureReason) {}
 }

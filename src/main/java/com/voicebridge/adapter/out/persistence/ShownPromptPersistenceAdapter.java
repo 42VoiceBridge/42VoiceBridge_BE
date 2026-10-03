@@ -6,6 +6,7 @@ import com.voicebridge.domain.recommendation.ShownPrompt;
 import com.voicebridge.port.out.ShownPromptRepositoryPort;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,11 @@ public class ShownPromptPersistenceAdapter implements ShownPromptRepositoryPort 
     } catch (DataIntegrityViolationException e) {
       throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, "추천 문장 기록을 저장하지 못했습니다.");
     }
+  }
+
+  @Override
+  public Optional<ShownPrompt> findById(UUID id) {
+    return jpaRepository.findById(id).map(ShownPromptPersistenceAdapter::toDomain);
   }
 
   @Override

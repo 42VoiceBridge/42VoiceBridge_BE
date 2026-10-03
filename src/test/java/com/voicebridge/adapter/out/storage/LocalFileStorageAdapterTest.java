@@ -1,6 +1,7 @@
 package com.voicebridge.adapter.out.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -55,5 +56,22 @@ class LocalFileStorageAdapterTest {
     String second = adapter.upload(new byte[] {2}, "recording.wav");
 
     assertThat(first).isNotEqualTo(second);
+  }
+
+  @Test
+  void reservedWavKeyCanBeDeletedIdempotently() throws IOException {
+    LocalFileStorageAdapter adapter = newAdapter();
+    String key = "personalization/" + java.util.UUID.randomUUID() + ".wav";
+    adapter.uploadAt(key, new byte[] {1, 2});
+    assertThat(Files.readAllBytes(tempDir.resolve(key))).containsExactly((byte) 1, (byte) 2);
+    adapter.delete(key);
+    adapter.delete(key);
+    assertThat(Files.exists(tempDir.resolve(key))).isFalse();
+  }
+
+  @Test
+  void deletionRejectsPathTraversal() {
+    assertThatThrownBy(() -> newAdapter().delete("../outside.wav"))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }

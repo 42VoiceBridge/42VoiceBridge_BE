@@ -79,9 +79,11 @@ class RecommendSentencesServiceTest {
     RecommendationResult result = service.recommend(userId, 2);
 
     assertThat(result.sentences())
-        .containsExactly(
-            new RecommendedSentence("02-03-0001", "식당이 어디예요?"),
-            new RecommendedSentence("06-01-0003", "물 좀 주세요."));
+        .extracting(RecommendedSentence::promptId)
+        .containsExactly("02-03-0001", "06-01-0003");
+    assertThat(result.sentences())
+        .extracting(RecommendedSentence::text)
+        .containsExactly("식당이 어디예요?", "물 좀 주세요.");
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<ShownPrompt>> saved = ArgumentCaptor.forClass(List.class);
