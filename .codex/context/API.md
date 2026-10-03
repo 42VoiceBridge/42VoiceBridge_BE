@@ -99,7 +99,10 @@ https://{host}/api/v1
 | `TRAINING_UNAVAILABLE` | 온라인 학습 계약과 AI job 조회 경로가 없어 학습 요청을 접수할 수 없음 (HTTP 503) |
 | `INSUFFICIENT_RECORDINGS` | 개인화 학습에 필요한 최소 녹음 수 미충족 |
 | `AI_INFERENCE_UNAVAILABLE` | AI 서버를 쓸 수 없음 (장애, 타임아웃, 계약과 다른 응답, 서버에 문장 풀 파일 없음) |
-| `AUDIO_PROCESSING_UNAVAILABLE` | 음성 변환 슬롯 대기 초과 또는 변환 처리 시간 초과로 일시적으로 처리할 수 없음 (HTTP 503). 실사용 인식과 향후 진단 업로드의 변환 경로에 공통 적용 |
+| `AUDIO_TOO_SHORT` | 진단 녹음이 0.3초 미만 (HTTP 400). 조금 더 길게 다시 녹음 |
+| `AUDIO_TOO_LONG` | 진단 녹음이 30초 초과 (HTTP 400). 짧게 끊어서 다시 녹음 |
+| `AUDIO_INVALID` | 진단 녹음 파일이 손상됐거나 지원하지 않는 형식 (HTTP 400). 다시 녹음 |
+| `AUDIO_PROCESSING_UNAVAILABLE` | 음성 변환 슬롯 대기 초과 또는 변환 처리 시간 초과로 일시적으로 처리할 수 없음 (HTTP 503). 실사용 인식·진단 업로드·개인화 업로드의 변환 경로에 공통 적용 |
 
 ---
 
@@ -275,9 +278,9 @@ Response (202 Accepted):
 >
 - 분석이 끝난(`ANALYZED`) 세션에는 녹음을 추가할 수 없다.
 - 파일 크기 상한은 10MB다.
-- ⚠️ 현재는 브라우저 원본(보통 WebM)을 변환하지 않고 AI에 보낸다. AI는 WAV(PCM16·모노·16kHz)만 받으므로 실제 AI에 연결하면 인식이 `FAILED`가 된다. 백엔드 B의 오디오 변환(P02)을 진단에도 적용할 예정이다.
+- 업로드할 때 서버가 WAV(PCM16·모노·16kHz)로 변환한다. 브라우저 녹음(WebM/Opus, M4A/AAC, WAV)을 그대로 보내면 된다. 0.3초 미만·30초 초과·읽을 수 없는 파일은 접수하지 않고 바로 거절한다.
 
-에러: `VALIDATION_FAILED`(400, 세션에 포함되지 않은 문장이거나 `sentenceId`·`audioFile`이 없음), `FORBIDDEN_ACCESS`(403, 본인 세션이 아님), `RESOURCE_NOT_FOUND`(404), `INVALID_STATE_TRANSITION`(409, 분석이 끝난 세션). 지원하지 않는 오디오 형식에 대한 `VALIDATION_FAILED`(400, 실사용 인식과 같음)는 오디오 변환 적용 때 함께 구현한다.
+에러: `VALIDATION_FAILED`(400, 세션에 포함되지 않은 문장이거나 `sentenceId`·`audioFile`이 없음), `FORBIDDEN_ACCESS`(403, 본인 세션이 아님), `RESOURCE_NOT_FOUND`(404), `INVALID_STATE_TRANSITION`(409, 분석이 끝난 세션), `AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`(400, 녹음 자체의 문제 — 0.6 참고), `AUDIO_PROCESSING_UNAVAILABLE`(503, 변환이 몰려 잠시 처리할 수 없음. 같은 녹음을 잠시 후 다시 보내면 된다).
 
 ### 2.4 녹음 인식 결과 조회
 
@@ -344,7 +347,7 @@ Response (200) — 실패:
 
 에러: `RESOURCE_NOT_FOUND`(404), `FORBIDDEN_ACCESS`(403), `VALIDATION_FAILED`(400, 경로의 세션과 녹음의 실제 소속이 다름)
 
-> 예정: `FAILED`일 때 실패 사유(`failureReason`)를 함께 내려준다. `AUDIO_TOO_SHORT`(조금 더 길게 다시 녹음) / `AUDIO_TOO_LONG`(짧게 끊어서 다시 녹음) / `AUDIO_INVALID`(다시 녹음) / `AI_UNAVAILABLE`(잠시 후 다시 시도, 재녹음 불필요). 오디오 변환 적용 때 함께 구현한다(2026-09-29 결정).
+> `FAILED`는 AI 쪽 문제(서버 장애·시간 초과 등)로 인식하지 못한 경우다. 녹음 자체의 문제는 업로드 때 400으로 거절되므로 여기까지 오지 않는다. 같은 문장을 잠시 후 다시 녹음하면 된다. (2026-09-29에 계획했던 `failureReason`은 업로드 때 변환하면서 필요 없어져 만들지 않는다.)
 >
 
 ### 2.5 자모 오류 통계 조회
@@ -746,3 +749,4 @@ POST /v1/enroll/next-prompts
 | 2026-10-02 | 7.2~7.3 | 초기 학습 성공 예시를 현재 AI 501/job 경로 부재 및 BE 503·DB 조회 계약으로 정정 |
 | 2026-10-02 | 5.1 | 기본 모델 요청 시 `use_adapter=false` 전달, AI 응답의 adapter ID로 `modelUsed` 판정 및 요청·응답 불일치 503 처리 명시 |
 | 2026-10-03 | 4.1 | JSON Content-Type 파라미터 허용, metadata 크기·문자열 타입 검증 및 원인별 오류 메시지·Blob 예시 추가; 보관 설정 기준 명시 (PR #40 리뷰 반영) |
+| 2026-10-03 | 0.6, 2.3, 2.4 | 진단 업로드 시 WAV 변환. 녹음 문제는 `AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`(400), 변환 지연은 `AUDIO_PROCESSING_UNAVAILABLE`(503). `FAILED`는 AI 쪽 문제뿐이라 `failureReason` 계획 취소 (PR #43) |
