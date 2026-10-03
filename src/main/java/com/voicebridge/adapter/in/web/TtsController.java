@@ -9,6 +9,7 @@ import com.voicebridge.port.in.RequestTtsUseCase;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -41,7 +42,7 @@ public class TtsController {
   public ResponseEntity<ApiResponse<TtsStatusResponse>> getStatus(
       @AuthenticationPrincipal UUID userId, @PathVariable("ttsId") UUID ttsId) {
     return ResponseEntity.ok()
-        .cacheControl(org.springframework.http.CacheControl.noStore())
+        .cacheControl(CacheControl.noStore())
         .body(
             ApiResponse.success(
                 TtsStatusResponse.from(getTtsStatusUseCase.getStatus(userId, ttsId))));

@@ -23,7 +23,8 @@ https://{host}/api/v1
 
 - 방식: JWT Bearer Token
 - 헤더: `Authorization: Bearer {accessToken}`
-- 인증이 필요 없는 API: `POST /auth/signup`, `POST /auth/login`, `POST /auth/refresh`
+- 인증이 필요한 API에 토큰이 없으면 401 `AUTH_REQUIRED`, 토큰이 만료됐거나 유효하지 않으면 401 `AUTH_TOKEN_EXPIRED`다. 둘 다 공통 응답 형식(0.3)으로 온다. 인증이 필요 없는 API는 만료된 토큰을 붙여 보내도 막지 않는다.
+- 인증이 필요 없는 API: `POST /auth/signup`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/kakao`
 
 ### 0.3 공통 응답 포맷
 
@@ -80,6 +81,8 @@ https://{host}/api/v1
 | 401 | 인증 실패/토큰 만료 |
 | 403 | 권한 없음(타인 데이터 접근 등) |
 | 404 | 리소스 없음 |
+| 405 | 그 주소가 받지 않는 HTTP 메서드 |
+| 415 | 그 API가 받지 않는 Content-Type |
 | 409 | 상태 충돌(예: 이미 진행중인 학습 job에 재요청) |
 | 422 | 비즈니스 규칙 위반(예: 최소 녹음 개수 미충족) |
 | 500 | 서버 내부 오류 |
@@ -91,15 +94,25 @@ https://{host}/api/v1
 | code | 상황 |
 | --- | --- |
 | `AUTH_INVALID_CREDENTIALS` | 로그인 실패 |
-| `AUTH_TOKEN_EXPIRED` | 액세스 토큰 만료 |
-| `VALIDATION_FAILED` | 요청 검증 실패. 필수 파라미터·파일이 빠지면 메시지에 빠진 필드명이 담긴다(예: `필수 요청 값이 없습니다: audioFile`) |
-| `RESOURCE_NOT_FOUND` | 대상 리소스 없음 |
+| `AUTH_TOKEN_EXPIRED` | 액세스 토큰이 만료됐거나 유효하지 않음 (HTTP 401). 메시지로 구분("인증 토큰이 만료되었습니다." / "유효하지 않은 토큰입니다."). 토큰 재발급(1.3) 후 다시 요청 |
+| `AUTH_REQUIRED` | 인증이 필요한 API를 토큰 없이 호출 (HTTP 401). 로그인 필요 |
+| `REFRESH_TOKEN_INVALID` | 리프레시 토큰이 위조·만료됐거나 이미 재발급에 쓰여 무효화됨 (HTTP 401) |
+| `KAKAO_AUTH_FAILED` | 카카오 로그인 실패 — 인가 코드 만료·재사용, redirect URI 불일치, 카카오 서버 장애 등 (HTTP 401) |
+| `EMAIL_ALREADY_EXISTS` | 이미 가입된 이메일 (HTTP 409). 카카오 계정 이메일이 기존 이메일 회원과 같을 때도 발생 |
+| `VALIDATION_FAILED` | 요청 검증 실패. 필수 파라미터·파일이 빠지면 메시지에 빠진 필드명이 담긴다(예: `필수 요청 값이 없습니다: audioFile`). 읽을 수 없는 JSON 본문도 이 코드다 |
+| `RESOURCE_NOT_FOUND` | 대상 리소스 없음. 없는 API 주소도 404로 온다 |
+| `METHOD_NOT_ALLOWED` | 그 주소가 받지 않는 HTTP 메서드 (HTTP 405, `Allow` 헤더에 허용 메서드) |
+| `UNSUPPORTED_MEDIA_TYPE` | 그 API가 받지 않는 Content-Type (HTTP 415) |
 | `FORBIDDEN_ACCESS` | 본인 소유가 아닌 리소스 접근 |
 | `INVALID_STATE_TRANSITION` | 상태 머신 규칙 위반 (예: 분석이 끝난 진단 세션에 녹음 추가) |
 | `TRAINING_UNAVAILABLE` | 온라인 학습 계약과 AI job 조회 경로가 없어 학습 요청을 접수할 수 없음 (HTTP 503) |
 | `INSUFFICIENT_RECORDINGS` | 개인화 학습에 필요한 최소 녹음 수 미충족 |
 | `AI_INFERENCE_UNAVAILABLE` | AI 서버를 쓸 수 없음 (장애, 타임아웃, 계약과 다른 응답, 서버에 문장 풀 파일 없음) |
-| `AUDIO_PROCESSING_UNAVAILABLE` | 음성 변환 슬롯 대기 초과 또는 변환 처리 시간 초과로 일시적으로 처리할 수 없음 (HTTP 503). 실사용 인식과 향후 진단 업로드의 변환 경로에 공통 적용 |
+| `INTERNAL_SERVER_ERROR` | 처리되지 않은 서버 오류 (HTTP 500) |
+| `AUDIO_TOO_SHORT` | 진단 녹음이 0.3초 미만 (HTTP 400). 조금 더 길게 다시 녹음 |
+| `AUDIO_TOO_LONG` | 진단 녹음이 30초 초과 (HTTP 400). 짧게 끊어서 다시 녹음 |
+| `AUDIO_INVALID` | 진단 녹음 파일이 손상됐거나 지원하지 않는 형식 (HTTP 400). 다시 녹음 |
+| `AUDIO_PROCESSING_UNAVAILABLE` | 음성 변환 슬롯 대기 초과 또는 변환 처리 시간 초과로 일시적으로 처리할 수 없음 (HTTP 503). 실사용 인식·진단 업로드·개인화 업로드의 변환 경로에 공통 적용 |
 
 ---
 
@@ -132,7 +145,7 @@ Response (201):
 }
 ```
 
-에러: `VALIDATION_FAILED`(400), 이메일 중복 시 `409`
+에러: `VALIDATION_FAILED`(400, 이메일 형식 오류·비밀번호 8자 미만·빈 값), `EMAIL_ALREADY_EXISTS`(409)
 
 ---
 
@@ -159,7 +172,7 @@ Response (200):
 }
 ```
 
-에러: `AUTH_INVALID_CREDENTIALS`(401)
+에러: `VALIDATION_FAILED`(400, 이메일 형식 오류·빈 값), `AUTH_INVALID_CREDENTIALS`(401, 없는 이메일·틀린 비밀번호). 카카오로 가입한 계정은 이메일·비밀번호로 로그인할 수 없다(1.5 사용).
 
 ---
 
@@ -167,8 +180,29 @@ Response (200):
 
 `POST /auth/refresh`
 
-Request: `{ "refreshToken": "jwt" }`
-Response (200): `{ "accessToken": "jwt", "expiresIn": 3600 }`
+Request:
+
+```json
+{ "refreshToken": "jwt" }
+```
+
+Response (200):
+
+```json
+{
+  "success": true,
+  "data": {
+    "accessToken": "jwt",
+    "refreshToken": "jwt",
+    "expiresIn": 3600
+  }
+}
+```
+
+- 재발급할 때마다 **리프레시 토큰도 새로 발급**되고, 요청에 쓴 이전 리프레시 토큰은 바로 무효가 된다. 프론트는 받은 두 토큰을 모두 새 값으로 바꿔 저장해야 한다.
+- `expiresIn`은 액세스 토큰 만료까지 남은 초(현재 3600). 리프레시 토큰은 14일.
+
+에러: `VALIDATION_FAILED`(400, 빈 값), `REFRESH_TOKEN_INVALID`(401, 위조·만료되었거나 이미 사용한 리프레시 토큰)
 
 ---
 
@@ -184,12 +218,40 @@ Response (200):
   "data": {
     "userId": "uuid",
     "email": "user@example.com",
-    "nickname": "string",
-    "hasPersonalizedModel": false,
-    "createdAt": "2026-09-14T09:00:00Z"
+    "nickname": "string"
   }
 }
 ```
+
+- 카카오로 가입한 사용자는 카카오에서 이메일을 받지 못한 경우 `email`이 `null`이다.
+- 개인화 모델 보유 여부는 4.4 `GET /personalization/model`로 확인한다.
+
+### 1.5 카카오 로그인
+
+`POST /auth/kakao`
+
+> 2026-10-02 변경(PR #41): 카카오 JavaScript SDK v2는 브라우저에서 액세스 토큰을 직접 받는 방식을 지원하지 않는다. 프론트는 `Kakao.Auth.authorize()`로 받은 **인가 코드**만 보내고, 백엔드가 카카오 토큰으로 교환해 사용자를 확인한다.
+>
+
+흐름:
+
+1. 프론트: `Kakao.Auth.authorize({ redirectUri })` 호출 → 사용자 동의 후 `redirectUri`로 돌아오면서 쿼리 파라미터 `code`를 받는다.
+2. 프론트: 그 `code`를 아래 API로 보낸다.
+3. 백엔드: 카카오에 인가 코드를 토큰으로 교환하고 사용자 정보를 조회한 뒤, 처음이면 가입시키고 우리 서비스 토큰을 발급한다.
+
+Request:
+
+```json
+{ "authorizationCode": "카카오가 redirectUri로 넘겨준 code 값" }
+```
+
+Response (200): 1.2 로그인과 같다(`accessToken`, `refreshToken`, `expiresIn`).
+
+- `redirectUri`는 프론트가 보내지 않는다. 백엔드 설정(`KAKAO_REDIRECT_URI`)과 **정확히 같은 주소**로 `authorize()`를 호출해야 한다. 다르면 카카오가 거절한다(KOE303). 주소는 카카오 개발자 콘솔에도 등록돼 있어야 한다.
+- 인가 코드는 한 번만, 짧은 시간 안에만 쓸 수 있다. 같은 코드로 다시 요청하면 실패한다(KOE320).
+- 사용자는 카카오 회원번호로 구분한다. 이메일은 없어도 가입되며, 닉네임이 없으면 `카카오사용자`로 저장된다.
+
+에러: `VALIDATION_FAILED`(400, `authorizationCode` 없음), `KAKAO_AUTH_FAILED`(401, 인가 코드 만료·재사용, redirect URI 불일치, 카카오 서버 장애 등), `EMAIL_ALREADY_EXISTS`(409, 카카오 계정 이메일이 이미 이메일 회원가입에 쓰인 경우)
 
 ---
 
@@ -242,7 +304,7 @@ Response (200):
 - `sentences`는 낭독 순서대로 온다.
 - 아직 녹음하지 않은 문장은 `recordingId`, `recordingStatus`가 `null`이다.
 - 같은 문장을 여러 번 녹음했으면 가장 최근 녹음이 온다.
-- `status`: `IN_PROGRESS`(녹음 중) / `ANALYZED`(문장마다 가장 최근 녹음이 `DONE`이 되어 자모 오류 통계에 포함됨) / `COMPLETED`
+- `status`: `IN_PROGRESS`(녹음 중) / `ANALYZED`(문장마다 가장 최근 녹음이 `DONE`이 되어 자모 오류 통계에 포함됨)
 
 에러: `RESOURCE_NOT_FOUND`(404), `FORBIDDEN_ACCESS`(403)
 
@@ -274,10 +336,10 @@ Response (202 Accepted):
 녹음 상태는 `PROCESSING` → `DONE` 또는 `FAILED`로 바뀐다. `FAILED`면 같은 문장을 다시 녹음하면 된다.
 >
 - 분석이 끝난(`ANALYZED`) 세션에는 녹음을 추가할 수 없다.
-- 파일 크기 상한은 10MB다.
-- ⚠️ 현재는 브라우저 원본(보통 WebM)을 변환하지 않고 AI에 보낸다. AI는 WAV(PCM16·모노·16kHz)만 받으므로 실제 AI에 연결하면 인식이 `FAILED`가 된다. 백엔드 B의 오디오 변환(P02)을 진단에도 적용할 예정이다.
+- 파일 크기 상한은 10MB다. 넘으면 `VALIDATION_FAILED`(400, "녹음 업로드 크기 제한을 초과했습니다.")로 거절한다.
+- 업로드할 때 서버가 WAV(PCM16·모노·16kHz)로 변환한다. 브라우저 녹음(WebM/Opus, M4A/AAC, WAV)을 그대로 보내면 된다. 0.3초 미만·30초 초과·읽을 수 없는 파일은 접수하지 않고 바로 거절한다.
 
-에러: `VALIDATION_FAILED`(400, 세션에 포함되지 않은 문장이거나 `sentenceId`·`audioFile`이 없음), `FORBIDDEN_ACCESS`(403, 본인 세션이 아님), `RESOURCE_NOT_FOUND`(404), `INVALID_STATE_TRANSITION`(409, 분석이 끝난 세션). 지원하지 않는 오디오 형식에 대한 `VALIDATION_FAILED`(400, 실사용 인식과 같음)는 오디오 변환 적용 때 함께 구현한다.
+에러: `VALIDATION_FAILED`(400, 세션에 포함되지 않은 문장이거나 `sentenceId`·`audioFile`이 없음), `FORBIDDEN_ACCESS`(403, 본인 세션이 아님), `RESOURCE_NOT_FOUND`(404), `INVALID_STATE_TRANSITION`(409, 분석이 끝난 세션), `AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`(400, 녹음 자체의 문제 — 0.6 참고), `AUDIO_PROCESSING_UNAVAILABLE`(503, 변환이 몰려 잠시 처리할 수 없음. 같은 녹음을 잠시 후 다시 보내면 된다).
 
 ### 2.4 녹음 인식 결과 조회
 
@@ -344,7 +406,7 @@ Response (200) — 실패:
 
 에러: `RESOURCE_NOT_FOUND`(404), `FORBIDDEN_ACCESS`(403), `VALIDATION_FAILED`(400, 경로의 세션과 녹음의 실제 소속이 다름)
 
-> 예정: `FAILED`일 때 실패 사유(`failureReason`)를 함께 내려준다. `AUDIO_TOO_SHORT`(조금 더 길게 다시 녹음) / `AUDIO_TOO_LONG`(짧게 끊어서 다시 녹음) / `AUDIO_INVALID`(다시 녹음) / `AI_UNAVAILABLE`(잠시 후 다시 시도, 재녹음 불필요). 오디오 변환 적용 때 함께 구현한다(2026-09-29 결정).
+> `FAILED`는 AI 쪽 문제(서버 장애·시간 초과 등)로 인식하지 못한 경우다. 녹음 자체의 문제는 업로드 때 400으로 거절되므로 여기까지 오지 않는다. 같은 문장을 잠시 후 다시 녹음하면 된다. (2026-09-29에 계획했던 `failureReason`은 업로드 때 변환하면서 필요 없어져 만들지 않는다.)
 >
 
 ### 2.5 자모 오류 통계 조회
@@ -420,7 +482,8 @@ Response (200):
 }
 ```
 
-- `promptId`는 AI 문장 풀의 ID다. `shownPromptId`는 이 사용자에게 생성된 단일 추천 기록의 UUID다. 업로드(4.1)는 두 값을 함께 받아 중복 추천의 정확한 원문과 연결한다. 진단 `sentenceId`와 다른 ID 체계다.
+- `promptId`는 AI 문장 풀의 ID다. 진단 세션의 `sentenceId`(UUID)와 **다른 ID 체계**다.
+- `shownPromptId`는 이 사용자에게 문장을 제안한 기록 하나의 UUID다. 개인화 녹음 업로드(4.1)에 `promptId`와 함께 보내야 하므로 두 값을 같이 보관한다. 업로드는 두 값을 함께 받아 제안 기록의 정확한 원문과 연결한다.
 - 이미 제안한 문장은 다음 추천에서 빠진다. 제안만 하고 읽지 않은 문장(예: 새로고침)도 빠지는데, 녹음하지 않은 문장을 다시 주는 “이어하기”는 개인화 녹음(4.1)이 생기면 정한다.
 - 제안 기록은 화면 표시·녹음·학습 자격을 뜻하지 않는다.
 - AI v1은 무작위(`random`) 선택만 지원한다. 오류 기반 선택(`error_based`)이 생기면 “이 문장이 노리는 자모” 같은 정보를 추가한다(기존 `targetPhonemes`는 그때까지 뺀다).
@@ -615,6 +678,8 @@ Response (202): `{ "ttsId": "uuid", "status": "PENDING" }`
 
 대상 confirmation이 이미 무효화됐으면(`valid=false`) `INVALID_STATE_TRANSITION`(409)으로 거부한다 — “무효·미확인·취소된 문장은 절대 재생되지 않는다”는 불변조건을 지키는 지점이다. 같은 `idempotencyKey`로 재요청하면 같은 결과를 반환하고(중복 재생 방지), 다른 confirmationId에 이미 쓴 키를 재사용하면 `VALIDATION_FAILED`(400)로 거부한다.
 
+비동기 합성 직전에도 confirmation 유효성을 재검사한다. 확인이 없거나 무효화됐으면 NCP 합성·업로드를 건너뛰고 요청을 `FAILED`로 저장한다. 이후 결과 조회는 아래의 confirmation 오류 규칙(404·409)을 따른다. 검사 이후 진행 중인 합성의 취소까지 보장하지는 않는다.
+
 ### 6.2 TTS 결과 조회
 
 `GET /tts/{ttsId}` (인증 필요)
@@ -714,10 +779,11 @@ POST /v1/analysis/jamo-errors
 ```
 POST /v1/enroll/next-prompts
 요청: { "user_id": "uuid", "n": 10, "strategy": "random", "seed": 호출마다 새 값, "exclude_prompt_ids": [이미 제안한 ID] }
-응답: strategy, strategy_version, seed, pool_size, prompts[{ prompt_id, text }]
+응답: strategy, strategy_version, seed, pool_size, pool_version, pool_sha256, prompts[{ prompt_id, text }]
 ```
 
 - `seed`가 같으면 같은 문장이 나오므로 호출마다 새로 뽑고 기록한다. `coverage`·`error_based` 전략은 501.
+- `strategy_version`·`seed`·`pool_sha256`이 모두 같아야 같은 문장이 다시 나온다(`pool_version`은 문장 풀 파일을 바꿀 때 올라간다). 네 값을 제안 기록(`shown_prompts`)에 함께 남긴다. `pool_version`이나 `pool_sha256`이 없으면 계약 위반으로 보고 503(`AI_INFERENCE_UNAVAILABLE`).
 - 서버에 문장 풀 파일(`data/script_pool.json`)이 없으면 503(`prompt_pool_missing`).
 - 구현: `HttpEnrollmentPromptClient` (로컬 프로파일은 `StubEnrollmentPromptClient`)
 
@@ -732,6 +798,7 @@ POST /v1/enroll/next-prompts
 | --- | --- | --- | --- |
 | POST | /auth/signup | BE-A | X |
 | POST | /auth/login | BE-A | X |
+| POST | /auth/kakao | BE-A | X |
 | POST | /auth/refresh | BE-A | X |
 | GET | /users/me | BE-A | O |
 | POST | /diagnosis-sessions | BE-A | O |
@@ -770,10 +837,18 @@ POST /v1/enroll/next-prompts
 | 2026-09-30 | 0.5, 0.6, 5.1 | 오디오 변환 용량·시간 초과 시 `AUDIO_PROCESSING_UNAVAILABLE`(503) 추가 (PR #39). 진단 업로드 변환에도 동일 코드 사용 |
 | 2026-09-30 | 2.2, 2.5 | 세션 완료와 통계 모두 문장마다 가장 최근 녹음 기준 (PR #38 리뷰 반영) |
 | 2026-09-30 | 2.3 | 지원하지 않는 오디오 형식: 422(예정) → 400 VALIDATION_FAILED (실사용 인식 PR #39와 맞춤) |
+| 2026-10-02 | 0.6, 1.1~1.4 | 인증 에러 코드(`REFRESH_TOKEN_INVALID`, `KAKAO_AUTH_FAILED`, `EMAIL_ALREADY_EXISTS`)와 `INTERNAL_SERVER_ERROR` 추가. 토큰 재발급 응답을 실제 구현에 맞춤(리프레시 토큰도 새로 발급). 내 정보 조회에서 구현에 없는 `hasPersonalizedModel`·`createdAt` 삭제(개인화 여부는 4.4) |
+| 2026-10-02 | 1.5, 8 | 카카오 로그인 추가 — 인가 코드 방식(`authorizationCode`) (PR #41) |
+| 2026-10-02 | 2.3 | 10MB 초과 업로드는 `400 VALIDATION_FAILED` (PR #39) |
 | 2026-10-02 | 0.6, 3.1, 4.1~4.2 | 추천 기록 ID, 개인화 WAV 업로드·삭제·30일 보관 계약 추가; 학습 API는 외부 계약 미지원으로 503 반환 |
 | 2026-10-02 | 4.3~4.4, 5.1 | 진행률 미지원 시 `progress: null` 명시; 완료 job과 활성 adapter를 분리해 모델 보유·인식 표시 기준 수정 |
 | 2026-10-02 | 7.2~7.3 | 초기 학습 성공 예시를 현재 AI 501/job 경로 부재 및 BE 503·DB 조회 계약으로 정정 |
 | 2026-10-02 | 5.1 | 기본 모델 요청 시 `use_adapter=false` 전달, AI 응답의 adapter ID로 `modelUsed` 판정 및 요청·응답 불일치 503 처리 명시 |
 | 2026-10-03 | 4.1 | JSON Content-Type 파라미터 허용, metadata 크기·문자열 타입 검증 및 원인별 오류 메시지·Blob 예시 추가; 보관 설정 기준 명시 (PR #40 리뷰 반영) |
-
+| 2026-10-03 | 0.6, 2.3, 2.4 | 진단 업로드 시 WAV 변환. 녹음 문제는 `AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`(400), 변환 지연은 `AUDIO_PROCESSING_UNAVAILABLE`(503). `FAILED`는 AI 쪽 문제뿐이라 `failureReason` 계획 취소 (PR #43) |
+| 2026-10-03 | 2.2 | 진단 세션 `status`에서 `COMPLETED` 삭제. 전환하는 API가 없어 도달할 수 없는 값이었다 |
+| 2026-10-03 | 7.6 | AI 응답의 `pool_version`·`pool_sha256`을 제안 기록에 저장, 없으면 503 (AI 답변 R5) |
+| 2026-10-03 | 0.2, 0.6 | 토큰 없이 호출하면 403(본문 없음) → 401 `AUTH_REQUIRED`, 만료·무효 토큰은 401 `AUTH_TOKEN_EXPIRED`로 공통 응답 형식에 맞춤 |
+| 2026-10-03 | 0.5, 0.6 | 클라이언트 요청 실수가 500으로 나가던 것을 수정: 없는 주소 404 `RESOURCE_NOT_FOUND`, 받지 않는 메서드 405 `METHOD_NOT_ALLOWED`, 읽을 수 없는 JSON 400 `VALIDATION_FAILED`, 받지 않는 Content-Type 415 `UNSUPPORTED_MEDIA_TYPE` |
 | 2026-10-03 | 6.2, 6.3 | TTS object key와 재생 URL 분리, private S3 임시 GET URL 및 만료·무효화 규칙, 인증된 로컬 MP3·Range 조회 추가 |
+| 2026-10-03 | 6.1 | 합성 직전 confirmation 재검사 및 무효·누락 시 외부 호출 없이 FAILED 처리 (PR #49 리뷰 반영) |

@@ -38,6 +38,10 @@ public class ShownPromptJpaEntity {
 
   private long seed;
 
+  private String poolVersion;
+
+  private String poolSha256;
+
   private LocalDateTime shownAt;
 
   @Builder
@@ -49,6 +53,8 @@ public class ShownPromptJpaEntity {
       String strategy,
       String strategyVersion,
       long seed,
+      String poolVersion,
+      String poolSha256,
       LocalDateTime shownAt) {
     this.id = id;
     this.userId = userId;
@@ -57,6 +63,8 @@ public class ShownPromptJpaEntity {
     this.strategy = strategy;
     this.strategyVersion = strategyVersion;
     this.seed = seed;
+    this.poolVersion = poolVersion;
+    this.poolSha256 = poolSha256;
     this.shownAt = shownAt;
   }
 }

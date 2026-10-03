@@ -75,7 +75,8 @@ graph TB
 
 ### 인증 — 완료
 - 이메일/비밀번호 회원가입·로그인
-- 카카오 로그인 (프론트가 카카오 SDK로 받은 accessToken을 백엔드가 그대로 카카오 API에 검증 요청 — 백엔드가 카카오 REST API 키를 가질 필요가 없는 설계)
+- 카카오 로그인 (인가 코드 방식, PR #41 — 프론트가 `Kakao.Auth.authorize()`로 받은 인가 코드를 백엔드가 카카오 토큰으로 교환해 사용자를 확인한다. 백엔드에 카카오 REST API 키와 Redirect URI 설정이 필요하다)
+- 인증이 필요한 API를 토큰 없이 부르면 401 `AUTH_REQUIRED`, 토큰이 만료·위조됐으면 401 `AUTH_TOKEN_EXPIRED`(PR #46)
 - JWT 액세스/리프레시 토큰 발급·재발급. refresh token은 SHA-256으로 별도 해싱해 **Redis**에 저장(사용자 비밀번호용 BCrypt와 관심사 분리 — BCrypt는 72바이트 제한이 있어 JWT 길이의 토큰에는 쓸 수 없음). Redis TTL로 만료를 자동 처리해 별도 정리(cleanup) 로직이 필요 없음 — **Redis가 기동되어 있지 않으면 로그인/refresh 자체가 실패**
 
 ### AI 음성 인식 연동 — HTTP 어댑터로 배선 완료
@@ -95,7 +96,7 @@ graph TB
 - 음성 저장은 `StoragePort` 뒤에 있다. 로컬 프로파일은 파일시스템, 그 외에는 S3를 쓰므로 **AWS 크레덴셜 없이도 개발할 수 있다**. 사용자가 보낸 파일명은 저장 키에 쓰지 않고 허용 목록의 확장자만 추출한다
 
 ### 추천 문장 — 구현
-- `POST /api/v1/users/me/recommendations`: 개인화 등록용으로 읽을 문장을 추천. **문장 선택은 AI(`/v1/enroll/next-prompts`)가 하고**, 백엔드는 제안한 문장을 전략·버전·seed와 함께 `shown_prompts`에 기록한다(AI 계약 §1, §3.6)
+- `POST /api/v1/users/me/recommendations`: 개인화 등록용으로 읽을 문장을 추천. **문장 선택은 AI(`/v1/enroll/next-prompts`)가 하고**, 백엔드는 제안한 문장을 전략·버전·seed·문장 풀(버전·해시)과 함께 `shown_prompts`에 기록한다(AI 계약 §1, §3.6)
 - 문장 ID는 우리 `sentences` 테이블이 아니라 AI 문장 풀의 `promptId`다. 이미 제안한 문장은 다음 추천에서 빠진다
 - AI v1은 무작위(`random`) 선택만 지원한다. 오류 기반 선택은 AI 쪽 구현 이후
 - 로컬(`local` 프로파일)은 `StubEnrollmentPromptClient`가 고정 12문장에서 고른다
@@ -120,11 +121,11 @@ graph TB
 |---|---|---|---|
 | 1 | `POST /api/v1/auth/signup` | 불필요 | 이메일/비밀번호 회원가입 |
 | 2 | `POST /api/v1/auth/login` | 불필요 | 이메일/비밀번호 로그인 |
-| 3 | `POST /api/v1/auth/kakao` | 불필요 | 카카오 로그인 |
+| 3 | `POST /api/v1/auth/kakao` | 불필요 | 카카오 로그인. 본문 `{ "authorizationCode": "..." }` |
 | 4 | `POST /api/v1/auth/refresh` | 불필요 | 액세스/리프레시 토큰 재발급 |
 | 5 | `POST /api/v1/diagnosis-sessions` | JWT 필요 | 진단 세션 시작(낭독 문장 목록 반환) |
 | 6 | `GET /api/v1/diagnosis-sessions/{sessionId}` | JWT 필요 | 세션 조회(문장별 녹음 상태 포함) |
-| 7 | `POST /api/v1/diagnosis-sessions/{sessionId}/recordings` | JWT 필요 | 녹음 업로드(multipart). 접수만 하고 `202` 반환 |
+| 7 | `POST /api/v1/diagnosis-sessions/{sessionId}/recordings` | JWT 필요 | 녹음 업로드(multipart). 업로드 때 WAV로 변환하고 접수만 한 뒤 `202` 반환. 잘못된 오디오는 `400 AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID` |
 | 8 | `GET /api/v1/diagnosis-sessions/{sessionId}/recordings/{recordingId}/result` | JWT 필요 | 인식 결과 조회(정답 문장 포함) |
 | 9 | `GET /api/v1/personalization/model` | JWT 필요 | 개인화 모델 상태 조회 |
 | 10 | `POST /api/v1/recognitions/{recognitionId}/confirm` | JWT 필요 | 인식 결과 확인(같은 인식 결과 재확인 시 이전 확인 무효화) |
@@ -171,7 +172,8 @@ M4A/MP4(AAC)를 **WAV PCM16·모노·16kHz·0.3~30초**로 변환합니다.
 
 원본과 중간 파일은 처리 중 임시 파일로만 사용하고 성공·실패 시 정리를 시도하며, 정리 실패는 로그로 남깁니다.
 원본 형식·코덱·채널·샘플레이트, 변환 버전과 전후 SHA-256을 인식 ID와 연결하여 로그에 남깁니다.
-DB 메타데이터 영구 보존은 후속 작업입니다. 이 변환은 실사용 인식에 적용하며 진단 업로드는 별도입니다.
+DB 메타데이터 영구 보존은 후속 작업입니다. 이 변환은 실사용 인식과 진단 업로드에 함께 적용합니다.
+진단 업로드는 거절 이유를 `AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`(400)로 나눠 알리고, 원본 대신 변환된 WAV를 저장해 인식에 씁니다.
 
 `./gradlew build`는 일반 테스트를, `./gradlew audioIntegrationTest`는 실제 FFmpeg 변환 및
 업로드 연결 테스트를 실행합니다. 후자는 FFmpeg/FFprobe 설치가 필수입니다.

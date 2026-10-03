@@ -50,7 +50,12 @@ class RecommendationIntegrationTest {
         .thenAnswer(
             invocation ->
                 new PromptBatch(
-                    "random", "prompt-random-v1", invocation.getArgument(2), List.of(prompts)));
+                    "random",
+                    "prompt-random-v1",
+                    invocation.getArgument(2),
+                    "script-pool-v1",
+                    "0123456789abcdef",
+                    List.of(prompts)));
   }
 
   @Test
@@ -101,6 +106,6 @@ class RecommendationIntegrationTest {
 
   @Test
   void 로그인하지_않으면_추천받을_수_없다() throws Exception {
-    mvc.perform(post(URL)).andExpect(status().isForbidden());
+    mvc.perform(post(URL)).andExpect(status().isUnauthorized());
   }
 }

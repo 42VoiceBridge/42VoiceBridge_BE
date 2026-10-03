@@ -127,7 +127,7 @@ class PersonalizationTrainingStatusIntegrationTest {
     PersonalizationJob job = PersonalizationJob.create(UUID.randomUUID(), 8);
     save(job);
 
-    mockMvc.perform(get(URL, job.getId())).andExpect(status().isForbidden());
+    mockMvc.perform(get(URL, job.getId())).andExpect(status().isUnauthorized());
   }
 
   private void save(PersonalizationJob job) {
