@@ -11,6 +11,12 @@
 - CD는 변경 가능한 브랜치 태그 대신 `ghcr.io/42voicebridge/42voicebridge_be@sha256:<digest>`를 배포 입력으로 사용한다. GitHub Release를 만들려면 별도 버전 태그/릴리즈 절차를 정한다. JAR·Dockerfile·Compose·환경변수 파일을 매 push마다 GitHub Release asset으로 올리지 않는다.
 - Dockerfile은 이미지 제작법으로 BE 저장소에 둔다. GHCR에는 Dockerfile이 아닌 완성된 이미지가 올라간다.
 
+## 배포 후 상태 확인
+
+- `GET /actuator/health`(포트 8080)는 토큰 없이 응답한다. 정상이면 200 `{"status":"UP"}`, DB나 Redis에 연결할 수 없으면 503 `{"status":"DOWN"}`이다. 어느 구성 요소가 문제인지는 응답에 담지 않으므로 앱 로그로 확인한다.
+- AI 서버와 S3는 검사에 넣지 않았다. AI가 내려가도 BE는 503·`FAILED`로 처리하며 동작하므로, AI 장애가 BE 배포 실패로 번지지 않게 한다.
+- FE(Caddy)는 `/api/*`만 BE로 넘기므로 이 주소는 인터넷에 노출되지 않는다. Infra 배포 검사는 EC2 안에서 `http://127.0.0.1:8080/actuator/health`를 호출하면 된다. 다른 actuator 주소는 열지 않았다.
+
 ## Infra 저장소가 맡을 것
 
 - Terraform으로 생성한 EC2에 운영 Compose, 고정 이미지 digest, 일반 설정을 배치하고 이미지를 pull·재시작·검증한다. 현재 BE의 `docker-compose.yml`은 로컬 MySQL/Redis 전용이다.

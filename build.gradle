@@ -45,6 +45,8 @@ dependencies {
     implementation 'software.amazon.awssdk:s3'
 
     implementation 'org.springframework.boot:spring-boot-starter-security'
+    // 배포 검사용 헬스 엔드포인트(/actuator/health). 노출 범위는 application.yml에서 health 하나로 제한한다.
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'

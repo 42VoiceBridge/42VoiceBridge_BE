@@ -415,7 +415,7 @@
 - 본인 데이터가 아닐 때의 403(`FORBIDDEN_ACCESS`)은 그대로다.
 - **검증**: 토큰 없음·만료·다른 키로 서명·Bearer 형식 아님은 401, 유효한 토큰은 통과, 인증이 필요 없는 로그인 요청은 만료된 토큰을 붙여도 통과, CORS 사전 요청(OPTIONS)은 토큰 없이 통과. 기존에 403을 기대하던 미인증 테스트 4건을 401로 바꿨다.
 
-### 29. Flyway로 운영 DB 초기 스키마 관리 (feature/flyway-initial-schema) — PR 대기
+### 29. Flyway로 운영 DB 초기 스키마 관리 (feature/flyway-initial-schema) — 완료 (PR #50 병합)
 
 - 배경: Infra가 BE를 별도 EC2에 배포하기 시작했는데 운영 RDS가 비어 있다. prod는 `ddl-auto: validate`라 빈 DB에서는 `missing table`로 앱이 뜨지 않는다. 지금까지는 테이블 변경마다 PR 본문의 SQL을 사람이 직접 실행하는 방식이었다(#37·#38·#40·#45).
 - Flyway(11.7.2, `flyway-core` + `flyway-mysql`)를 넣고 운영(prod)에서만 켰다. 로컬은 `ddl-auto: update`로 이미 만든 테이블이 있어 Flyway가 시작을 거부하므로 끄고, 테스트(H2)도 끈다.
@@ -423,6 +423,14 @@
   - **enum 필드는 MySQL `enum` 대신 `VARCHAR(255)`**로 뒀다. 자바 enum에 값을 추가하고 마이그레이션을 빠뜨리면 `validate`는 통과하지만(값 목록을 비교하지 않음) 그 값을 처음 저장할 때 실패한다. 개인화 스키마 문서(#40)도 VARCHAR였다.
 - **검증**: 같은 MySQL에서 하이버네이트가 만든 스키마와 V1이 만든 스키마를 컬럼·타입·NULL 여부·인덱스(DESC 포함)·외래 키·문자셋까지 비교해, 의도한 enum 7개 외에는 같음을 확인했다. 실패해야 할 때 실패하는지도 확인했다: 마이그레이션 없는 빈 DB는 `missing table`, 컬럼 하나를 지우면 `missing column`으로 기동 실패. 상시 테스트 `FlywayMigrationTest`(빈 MySQL → Flyway → validate 기동, 설정이 실제로 MySQL·validate로 적용됐는지 함께 확인, 전 테이블 utf8mb4).
 - **앞으로의 규칙**: 테이블·컬럼을 바꾸는 PR은 `V2__설명.sql`처럼 새 파일을 같은 PR에 넣는다. 이미 적용된 파일은 고치지 않는다(Flyway가 체크섬 불일치로 시작을 거부한다). `FlywayMigrationTest`가 엔티티와 마이그레이션이 어긋나면 깨진다.
+### 30. 배포 검사용 헬스 엔드포인트 (feature/health-endpoint) — PR 대기
+
+- Infra 배포 검사가 "8080이 아무 HTTP 응답이나 하면 성공"이라, 401만 돌려주는 반쯤 고장 난 서버도 성공으로 보였다. 팀장 요청으로 Spring Boot Actuator의 `GET /actuator/health`를 토큰 없이 열었다.
+- 노출은 `health` 하나뿐이고, 응답은 상태(UP/DOWN)만 담는다(`show-details`·`show-components: never`). 허용은 GET만이다.
+- 검사 범위는 기본값(DB, Redis, 디스크)이다. 로그인·토큰 재발급이 Redis에 기대므로 Redis가 죽으면 503 DOWN이 맞다. AI·S3는 넣지 않았다(AI 장애가 BE 배포 실패로 번지지 않게).
+- 테스트: 실제 Redis 컨테이너로 200 UP·상세 정보 없음·다른 actuator 주소 비노출·POST 불가, 연결할 수 없는 Redis로 503 DOWN.
+- #48 CI 주석의 `cd-preflight` 설명을 `deploy-backend`로 고쳤다(Infra가 이벤트를 받는 워크플로가 바뀜).
+- 작업 중 없는 주소가 404가 아니라 500으로 나가는 것을 발견해 따로 고쳤다(작업 이력 31번, PR #52).
 ### 31. 클라이언트 요청 실수를 4xx로 (fix/not-found-404) — 완료 (PR #52 병합)
 
 - 헬스 엔드포인트 작업 중 발견. 인증을 통과한 요청 중 클라이언트 실수 네 가지가 모두 500(서버 고장)으로 나갔다. 전역 예외 처리에 해당 예외 처리가 없어 마지막 `Exception` 처리로 떨어졌기 때문이다.
