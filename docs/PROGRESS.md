@@ -415,6 +415,13 @@
 - 본인 데이터가 아닐 때의 403(`FORBIDDEN_ACCESS`)은 그대로다.
 - **검증**: 토큰 없음·만료·다른 키로 서명·Bearer 형식 아님은 401, 유효한 토큰은 통과, 인증이 필요 없는 로그인 요청은 만료된 토큰을 붙여도 통과, CORS 사전 요청(OPTIONS)은 토큰 없이 통과. 기존에 403을 기대하던 미인증 테스트 4건을 401로 바꿨다.
 
+### 31. 클라이언트 요청 실수를 4xx로 (fix/not-found-404) — PR 대기
+
+- 헬스 엔드포인트 작업 중 발견. 인증을 통과한 요청 중 클라이언트 실수 네 가지가 모두 500(서버 고장)으로 나갔다. 전역 예외 처리에 해당 예외 처리가 없어 마지막 `Exception` 처리로 떨어졌기 때문이다.
+- 없는 주소(`NoResourceFoundException`) → 404 `RESOURCE_NOT_FOUND`, 받지 않는 메서드 → 405 `METHOD_NOT_ALLOWED`(`Allow` 헤더 포함), 읽을 수 없는 JSON → 400 `VALIDATION_FAILED`, 받지 않는 Content-Type → 415 `UNSUPPORTED_MEDIA_TYPE`. 405·415 코드는 새로 추가했다.
+- 토큰 없이 오면 지금처럼 보안 설정에서 401이 먼저 나간다.
+- 테스트: 네 경우를 인증된 MockMvc 요청으로 확인(`ClientErrorResponseIntegrationTest`). 수정 전에는 네 경우 모두 500임을 먼저 확인했다.
+
 ## 알려진 이슈 / 확인 필요 사항
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.
