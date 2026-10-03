@@ -423,6 +423,12 @@
   - **enum 필드는 MySQL `enum` 대신 `VARCHAR(255)`**로 뒀다. 자바 enum에 값을 추가하고 마이그레이션을 빠뜨리면 `validate`는 통과하지만(값 목록을 비교하지 않음) 그 값을 처음 저장할 때 실패한다. 개인화 스키마 문서(#40)도 VARCHAR였다.
 - **검증**: 같은 MySQL에서 하이버네이트가 만든 스키마와 V1이 만든 스키마를 컬럼·타입·NULL 여부·인덱스(DESC 포함)·외래 키·문자셋까지 비교해, 의도한 enum 7개 외에는 같음을 확인했다. 실패해야 할 때 실패하는지도 확인했다: 마이그레이션 없는 빈 DB는 `missing table`, 컬럼 하나를 지우면 `missing column`으로 기동 실패. 상시 테스트 `FlywayMigrationTest`(빈 MySQL → Flyway → validate 기동, 설정이 실제로 MySQL·validate로 적용됐는지 함께 확인, 전 테이블 utf8mb4).
 - **앞으로의 규칙**: 테이블·컬럼을 바꾸는 PR은 `V2__설명.sql`처럼 새 파일을 같은 PR에 넣는다. 이미 적용된 파일은 고치지 않는다(Flyway가 체크섬 불일치로 시작을 거부한다). `FlywayMigrationTest`가 엔티티와 마이그레이션이 어긋나면 깨진다.
+### 31. 클라이언트 요청 실수를 4xx로 (fix/not-found-404) — 완료 (PR #52 병합)
+
+- 헬스 엔드포인트 작업 중 발견. 인증을 통과한 요청 중 클라이언트 실수 네 가지가 모두 500(서버 고장)으로 나갔다. 전역 예외 처리에 해당 예외 처리가 없어 마지막 `Exception` 처리로 떨어졌기 때문이다.
+- 없는 주소(`NoResourceFoundException`) → 404 `RESOURCE_NOT_FOUND`, 받지 않는 메서드 → 405 `METHOD_NOT_ALLOWED`(`Allow` 헤더 포함), 읽을 수 없는 JSON → 400 `VALIDATION_FAILED`, 받지 않는 Content-Type → 415 `UNSUPPORTED_MEDIA_TYPE`. 405·415 코드는 새로 추가했다.
+- 토큰 없이 오면 지금처럼 보안 설정에서 401이 먼저 나간다.
+- 테스트: 네 경우를 인증된 MockMvc 요청으로 확인(`ClientErrorResponseIntegrationTest`). 수정 전에는 네 경우 모두 500임을 먼저 확인했다.
 
 ## 알려진 이슈 / 확인 필요 사항
 
