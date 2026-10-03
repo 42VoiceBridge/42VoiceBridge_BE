@@ -32,6 +32,7 @@ public class GetPersonalizationTrainingStatusService
     return new TrainingStatusResult(
         job.getId(),
         job.getStatus().name(),
+        null,
         job.getStartedAt(),
         job.getCompletedAt(),
         job.getFailureReason());

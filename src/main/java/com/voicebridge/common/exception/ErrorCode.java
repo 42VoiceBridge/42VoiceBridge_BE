@@ -14,6 +14,7 @@ public enum ErrorCode {
   RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
   FORBIDDEN_ACCESS(HttpStatus.FORBIDDEN, "해당 리소스에 접근할 권한이 없습니다."),
   INVALID_STATE_TRANSITION(HttpStatus.CONFLICT, "현재 상태에서는 처리할 수 없는 요청입니다."),
+  TRAINING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "개인화 학습 서버를 사용할 수 없습니다."),
   INSUFFICIENT_RECORDINGS(HttpStatus.UNPROCESSABLE_ENTITY, "개인화 학습에 필요한 녹음 수가 부족합니다."),
   AI_INFERENCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI 추론 서버를 사용할 수 없습니다."),
   AUDIO_PROCESSING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "음성 변환을 잠시 처리할 수 없습니다."),

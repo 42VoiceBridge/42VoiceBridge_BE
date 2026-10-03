@@ -1,8 +1,8 @@
 package com.voicebridge.application;
 
-import com.voicebridge.domain.personalization.PersonalizationJob;
+import com.voicebridge.domain.personalization.PersonalizationAdapter;
 import com.voicebridge.port.in.GetPersonalizationModelUseCase;
-import com.voicebridge.port.out.PersonalizationJobRepositoryPort;
+import com.voicebridge.port.out.PersonalizationAdapterRepositoryPort;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -14,19 +14,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GetPersonalizationModelService implements GetPersonalizationModelUseCase {
 
-  private final PersonalizationJobRepositoryPort personalizationJobRepositoryPort;
+  private final PersonalizationAdapterRepositoryPort personalizationAdapterRepositoryPort;
 
   @Override
   public ModelStatusResult getModelStatus(UUID userId) {
-    Optional<PersonalizationJob> latestCompleted =
-        personalizationJobRepositoryPort.findLatestCompletedByUserId(userId);
+    Optional<PersonalizationAdapter> active =
+        personalizationAdapterRepositoryPort.findActiveByUserId(userId);
 
-    if (latestCompleted.isEmpty()) {
+    if (active.isEmpty()) {
       return new ModelStatusResult(false, null, null, null);
     }
 
-    PersonalizationJob job = latestCompleted.get();
+    PersonalizationAdapter adapter = active.get();
     return new ModelStatusResult(
-        true, job.getModelVersion(), job.getCompletedAt(), job.getTrainingRecordingCount());
+        true, adapter.modelVersion(), adapter.trainedAt(), adapter.trainingRecordingCount());
   }
 }

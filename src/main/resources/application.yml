@@ -26,6 +26,12 @@ server:
   port: 8080
 
 voicebridge:
+  personalization:
+    # createdAt 기준. 변경한 기간은 기존 녹음에도 적용된다. 팀·AI의 보관 기간 합의는 별도 확인이 필요하다.
+    retention-days: ${PERSONALIZATION_RETENTION_DAYS:30}
+    cleanup-delay-ms: ${PERSONALIZATION_CLEANUP_DELAY_MS:300000}
+    # 실패 업로드 정리와 만료 삭제를 함께 제어한다.
+    scheduling-enabled: ${PERSONALIZATION_SCHEDULING_ENABLED:true}
   audio:
     ffmpeg: ${FFMPEG_PATH:ffmpeg}
     ffprobe: ${FFPROBE_PATH:ffprobe}

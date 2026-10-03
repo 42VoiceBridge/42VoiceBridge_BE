@@ -23,6 +23,33 @@ public class LocalFileStorageAdapter implements StoragePort {
     this.baseDir = Path.of(localDir);
   }
 
+  private Path resolveKey(String key) {
+    if (key == null || !key.matches("personalization/[0-9a-f-]{36}\\.wav")) {
+      throw new IllegalArgumentException("Invalid personalization storage key");
+    }
+    return baseDir.toAbsolutePath().normalize().resolve(key).normalize();
+  }
+
+  @Override
+  public void uploadAt(String key, byte[] bytes) {
+    Path target = resolveKey(key);
+    try {
+      Files.createDirectories(target.getParent());
+      Files.write(target, bytes);
+    } catch (IOException e) {
+      throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, "음성 파일 저장에 실패했습니다.");
+    }
+  }
+
+  @Override
+  public void delete(String key) {
+    try {
+      Files.deleteIfExists(resolveKey(key));
+    } catch (IOException e) {
+      throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, "음성 파일 삭제에 실패했습니다.");
+    }
+  }
+
   @Override
   public String upload(byte[] fileBytes, String fileName) {
     String key = StorageKeys.newKey(fileName);

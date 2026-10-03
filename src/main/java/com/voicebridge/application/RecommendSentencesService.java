@@ -49,7 +49,9 @@ public class RecommendSentencesService implements RecommendSentencesUseCase {
 
     return new RecommendationResult(
         shown.stream()
-            .map(prompt -> new RecommendedSentence(prompt.getPromptId(), prompt.getText()))
+            .map(
+                prompt ->
+                    new RecommendedSentence(prompt.getId(), prompt.getPromptId(), prompt.getText()))
             .toList());
   }
 }

@@ -7,6 +7,7 @@ import java.util.UUID;
 public record PersonalizationTrainingStatusResponse(
     UUID jobId,
     String status,
+    Double progress,
     LocalDateTime startedAt,
     LocalDateTime completedAt,
     String failureReason) {
@@ -15,6 +16,7 @@ public record PersonalizationTrainingStatusResponse(
     return new PersonalizationTrainingStatusResponse(
         result.jobId(),
         result.status(),
+        result.progress(),
         result.startedAt(),
         result.completedAt(),
         result.failureReason());
