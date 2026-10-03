@@ -63,6 +63,8 @@ voicebridge:
       # 진단 화면용으로 10을 쓴다(2026-09-29 결정, 근거는 PROGRESS 23번). 바꾸면 기존 스냅샷은 다음 조회 때 새 기준으로 다시 계산된다.
       min-support: 10
   diagnosis:
+    # 진단 낭독 문장이 하나도 없을 때 시드 문장을 넣는다(SentenceSeeder). 로컬·배포 모두 켜 둔다. 이미 문장이 있으면 아무것도 하지 않는다.
+    seed-sentences: true
     recognition:
       # 진단 녹음 인식 전용 스레드 수와 대기열. AI 서버가 요청을 하나씩 처리하므로 스레드를 늘려도 빨라지지 않는다.
       threads: 2
