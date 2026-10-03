@@ -37,6 +37,9 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     runtimeOnly 'com.mysql:mysql-connector-j'
+    // 운영 DB 스키마를 src/main/resources/db/migration의 SQL로 만든다. MySQL 8은 flyway-mysql이 있어야 지원된다.
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-mysql'
 
     implementation platform('software.amazon.awssdk:bom:2.31.0')
     implementation 'software.amazon.awssdk:s3'
