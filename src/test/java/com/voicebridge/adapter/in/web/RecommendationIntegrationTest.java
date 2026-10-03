@@ -106,6 +106,6 @@ class RecommendationIntegrationTest {
 
   @Test
   void 로그인하지_않으면_추천받을_수_없다() throws Exception {
-    mvc.perform(post(URL)).andExpect(status().isForbidden());
+    mvc.perform(post(URL)).andExpect(status().isUnauthorized());
   }
 }

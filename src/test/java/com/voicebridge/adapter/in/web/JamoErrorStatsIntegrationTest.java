@@ -60,6 +60,6 @@ class JamoErrorStatsIntegrationTest {
 
   @Test
   void 로그인하지_않으면_조회할_수_없다() throws Exception {
-    mvc.perform(get(URL)).andExpect(status().isForbidden());
+    mvc.perform(get(URL)).andExpect(status().isUnauthorized());
   }
 }

@@ -23,6 +23,7 @@ https://{host}/api/v1
 
 - 방식: JWT Bearer Token
 - 헤더: `Authorization: Bearer {accessToken}`
+- 인증이 필요한 API에 토큰이 없으면 401 `AUTH_REQUIRED`, 토큰이 만료됐거나 유효하지 않으면 401 `AUTH_TOKEN_EXPIRED`다. 둘 다 공통 응답 형식(0.3)으로 온다. 인증이 필요 없는 API는 만료된 토큰을 붙여 보내도 막지 않는다.
 - 인증이 필요 없는 API: `POST /auth/signup`, `POST /auth/login`, `POST /auth/refresh`
 
 ### 0.3 공통 응답 포맷
@@ -91,7 +92,8 @@ https://{host}/api/v1
 | code | 상황 |
 | --- | --- |
 | `AUTH_INVALID_CREDENTIALS` | 로그인 실패 |
-| `AUTH_TOKEN_EXPIRED` | 액세스 토큰 만료 |
+| `AUTH_TOKEN_EXPIRED` | 액세스 토큰이 만료됐거나 유효하지 않음 (HTTP 401). 메시지로 구분("인증 토큰이 만료되었습니다." / "유효하지 않은 토큰입니다."). 토큰 재발급(1.3) 후 다시 요청 |
+| `AUTH_REQUIRED` | 인증이 필요한 API를 토큰 없이 호출 (HTTP 401). 로그인 필요 |
 | `VALIDATION_FAILED` | 요청 검증 실패. 필수 파라미터·파일이 빠지면 메시지에 빠진 필드명이 담긴다(예: `필수 요청 값이 없습니다: audioFile`) |
 | `RESOURCE_NOT_FOUND` | 대상 리소스 없음 |
 | `FORBIDDEN_ACCESS` | 본인 소유가 아닌 리소스 접근 |
@@ -752,4 +754,5 @@ POST /v1/enroll/next-prompts
 | 2026-10-03 | 4.1 | JSON Content-Type 파라미터 허용, metadata 크기·문자열 타입 검증 및 원인별 오류 메시지·Blob 예시 추가; 보관 설정 기준 명시 (PR #40 리뷰 반영) |
 | 2026-10-03 | 0.6, 2.3, 2.4 | 진단 업로드 시 WAV 변환. 녹음 문제는 `AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`(400), 변환 지연은 `AUDIO_PROCESSING_UNAVAILABLE`(503). `FAILED`는 AI 쪽 문제뿐이라 `failureReason` 계획 취소 (PR #43) |
 | 2026-10-03 | 7.6 | AI 응답의 `pool_version`·`pool_sha256`을 제안 기록에 저장, 없으면 503 (AI 답변 R5) |
+| 2026-10-03 | 0.2, 0.6 | 토큰 없이 호출하면 403(본문 없음) → 401 `AUTH_REQUIRED`, 만료·무효 토큰은 401 `AUTH_TOKEN_EXPIRED`로 공통 응답 형식에 맞춤 |
 | 2026-10-03 | 2.2 | 진단 세션 `status`에서 `COMPLETED` 삭제. 전환하는 API가 없어 도달할 수 없는 값이었다 |

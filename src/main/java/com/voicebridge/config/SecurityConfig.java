@@ -1,5 +1,6 @@
 package com.voicebridge.config;
 
+import com.voicebridge.adapter.in.web.JwtAuthenticationEntryPoint;
 import com.voicebridge.adapter.in.web.JwtAuthenticationFilter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -37,6 +39,9 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .authenticated())
+        // 토큰이 없거나 거절되면 401. 지정하지 않으면 기본값인 본문 없는 403이 나간다(명세서 0.5).
+        .exceptionHandling(
+            exceptions -> exceptions.authenticationEntryPoint(jwtAuthenticationEntryPoint))
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();

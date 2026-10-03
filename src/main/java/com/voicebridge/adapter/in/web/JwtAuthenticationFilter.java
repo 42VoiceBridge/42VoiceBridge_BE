@@ -22,6 +22,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private static final String HEADER = "Authorization";
   private static final String PREFIX = "Bearer ";
 
+  /** 토큰이 거절된 이유를 담는 요청 속성. 인증이 필요한 요청이면 JwtAuthenticationEntryPoint가 이 이유로 401 응답을 만든다. */
+  static final String TOKEN_FAILURE = JwtAuthenticationFilter.class.getName() + ".TOKEN_FAILURE";
+
   private final TokenProviderPort tokenProviderPort;
 
   @Override
@@ -38,6 +41,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         SecurityContextHolder.getContext().setAuthentication(authentication);
       } catch (RuntimeException e) {
         SecurityContextHolder.clearContext();
+        request.setAttribute(TOKEN_FAILURE, e);
       }
     }
 

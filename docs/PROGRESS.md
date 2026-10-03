@@ -407,6 +407,13 @@
 - 개인화 녹음의 `promptPoolVersion`(#40)은 이 값(`ShownPrompt.getPoolVersion()`)으로 채울 수 있다. 개인화 쪽 코드라 여기서는 바꾸지 않았다.
 - **운영 DB**: `ALTER TABLE shown_prompts ADD COLUMN pool_version VARCHAR(255) NULL, ADD COLUMN pool_sha256 VARCHAR(255) NULL;` 이 없으면 `validate`에서 서버가 뜨지 않는다. MySQL 컨테이너에서 #37 DDL로 만든 테이블에 대해, 추가 전에는 `missing column`으로 기동 실패하고 추가 후에는 기동되며 기존 행은 null로 남는 것을 확인했다.
 
+### 28. 인증 실패를 401로 (fix/unauthenticated-401) — PR 대기
+
+- 토큰 없이 인증이 필요한 API를 부르면 본문 없는 403이 나갔다. 보안 설정에 인증 실패 응답(`AuthenticationEntryPoint`)이 없어 스프링 시큐리티 기본값이 쓰였기 때문이다. 명세서(0.5)는 401이다.
+- `JwtAuthenticationEntryPoint`를 추가해 401을 공통 응답 형식으로 돌려준다. 토큰이 없으면 `AUTH_REQUIRED`(새 코드), 토큰이 만료됐거나 위조됐으면 필터가 남긴 거절 이유 그대로 `AUTH_TOKEN_EXPIRED`다. 프론트는 `AUTH_TOKEN_EXPIRED`면 재발급, `AUTH_REQUIRED`면 로그인으로 보내면 된다.
+- 본인 데이터가 아닐 때의 403(`FORBIDDEN_ACCESS`)은 그대로다.
+- **검증**: 토큰 없음·만료·다른 키로 서명·Bearer 형식 아님은 401, 유효한 토큰은 통과, 인증이 필요 없는 로그인 요청은 만료된 토큰을 붙여도 통과, CORS 사전 요청(OPTIONS)은 토큰 없이 통과. 기존에 403을 기대하던 미인증 테스트 4건을 401로 바꿨다.
+
 ## 알려진 이슈 / 확인 필요 사항
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.
