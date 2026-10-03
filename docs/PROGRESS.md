@@ -415,6 +415,15 @@
 - 본인 데이터가 아닐 때의 403(`FORBIDDEN_ACCESS`)은 그대로다.
 - **검증**: 토큰 없음·만료·다른 키로 서명·Bearer 형식 아님은 401, 유효한 토큰은 통과, 인증이 필요 없는 로그인 요청은 만료된 토큰을 붙여도 통과, CORS 사전 요청(OPTIONS)은 토큰 없이 통과. 기존에 403을 기대하던 미인증 테스트 4건을 401로 바꿨다.
 
+### 30. 배포 검사용 헬스 엔드포인트 (feature/health-endpoint) — PR 대기
+
+- Infra 배포 검사가 "8080이 아무 HTTP 응답이나 하면 성공"이라, 401만 돌려주는 반쯤 고장 난 서버도 성공으로 보였다. 팀장 요청으로 Spring Boot Actuator의 `GET /actuator/health`를 토큰 없이 열었다.
+- 노출은 `health` 하나뿐이고, 응답은 상태(UP/DOWN)만 담는다(`show-details`·`show-components: never`). 허용은 GET만이다.
+- 검사 범위는 기본값(DB, Redis, 디스크)이다. 로그인·토큰 재발급이 Redis에 기대므로 Redis가 죽으면 503 DOWN이 맞다. AI·S3는 넣지 않았다(AI 장애가 BE 배포 실패로 번지지 않게).
+- 테스트: 실제 Redis 컨테이너로 200 UP·상세 정보 없음·다른 actuator 주소 비노출·POST 불가, 연결할 수 없는 Redis로 503 DOWN.
+- #48 CI 주석의 `cd-preflight` 설명을 `deploy-backend`로 고쳤다(Infra가 이벤트를 받는 워크플로가 바뀜).
+- 발견: 토큰이 있는 요청이 없는 주소로 가면 404가 아니라 500이 나간다. 전역 예외 처리에 `NoResourceFoundException` 처리가 없어 마지막 `Exception` 처리로 떨어지기 때문이다. 이 PR과 무관해 따로 고친다.
+
 ## 알려진 이슈 / 확인 필요 사항
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.

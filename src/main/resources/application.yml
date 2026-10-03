@@ -22,6 +22,18 @@ spring:
       max-file-size: 10MB
       max-request-size: 11MB
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # 배포 검사가 쓰는 health만 연다. env·beans 같은 다른 actuator 주소는 설정값과 내부 구조를 드러낸다.
+        include: health
+  endpoint:
+    health:
+      # 토큰 없이 열려 있으므로 상태(UP/DOWN)만 내보내고 DB·Redis 같은 구성 요소 정보는 숨긴다.
+      show-details: never
+      show-components: never
+
 server:
   port: 8080
 

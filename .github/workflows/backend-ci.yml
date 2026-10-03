@@ -130,8 +130,8 @@ jobs:
           echo "### Deployable backend image" >> "$GITHUB_STEP_SUMMARY"
           echo "\`$digest\`" >> "$GITHUB_STEP_SUMMARY"
 
-      # Infra's cd-preflight accepts only main. github.sha here is the BE commit
-      # that was just published as sha-<SHA>; Infra must read it from client_payload.
+      # Infra's deploy-backend workflow accepts only main and deploys sha-<SHA> to the BE EC2.
+      # github.sha here is the BE commit just published; Infra reads it from client_payload.
       - name: Notify Infra after GHCR publish
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:

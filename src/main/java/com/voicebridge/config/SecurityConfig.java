@@ -6,6 +6,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -36,6 +37,9 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/v1/auth/**")
                     .permitAll()
                     .requestMatchers("/swagger-ui/**", "/v3/api-docs/**")
+                    .permitAll()
+                    // 배포 검사(Infra)가 토큰 없이 서버 상태를 확인한다. 상세 정보는 설정에서 숨긴다.
+                    .requestMatchers(HttpMethod.GET, "/actuator/health")
                     .permitAll()
                     .anyRequest()
                     .authenticated())

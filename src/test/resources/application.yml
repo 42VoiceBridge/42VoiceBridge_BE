@@ -11,6 +11,17 @@ spring:
     execution:
       mode: force
 
+# 운영 설정(main application.yml)과 같게 둔다. 테스트 설정은 main 설정을 통째로 대신하므로 빠지면 헬스 테스트가 기본값을 검증하게 된다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+
 voicebridge:
   personalization:
     retention-days: 30
