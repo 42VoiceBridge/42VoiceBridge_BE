@@ -112,7 +112,8 @@ class DiagnosisRecordingRaceTest extends MySqlContainerTest {
     UploadCommand retake =
         new UploadCommand(userId, session.getId(), sentenceA, new byte[] {1}, "retake.wav");
     other =
-        startInAnotherThread(() -> registrar.register(retake, "recordings/retake.wav"), failure);
+        startInAnotherThread(
+            () -> registrar.register(retake, "recordings/retake.wav", new byte[] {1}), failure);
     awaitLockWait(other, failure);
 
     locked.markAnalyzed();

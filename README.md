@@ -124,7 +124,7 @@ graph TB
 | 4 | `POST /api/v1/auth/refresh` | 불필요 | 액세스/리프레시 토큰 재발급 |
 | 5 | `POST /api/v1/diagnosis-sessions` | JWT 필요 | 진단 세션 시작(낭독 문장 목록 반환) |
 | 6 | `GET /api/v1/diagnosis-sessions/{sessionId}` | JWT 필요 | 세션 조회(문장별 녹음 상태 포함) |
-| 7 | `POST /api/v1/diagnosis-sessions/{sessionId}/recordings` | JWT 필요 | 녹음 업로드(multipart). 접수만 하고 `202` 반환 |
+| 7 | `POST /api/v1/diagnosis-sessions/{sessionId}/recordings` | JWT 필요 | 녹음 업로드(multipart). 업로드 때 WAV로 변환하고 접수만 한 뒤 `202` 반환. 잘못된 오디오는 `400 AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID` |
 | 8 | `GET /api/v1/diagnosis-sessions/{sessionId}/recordings/{recordingId}/result` | JWT 필요 | 인식 결과 조회(정답 문장 포함) |
 | 9 | `GET /api/v1/personalization/model` | JWT 필요 | 개인화 모델 상태 조회 |
 | 10 | `POST /api/v1/recognitions/{recognitionId}/confirm` | JWT 필요 | 인식 결과 확인(같은 인식 결과 재확인 시 이전 확인 무효화) |
@@ -171,7 +171,8 @@ M4A/MP4(AAC)를 **WAV PCM16·모노·16kHz·0.3~30초**로 변환합니다.
 
 원본과 중간 파일은 처리 중 임시 파일로만 사용하고 성공·실패 시 정리를 시도하며, 정리 실패는 로그로 남깁니다.
 원본 형식·코덱·채널·샘플레이트, 변환 버전과 전후 SHA-256을 인식 ID와 연결하여 로그에 남깁니다.
-DB 메타데이터 영구 보존은 후속 작업입니다. 이 변환은 실사용 인식에 적용하며 진단 업로드는 별도입니다.
+DB 메타데이터 영구 보존은 후속 작업입니다. 이 변환은 실사용 인식과 진단 업로드에 함께 적용합니다.
+진단 업로드는 거절 이유를 `AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`(400)로 나눠 알리고, 원본 대신 변환된 WAV를 저장해 인식에 씁니다.
 
 `./gradlew build`는 일반 테스트를, `./gradlew audioIntegrationTest`는 실제 FFmpeg 변환 및
 업로드 연결 테스트를 실행합니다. 후자는 FFmpeg/FFprobe 설치가 필수입니다.

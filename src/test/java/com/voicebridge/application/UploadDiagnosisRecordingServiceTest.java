@@ -3,8 +3,10 @@ package com.voicebridge.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.voicebridge.common.exception.CustomException;
@@ -12,7 +14,12 @@ import com.voicebridge.common.exception.ErrorCode;
 import com.voicebridge.domain.diagnosis.DiagnosisSession;
 import com.voicebridge.domain.diagnosis.DiagnosisSessionStatus;
 import com.voicebridge.port.in.UploadDiagnosisRecordingUseCase.UploadCommand;
+import com.voicebridge.port.out.AudioNormalizationPort;
+import com.voicebridge.port.out.AudioNormalizationPort.Metadata;
+import com.voicebridge.port.out.AudioNormalizationPort.NormalizedAudio;
+import com.voicebridge.port.out.AudioProcessingException;
 import com.voicebridge.port.out.DiagnosisSessionRepositoryPort;
+import com.voicebridge.port.out.InvalidAudioException;
 import com.voicebridge.port.out.RecordingRepositoryPort;
 import com.voicebridge.port.out.StoragePort;
 import java.time.LocalDateTime;
@@ -22,6 +29,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -33,6 +42,7 @@ class UploadDiagnosisRecordingServiceTest {
   @Mock private DiagnosisSessionRepositoryPort diagnosisSessionRepositoryPort;
   @Mock private RecordingRepositoryPort recordingRepositoryPort;
   @Mock private StoragePort storagePort;
+  @Mock private AudioNormalizationPort audioNormalizationPort;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   private UploadDiagnosisRecordingService service;
@@ -48,7 +58,18 @@ class UploadDiagnosisRecordingServiceTest {
         new UploadDiagnosisRecordingService(
             new DiagnosisRecordingRegistrar(
                 diagnosisSessionRepositoryPort, recordingRepositoryPort, eventPublisher),
+            audioNormalizationPort,
             storagePort);
+  }
+
+  private static final byte[] BROWSER_AUDIO = {1, 2, 3};
+  private static final byte[] WAV = {9, 9, 9, 9};
+
+  private void normalizerReturnsWav() {
+    when(audioNormalizationPort.normalize(BROWSER_AUDIO))
+        .thenReturn(
+            new NormalizedAudio(
+                WAV, new Metadata("matroska,webm", "opus", 48000, 1, 16000, "src", "wav", "v1")));
   }
 
   private DiagnosisSession sessionOwnedBy(UUID ownerId) {
@@ -61,16 +82,17 @@ class UploadDiagnosisRecordingServiceTest {
   }
 
   private UploadCommand command() {
-    return new UploadCommand(userId, sessionId, sentenceId, new byte[] {1, 2, 3}, "recording.wav");
+    return new UploadCommand(userId, sessionId, sentenceId, BROWSER_AUDIO, "recording.webm");
   }
 
   @Test
-  void 업로드하면_PROCESSING_상태로_저장하고_인식_이벤트를_발행한다() {
+  void 업로드하면_변환한_WAV를_저장하고_PROCESSING으로_등록한_뒤_WAV로_인식을_요청한다() {
     when(diagnosisSessionRepositoryPort.findById(sessionId))
         .thenReturn(Optional.of(sessionOwnedBy(userId)));
+    normalizerReturnsWav();
     when(diagnosisSessionRepositoryPort.findByIdForUpdate(sessionId))
         .thenReturn(Optional.of(sessionOwnedBy(userId)));
-    when(storagePort.upload(any(), any())).thenReturn("recordings/abc.wav");
+    when(storagePort.upload(WAV, "recording.wav")).thenReturn("recordings/abc.wav");
     when(recordingRepositoryPort.save(any())).thenAnswer(i -> i.getArgument(0));
 
     var result = service.upload(command());
@@ -83,6 +105,41 @@ class UploadDiagnosisRecordingServiceTest {
         ArgumentCaptor.forClass(RecordingUploadedEvent.class);
     verify(eventPublisher).publishEvent(event.capture());
     assertThat(event.getValue().recordingId()).isEqualTo(result.recordingId());
+    // 브라우저 원본(WebM)이 아니라 변환된 WAV가 저장되고 AI로 간다
+    verify(storagePort).upload(eq(WAV), eq("recording.wav"));
+    assertThat(event.getValue().audioBytes()).isEqualTo(WAV);
+  }
+
+  @ParameterizedTest(name = "{0} → {1}")
+  @CsvSource({"TOO_SHORT, AUDIO_TOO_SHORT", "TOO_LONG, AUDIO_TOO_LONG", "INVALID, AUDIO_INVALID"})
+  void 변환기가_오디오를_거절하면_이유별_코드로_바로_거절하고_저장하지_않는다(
+      InvalidAudioException.Reason reason, ErrorCode expected) {
+    when(diagnosisSessionRepositoryPort.findById(sessionId))
+        .thenReturn(Optional.of(sessionOwnedBy(userId)));
+    when(audioNormalizationPort.normalize(BROWSER_AUDIO))
+        .thenThrow(new InvalidAudioException(reason, "rejected"));
+
+    assertThatThrownBy(() -> service.upload(command()))
+        .isInstanceOf(CustomException.class)
+        .hasFieldOrPropertyWithValue("errorCode", expected);
+
+    verifyNoInteractions(storagePort);
+    verify(recordingRepositoryPort, never()).save(any());
+  }
+
+  @Test
+  void 변환기가_꽉_찼거나_시간을_넘기면_그대로_전달해_503이_되고_저장하지_않는다() {
+    when(diagnosisSessionRepositoryPort.findById(sessionId))
+        .thenReturn(Optional.of(sessionOwnedBy(userId)));
+    AudioProcessingException busy =
+        new AudioProcessingException(AudioProcessingException.Reason.CAPACITY, "busy");
+    when(audioNormalizationPort.normalize(BROWSER_AUDIO)).thenThrow(busy);
+
+    // 전역 핸들러가 CAPACITY·TIMEOUT을 503 AUDIO_PROCESSING_UNAVAILABLE로 바꾼다
+    assertThatThrownBy(() -> service.upload(command())).isSameAs(busy);
+
+    verifyNoInteractions(storagePort);
+    verify(recordingRepositoryPort, never()).save(any());
   }
 
   @Test
@@ -107,6 +164,8 @@ class UploadDiagnosisRecordingServiceTest {
 
     verify(storagePort, never()).upload(any(), any());
     verify(eventPublisher, never()).publishEvent(any(RecordingUploadedEvent.class));
+    // 거절할 요청에는 변환기 자원을 쓰지 않는다
+    verifyNoInteractions(audioNormalizationPort);
   }
 
   @Test
@@ -127,6 +186,7 @@ class UploadDiagnosisRecordingServiceTest {
     analyzedMeanwhile.markAnalyzed();
     when(diagnosisSessionRepositoryPort.findById(sessionId))
         .thenReturn(Optional.of(sessionOwnedBy(userId)));
+    normalizerReturnsWav();
     when(storagePort.upload(any(), any())).thenReturn("recordings/abc.wav");
     when(diagnosisSessionRepositoryPort.findByIdForUpdate(sessionId))
         .thenReturn(Optional.of(analyzedMeanwhile));
