@@ -12,6 +12,10 @@ spring:
       mode: force
 
 voicebridge:
+  personalization:
+    retention-days: 30
+    cleanup-delay-ms: 300000
+    scheduling-enabled: false
   jwt:
     secret: test-secret-key-for-jwt-signing-in-unit-tests-32chars-min
     access-token-expire-seconds: 3600

@@ -21,7 +21,7 @@ public record PersonalizationRecording(
     String sourceSha256,
     String wavSha256,
     String normalizationVersion,
-    String status,
+    PersonalizationRecordingStatus status,
     LocalDateTime createdAt,
     String promptPoolVersion,
     String reviewedSpokenText,
@@ -56,7 +56,7 @@ public record PersonalizationRecording(
         metadata.sourceSha256(),
         metadata.wavSha256(),
         metadata.normalizationVersion(),
-        "PREPARING",
+        PersonalizationRecordingStatus.PREPARING,
         now,
         null,
         null,
@@ -68,7 +68,7 @@ public record PersonalizationRecording(
   /** 후보 판정만 수행한다. 이 결과만으로 job 제출이나 train/dev 분할을 확정하지 않는다. */
   public boolean isTrainingCandidate(LocalDateTime now, int retentionDays) {
     return useForTraining
-        && "UPLOADED".equals(status)
+        && status == PersonalizationRecordingStatus.UPLOADED
         && createdAt != null
         && createdAt.plusDays(retentionDays).isAfter(now)
         && consentedAt != null

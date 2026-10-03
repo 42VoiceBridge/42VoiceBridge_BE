@@ -67,6 +67,126 @@ class PersonalizationRecordingIntegrationTest {
         + ",\"useForTraining\":false}";
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.NullAndEmptySource
+  @org.junit.jupiter.params.provider.ValueSource(
+      strings = {"text/plain", "invalid", "application/json;charset=\"unterminated"})
+  void rejectsInvalidMetadataContentType(String contentType) throws Exception {
+    mvc.perform(
+            multipart("/api/v1/personalization/recordings")
+                .file(
+                    new MockMultipartFile(
+                        "metadata", "metadata.json", contentType, "{}".getBytes()))
+                .file(audio())
+                .with(asUser(UUID.randomUUID())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+        .andExpect(
+            jsonPath("$.error.message").value("metadata의 Content-Type은 application/json이어야 합니다."));
+    org.mockito.Mockito.verifyNoInteractions(normalizer, storage);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.MethodSource("invalidMetadata")
+  void explainsInvalidMetadata(String body, String message) throws Exception {
+    mvc.perform(
+            multipart("/api/v1/personalization/recordings")
+                .file(metadata(body))
+                .file(audio())
+                .with(asUser(UUID.randomUUID())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.error.message").value(message));
+    org.mockito.Mockito.verifyNoInteractions(normalizer, storage);
+  }
+
+  static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> invalidMetadata() {
+    String id = UUID.randomUUID().toString();
+    return java.util.stream.Stream.of(
+        org.junit.jupiter.params.provider.Arguments.of("", "metadata가 비어 있습니다."),
+        org.junit.jupiter.params.provider.Arguments.of(
+            " ".repeat(4097), "metadata는 4096바이트 이하여야 합니다."),
+        org.junit.jupiter.params.provider.Arguments.of("{}{}", "metadata는 올바른 JSON 객체여야 합니다."),
+        org.junit.jupiter.params.provider.Arguments.of("{", "metadata는 올바른 JSON 객체여야 합니다."),
+        org.junit.jupiter.params.provider.Arguments.of("[]", "metadata는 올바른 JSON 객체여야 합니다."),
+        org.junit.jupiter.params.provider.Arguments.of("null", "metadata는 올바른 JSON 객체여야 합니다."),
+        org.junit.jupiter.params.provider.Arguments.of("{}", "shownPromptId는 유효한 UUID 문자열이어야 합니다."),
+        org.junit.jupiter.params.provider.Arguments.of(
+            "{\"shownPromptId\":1}", "shownPromptId는 유효한 UUID 문자열이어야 합니다."),
+        org.junit.jupiter.params.provider.Arguments.of(
+            "{\"shownPromptId\":\"1-1-1-1-1\"}", "shownPromptId는 유효한 UUID 문자열이어야 합니다."),
+        org.junit.jupiter.params.provider.Arguments.of(
+            "{\"shownPromptId\":\"" + id + "\",\"promptId\":1}", "promptId는 비어 있지 않은 문자열이어야 합니다."),
+        org.junit.jupiter.params.provider.Arguments.of(
+            "{\"storeAudio\":null}", "storeAudio는 boolean 값이어야 합니다."),
+        org.junit.jupiter.params.provider.Arguments.of(
+            "{\"useForTraining\":1}", "useForTraining는 boolean 값이어야 합니다."));
+  }
+
+  @Test
+  void explainsMissingConsentAndMismatchedPrompt() throws Exception {
+    UUID user = UUID.randomUUID();
+    ShownPrompt shown =
+        prompts
+            .saveAll(List.of(ShownPrompt.create(user, "p-validation", "문장", "random", "v1", 1)))
+            .get(0);
+    for (String consent : new String[] {"false", "true"}) {
+      mvc.perform(
+              multipart("/api/v1/personalization/recordings")
+                  .file(metadata(body(shown.getId(), "wrong", consent)))
+                  .file(audio())
+                  .with(asUser(user)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+          .andExpect(
+              jsonPath("$.error.message")
+                  .value(
+                      consent.equals("false")
+                          ? "녹음 저장에 동의해야 합니다: storeAudio=true"
+                          : "promptId가 추천 기록의 문장과 일치하지 않습니다."));
+    }
+    org.mockito.Mockito.verifyNoInteractions(normalizer, storage);
+  }
+
+  @Test
+  void rejectsMissingConsentEmptyAudioAndMissingRecommendation() throws Exception {
+    UUID user = UUID.randomUUID();
+    String metadata = "{\"shownPromptId\":\"" + UUID.randomUUID() + "\",\"promptId\":\"p\"}";
+    mvc.perform(
+            multipart("/api/v1/personalization/recordings")
+                .file(metadata(metadata))
+                .file(audio())
+                .with(asUser(user)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.message").value("녹음 저장에 동의해야 합니다: storeAudio=true"));
+    mvc.perform(
+            multipart("/api/v1/personalization/recordings")
+                .file(metadata(body(UUID.randomUUID(), "p", "true")))
+                .file(new MockMultipartFile("audioFile", new byte[0]))
+                .with(asUser(user)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.message").value("audioFile이 비어 있습니다."));
+    mvc.perform(
+            multipart("/api/v1/personalization/recordings")
+                .file(metadata(body(UUID.randomUUID(), "p", "true")))
+                .file(audio())
+                .with(asUser(user)))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    org.mockito.Mockito.verifyNoInteractions(normalizer, storage);
+  }
+
+  @Test
+  void schedulingIsDisabledInTests() {
+    assertThat(
+            context.getBeansOfType(
+                org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor
+                    .class))
+        .isEmpty();
+  }
+
+  @Autowired org.springframework.context.ApplicationContext context;
+
   @Test
   void uploadsTheExactRecommendationAndPersistsMetadata() throws Exception {
     UUID user = UUID.randomUUID();
@@ -80,7 +200,12 @@ class PersonalizationRecordingIntegrationTest {
 
     mvc.perform(
             multipart("/api/v1/personalization/recordings")
-                .file(metadata(body(shown.getId(), "p-1", "true")))
+                .file(
+                    new MockMultipartFile(
+                        "metadata",
+                        "metadata.json",
+                        "application/json;charset=UTF-8",
+                        body(shown.getId(), "p-1", "true").getBytes()))
                 .file(audio())
                 .with(asUser(user)))
         .andExpect(status().isCreated())
@@ -201,7 +326,7 @@ class PersonalizationRecordingIntegrationTest {
             "source",
             "wav",
             "v1",
-            "PREPARING",
+            com.voicebridge.domain.personalization.PersonalizationRecordingStatus.PREPARING,
             old,
             null,
             null,

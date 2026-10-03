@@ -113,6 +113,22 @@ class PersonalizationLifecyclePersistenceTest {
         .containsExactly(reviewed.id());
   }
 
+  @Test
+  void expiryQueryKeepsRecentRecordingsAndDomainStatusRoundTrips() {
+    LocalDateTime now = LocalDateTime.now();
+    var recent = recording(UUID.randomUUID(), now.minusDays(29), true);
+    var expired = recording(UUID.randomUUID(), now.minusDays(31), true);
+    recordings.prepare(recent);
+    recordings.prepare(expired);
+    entityManager.clear();
+    assertThat(recordings.findExpiredUploaded(now.minusDays(30)))
+        .extracting(PersonalizationRecording::id)
+        .contains(expired.id())
+        .doesNotContain(recent.id());
+    assertThat(recordings.findById(recent.id()).orElseThrow().status())
+        .isEqualTo(com.voicebridge.domain.personalization.PersonalizationRecordingStatus.UPLOADED);
+  }
+
   private PersonalizationRecording recording(UUID userId, LocalDateTime now, boolean reviewed) {
     return new PersonalizationRecording(
         UUID.randomUUID(),
@@ -132,7 +148,7 @@ class PersonalizationLifecyclePersistenceTest {
         "source",
         "wav",
         "normalize-v1",
-        "UPLOADED",
+        com.voicebridge.domain.personalization.PersonalizationRecordingStatus.UPLOADED,
         now,
         reviewed ? "pool-v1" : null,
         reviewed ? "실제 발화" : null,

@@ -73,7 +73,7 @@ public class PersonalizationRecordingJpaEntity {
     sourceSha256 = r.sourceSha256();
     wavSha256 = r.wavSha256();
     normalizationVersion = r.normalizationVersion();
-    status = r.status();
+    status = r.status().name();
     createdAt = r.createdAt();
     promptPoolVersion = r.promptPoolVersion();
     reviewedSpokenText = r.reviewedSpokenText();
@@ -105,7 +105,7 @@ public class PersonalizationRecordingJpaEntity {
         sourceSha256,
         wavSha256,
         normalizationVersion,
-        status,
+        com.voicebridge.domain.personalization.PersonalizationRecordingStatus.valueOf(status),
         createdAt,
         promptPoolVersion,
         reviewedSpokenText,

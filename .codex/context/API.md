@@ -242,7 +242,7 @@ Response (200):
 - `sentences`는 낭독 순서대로 온다.
 - 아직 녹음하지 않은 문장은 `recordingId`, `recordingStatus`가 `null`이다.
 - 같은 문장을 여러 번 녹음했으면 가장 최근 녹음이 온다.
-- `status`: `IN_PROGRESS`(녹음 중) / `ANALYZED`(모든 문장에 `DONE` 녹음이 생겨 자모 오류 통계에 포함됨) / `COMPLETED`
+- `status`: `IN_PROGRESS`(녹음 중) / `ANALYZED`(문장마다 가장 최근 녹음이 `DONE`이 되어 자모 오류 통계에 포함됨) / `COMPLETED`
 
 에러: `RESOURCE_NOT_FOUND`(404), `FORBIDDEN_ACCESS`(403)
 
@@ -277,7 +277,7 @@ Response (202 Accepted):
 - 파일 크기 상한은 10MB다.
 - ⚠️ 현재는 브라우저 원본(보통 WebM)을 변환하지 않고 AI에 보낸다. AI는 WAV(PCM16·모노·16kHz)만 받으므로 실제 AI에 연결하면 인식이 `FAILED`가 된다. 백엔드 B의 오디오 변환(P02)을 진단에도 적용할 예정이다.
 
-에러: `VALIDATION_FAILED`(400, 세션에 포함되지 않은 문장이거나 `sentenceId`·`audioFile`이 없음), `FORBIDDEN_ACCESS`(403, 본인 세션이 아님), `RESOURCE_NOT_FOUND`(404), `INVALID_STATE_TRANSITION`(409, 분석이 끝난 세션). 지원하지 않는 오디오 형식에 대한 `422`는 오디오 변환 적용 때 함께 구현한다.
+에러: `VALIDATION_FAILED`(400, 세션에 포함되지 않은 문장이거나 `sentenceId`·`audioFile`이 없음), `FORBIDDEN_ACCESS`(403, 본인 세션이 아님), `RESOURCE_NOT_FOUND`(404), `INVALID_STATE_TRANSITION`(409, 분석이 끝난 세션). 지원하지 않는 오디오 형식에 대한 `VALIDATION_FAILED`(400, 실사용 인식과 같음)는 오디오 변환 적용 때 함께 구현한다.
 
 ### 2.4 녹음 인식 결과 조회
 
@@ -352,7 +352,7 @@ Response (200) — 실패:
 `GET /users/me/jamo-error-stats`
 
 > 사용자의 분석 완료(`ANALYZED`) 세션들을 **누적**해서 계산한다. 세션 하나(5문장)로는 자모별 표본이 모이지 않기 때문이다.
-세션은 모든 문장에 `DONE` 녹음이 하나씩 생기면 `ANALYZED`가 된다. 실패한 녹음이 남아 있어도 같은 문장을 다시 녹음해 `DONE`이면 된다.
+세션은 문장마다 가장 최근 녹음이 `DONE`이면 `ANALYZED`가 된다(2.2 조회에 보이는 녹음과 같다). 실패한 녹음이 남아 있어도 같은 문장을 다시 녹음해 `DONE`이면 된다. 다시 녹음한 것이 아직 인식 중이거나 실패했으면 예전 `DONE`이 있어도 끝나지 않는다. 통계에도 문장마다 가장 최근 녹음 하나만 쓰고, 그게 무음이면 그 문장은 뺀다.
 표본이 부족해도 에러가 아니라 200으로 응답하고, 해당 자모는 `INSUFFICIENT_DATA`로 온다.
 >
 - **기준 표본 수(`minSupport`)는 10**이다(2026-09-29 결정). AI 기본값은 20이지만 세션 2~3개로는 거의 보이지 않아 진단 화면용으로 낮췄다. 시드 문장 기준으로 오류율을 보여줄 수 있는 자모 종류는 세션 1개면 약 2종류, 2개면 6종류, 3개면 10종류다(기준 20이면 각각 0, 2.4, 4종류).
@@ -441,6 +441,17 @@ Response (200):
 | `audioFile` | file | PCM WAV, WebM Opus/Vorbis, M4A AAC; 10 MB 이하, 0.3~30초 |
 
 예: `metadata={"shownPromptId":"uuid","promptId":"02-03-0001","storeAudio":true,"useForTraining":false}`. 전달된 동의 값은 JSON boolean이어야 한다. null·문자열·숫자는 400이다. `storeAudio=false`이면 녹음을 저장하지 않고 400으로 거절한다. `useForTraining=false` 녹음도 저장할 수 있으나 학습 대상에서는 제외한다. 동의 정책 버전 `personalization-consent-v1`과 동의 시각을 함께 보존한다. 업로드 후 30일이 지나면 녹음과 파일을 삭제한다. 4.1.1절의 삭제 요청으로 더 일찍 철회할 수 있다. 요청의 원문은 무시하고 서버의 추천 기록 원문을 저장한다.
+
+metadata는 4,096바이트 이하의 JSON 객체여야 하며, `shownPromptId`는 UUID 문자열, `promptId`는 비어 있지 않은 문자열이어야 한다. `application/json;charset=UTF-8`처럼 파라미터가 있는 JSON Content-Type도 허용한다. Content-Type 누락·잘못된 값, 빈 파트, 잘못된 JSON, 필드 타입 오류는 400 `VALIDATION_FAILED`이며 `error.message`로 원인을 안내한다. 저장 동의 누락과 문장 불일치도 각각 구체적인 메시지를 반환한다. 동의 값의 boolean 타입을 명확히 검증하기 위해 JSON 파트를 사용한다.
+
+```javascript
+const formData = new FormData();
+formData.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+formData.append('audioFile', audioFile);
+// 요청 전체 Content-Type은 브라우저가 boundary와 함께 설정한다.
+```
+
+기본 보관 기간은 `voicebridge.personalization.retention-days=30`이며 `createdAt` 기준이다. 설정 변경은 기존 녹음에도 적용된다. 현재 학습 API가 503이어도 만료 정책은 적용된다. 팀·AI의 기간 합의는 별도 확인이 필요하다.
 
 Response (201): `{"success":true,"data":{"recordingId":"uuid","status":"UPLOADED"}}`. 저장된 음성은 PCM16 모노 16kHz WAV다. `UPLOADED`는 정답 검토나 학습 가능 상태를 뜻하지 않는다.
 
@@ -728,7 +739,10 @@ POST /v1/enroll/next-prompts
 | 2026-09-29 | 3.1 | 추천 문장 `GET /recommendations` → `POST /users/me/recommendations`, `promptId`, `sessionId`·`targetPhonemes` 삭제 (PR #37) |
 | 2026-09-30 | 7.5, 7.6 | 자모 오류 통계·추천 문장의 실제 AI 호출 추가 |
 | 2026-09-30 | 0.5, 0.6, 5.1 | 오디오 변환 용량·시간 초과 시 `AUDIO_PROCESSING_UNAVAILABLE`(503) 추가 (PR #39). 진단 업로드 변환에도 동일 코드 사용 |
+| 2026-09-30 | 2.2, 2.5 | 세션 완료와 통계 모두 문장마다 가장 최근 녹음 기준 (PR #38 리뷰 반영) |
+| 2026-09-30 | 2.3 | 지원하지 않는 오디오 형식: 422(예정) → 400 VALIDATION_FAILED (실사용 인식 PR #39와 맞춤) |
 | 2026-10-02 | 0.6, 3.1, 4.1~4.2 | 추천 기록 ID, 개인화 WAV 업로드·삭제·30일 보관 계약 추가; 학습 API는 외부 계약 미지원으로 503 반환 |
 | 2026-10-02 | 4.3~4.4, 5.1 | 진행률 미지원 시 `progress: null` 명시; 완료 job과 활성 adapter를 분리해 모델 보유·인식 표시 기준 수정 |
 | 2026-10-02 | 7.2~7.3 | 초기 학습 성공 예시를 현재 AI 501/job 경로 부재 및 BE 503·DB 조회 계약으로 정정 |
 | 2026-10-02 | 5.1 | 기본 모델 요청 시 `use_adapter=false` 전달, AI 응답의 adapter ID로 `modelUsed` 판정 및 요청·응답 불일치 503 처리 명시 |
+| 2026-10-03 | 4.1 | JSON Content-Type 파라미터 허용, metadata 크기·문자열 타입 검증 및 원인별 오류 메시지·Blob 예시 추가; 보관 설정 기준 명시 (PR #40 리뷰 반영) |

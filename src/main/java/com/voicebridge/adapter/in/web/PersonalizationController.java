@@ -47,32 +47,59 @@ public class PersonalizationController {
       @AuthenticationPrincipal UUID userId,
       @RequestPart("metadata") MultipartFile metadata,
       @RequestPart("audioFile") MultipartFile audioFile) {
-    if (!MediaType.APPLICATION_JSON_VALUE.equals(metadata.getContentType())
-        || metadata.isEmpty()
-        || metadata.getSize() > 4096) {
-      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+    try {
+      if (metadata.getContentType() == null
+          || !MediaType.parseMediaType(metadata.getContentType())
+              .isCompatibleWith(MediaType.APPLICATION_JSON)) {
+        throw invalid("metadata의 Content-Type은 application/json이어야 합니다.");
+      }
+    } catch (org.springframework.http.InvalidMediaTypeException e) {
+      throw invalid("metadata의 Content-Type은 application/json이어야 합니다.");
+    }
+    if (metadata.isEmpty()) {
+      throw invalid("metadata가 비어 있습니다.");
+    }
+    if (metadata.getSize() > 4096) {
+      throw invalid("metadata는 4096바이트 이하여야 합니다.");
     }
     JsonNode node;
     try {
-      node = objectMapper.readTree(metadata.getBytes());
+      node =
+          objectMapper
+              .reader()
+              .with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+              .readTree(metadata.getBytes());
     } catch (IOException e) {
-      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+      throw invalid("metadata는 올바른 JSON 객체여야 합니다.");
     }
-    if (node == null
-        || !node.isObject()
-        || (node.has("storeAudio") && !node.get("storeAudio").isBoolean())
-        || (node.has("useForTraining") && !node.get("useForTraining").isBoolean())) {
-      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+    if (node == null || !node.isObject()) {
+      throw invalid("metadata는 올바른 JSON 객체여야 합니다.");
+    }
+    for (String field : new String[] {"storeAudio", "useForTraining"}) {
+      if (node.has(field) && !node.get(field).isBoolean()) {
+        throw invalid(field + "는 boolean 값이어야 합니다.");
+      }
     }
     UUID shownPromptId;
     try {
-      shownPromptId = UUID.fromString(node.path("shownPromptId").asText());
+      JsonNode id = node.path("shownPromptId");
+      if (!id.isTextual()) {
+        throw new IllegalArgumentException();
+      }
+      shownPromptId = UUID.fromString(id.textValue());
+      if (!shownPromptId.toString().equalsIgnoreCase(id.textValue())) {
+        throw new IllegalArgumentException();
+      }
     } catch (IllegalArgumentException e) {
-      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+      throw invalid("shownPromptId는 유효한 UUID 문자열이어야 합니다.");
     }
-    String promptId = node.path("promptId").asText(null);
+    JsonNode prompt = node.path("promptId");
+    if (!prompt.isTextual() || prompt.textValue().isBlank()) {
+      throw invalid("promptId는 비어 있지 않은 문자열이어야 합니다.");
+    }
+    String promptId = prompt.textValue();
     if (audioFile.isEmpty()) {
-      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+      throw invalid("audioFile이 비어 있습니다.");
     }
     byte[] bytes;
     try {
@@ -93,6 +120,10 @@ public class PersonalizationController {
         .body(
             ApiResponse.success(
                 new UploadPersonalizationRecordingResponse(result.recordingId(), result.status())));
+  }
+
+  private static CustomException invalid(String message) {
+    return new CustomException(ErrorCode.VALIDATION_FAILED, message);
   }
 
   @DeleteMapping("/recordings/{recordingId}")

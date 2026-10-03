@@ -26,14 +26,20 @@ public class UploadPersonalizationRecordingService
 
   @Override
   public UploadResult upload(UploadCommand command) {
-    if (command.userId() == null
-        || command.shownPromptId() == null
-        || command.promptId() == null
-        || command.promptId().isBlank()
-        || !command.storeAudio()
-        || command.audioBytes() == null
-        || command.audioBytes().length == 0) {
-      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+    if (command.userId() == null) {
+      throw new CustomException(ErrorCode.VALIDATION_FAILED, "userId가 필요합니다.");
+    }
+    if (command.shownPromptId() == null) {
+      throw new CustomException(ErrorCode.VALIDATION_FAILED, "shownPromptId가 필요합니다.");
+    }
+    if (command.promptId() == null || command.promptId().isBlank()) {
+      throw new CustomException(ErrorCode.VALIDATION_FAILED, "promptId는 비어 있지 않은 문자열이어야 합니다.");
+    }
+    if (!command.storeAudio()) {
+      throw new CustomException(ErrorCode.VALIDATION_FAILED, "녹음 저장에 동의해야 합니다: storeAudio=true");
+    }
+    if (command.audioBytes() == null || command.audioBytes().length == 0) {
+      throw new CustomException(ErrorCode.VALIDATION_FAILED, "audioFile이 비어 있습니다.");
     }
     var prompt =
         shownPrompts
@@ -43,7 +49,7 @@ public class UploadPersonalizationRecordingService
       throw new CustomException(ErrorCode.FORBIDDEN_ACCESS);
     }
     if (!prompt.getPromptId().equals(command.promptId())) {
-      throw new CustomException(ErrorCode.VALIDATION_FAILED);
+      throw new CustomException(ErrorCode.VALIDATION_FAILED, "promptId가 추천 기록의 문장과 일치하지 않습니다.");
     }
     var normalized = normalizer.normalize(command.audioBytes());
     var recording =

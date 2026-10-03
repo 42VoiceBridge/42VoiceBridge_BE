@@ -3,21 +3,32 @@ package com.voicebridge.application;
 import com.voicebridge.port.out.PersonalizationRecordingRepositoryPort;
 import com.voicebridge.port.out.StoragePort;
 import java.time.LocalDateTime;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class PersonalizationUploadCleanup {
   private final PersonalizationRecordingRepositoryPort recordings;
   private final StoragePort storage;
 
-  @org.springframework.beans.factory.annotation.Value(
-      "${voicebridge.personalization.retention-days:30}")
-  private int retentionDays;
+  private final int retentionDays;
+
+  public PersonalizationUploadCleanup(
+      PersonalizationRecordingRepositoryPort recordings,
+      StoragePort storage,
+      @Value("${voicebridge.personalization.retention-days:30}") int retentionDays,
+      @Value("${voicebridge.personalization.cleanup-delay-ms:300000}") long cleanupDelayMs) {
+    if (retentionDays <= 0 || cleanupDelayMs <= 0) {
+      throw new IllegalArgumentException(
+          "Personalization retention and cleanup delay must be positive");
+    }
+    this.recordings = recordings;
+    this.storage = storage;
+    this.retentionDays = retentionDays;
+  }
 
   @Scheduled(fixedDelayString = "${voicebridge.personalization.cleanup-delay-ms:300000}")
   public void cleanup() {

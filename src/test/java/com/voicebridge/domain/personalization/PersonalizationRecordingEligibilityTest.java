@@ -49,7 +49,7 @@ class PersonalizationRecordingEligibilityTest {
         "source-hash",
         "wav-hash",
         "normalize-v1",
-        status,
+        PersonalizationRecordingStatus.valueOf(status),
         now,
         poolVersion,
         spokenText,
