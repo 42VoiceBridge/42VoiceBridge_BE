@@ -1,6 +1,7 @@
 package com.voicebridge.application;
 
 import com.voicebridge.domain.recognition.TtsRequest;
+import com.voicebridge.port.out.ConfirmationRepositoryPort;
 import com.voicebridge.port.out.StoragePort;
 import com.voicebridge.port.out.TtsEnginePort;
 import com.voicebridge.port.out.TtsRequestRepositoryPort;
@@ -24,6 +25,7 @@ public class TtsSynthesisHandler {
   private final TtsRequestRepositoryPort ttsRequestRepositoryPort;
   private final TtsEnginePort ttsEnginePort;
   private final StoragePort storagePort;
+  private final ConfirmationRepositoryPort confirmationRepositoryPort;
 
   /**
    * AFTER_COMMIT이라 요청 트랜잭션이 커밋된 뒤에만 실행된다. 이게 없으면 비동기 스레드가 아직 커밋되지 않은 TtsRequest를 조회해 찾지 못한다.
@@ -41,9 +43,16 @@ public class TtsSynthesisHandler {
     }
 
     try {
+      var confirmation =
+          confirmationRepositoryPort.findById(ttsRequest.getConfirmationId()).orElse(null);
+      if (confirmation == null || !confirmation.isValid()) {
+        ttsRequest.markFailed();
+        ttsRequestRepositoryPort.save(ttsRequest);
+        return;
+      }
       byte[] audio = ttsEnginePort.synthesize(event.confirmedText());
-      String audioUrl = storagePort.upload(audio, AUDIO_FILE_NAME);
-      ttsRequest.markCompleted(audioUrl);
+      String audioStorageKey = storagePort.upload(audio, AUDIO_FILE_NAME);
+      ttsRequest.markCompleted(audioStorageKey);
     } catch (Exception e) {
       log.error("[TTS 합성] 실패 ttsId={}", event.ttsId(), e);
       ttsRequest.markFailed();

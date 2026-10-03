@@ -6,8 +6,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.voicebridge.domain.recognition.Confirmation;
 import com.voicebridge.domain.recognition.TtsRequest;
 import com.voicebridge.domain.recognition.TtsRequestStatus;
+import com.voicebridge.port.out.ConfirmationRepositoryPort;
 import com.voicebridge.port.out.StoragePort;
 import com.voicebridge.port.out.TtsEnginePort;
 import com.voicebridge.port.out.TtsRequestRepositoryPort;
@@ -27,17 +29,24 @@ class TtsSynthesisHandlerTest {
   @Mock private TtsEnginePort ttsEnginePort;
   @Mock private StoragePort storagePort;
 
+  @Mock private ConfirmationRepositoryPort confirmationRepositoryPort;
+
   private TtsSynthesisHandler handler;
 
   private final String confirmedText = "물 좀 주세요";
 
   @BeforeEach
   void setUp() {
-    handler = new TtsSynthesisHandler(ttsRequestRepositoryPort, ttsEnginePort, storagePort);
+    handler =
+        new TtsSynthesisHandler(
+            ttsRequestRepositoryPort, ttsEnginePort, storagePort, confirmationRepositoryPort);
   }
 
   private TtsRequest pendingRequest() {
-    return TtsRequest.create(UUID.randomUUID(), UUID.randomUUID());
+    var confirmation = Confirmation.create(UUID.randomUUID(), UUID.randomUUID(), confirmedText);
+    when(confirmationRepositoryPort.findById(confirmation.getId()))
+        .thenReturn(Optional.of(confirmation));
+    return TtsRequest.create(confirmation.getId(), UUID.randomUUID());
   }
 
   private TtsRequest captureSaved() {
@@ -58,7 +67,7 @@ class TtsSynthesisHandlerTest {
 
     TtsRequest saved = captureSaved();
     assertThat(saved.getStatus()).isEqualTo(TtsRequestStatus.COMPLETED);
-    assertThat(saved.getAudioUrl()).isEqualTo("tts/abc.mp3");
+    assertThat(saved.getAudioStorageKey()).isEqualTo("tts/abc.mp3");
   }
 
   @Test
@@ -71,7 +80,7 @@ class TtsSynthesisHandlerTest {
 
     TtsRequest saved = captureSaved();
     assertThat(saved.getStatus()).isEqualTo(TtsRequestStatus.FAILED);
-    assertThat(saved.getAudioUrl()).isNull();
+    assertThat(saved.getAudioStorageKey()).isNull();
   }
 
   @Test
@@ -97,5 +106,35 @@ class TtsSynthesisHandlerTest {
 
     verify(ttsRequestRepositoryPort, never()).save(any());
     verify(ttsEnginePort, never()).synthesize(any());
+  }
+
+  @Test
+  void 무효화된_확인은_합성과_업로드_없이_FAILED로_저장한다() {
+    var confirmation = Confirmation.create(UUID.randomUUID(), UUID.randomUUID(), confirmedText);
+    confirmation.invalidate();
+    var request = TtsRequest.create(confirmation.getId(), UUID.randomUUID());
+    when(ttsRequestRepositoryPort.findById(request.getId())).thenReturn(Optional.of(request));
+    when(confirmationRepositoryPort.findById(confirmation.getId()))
+        .thenReturn(Optional.of(confirmation));
+
+    handler.handle(new TtsRequestedEvent(request.getId(), confirmedText));
+
+    assertThat(captureSaved().getStatus()).isEqualTo(TtsRequestStatus.FAILED);
+    verify(ttsEnginePort, never()).synthesize(any());
+    verify(storagePort, never()).upload(any(), any());
+  }
+
+  @Test
+  void 확인이_없으면_합성과_업로드_없이_FAILED로_저장한다() {
+    var request = TtsRequest.create(UUID.randomUUID(), UUID.randomUUID());
+    when(ttsRequestRepositoryPort.findById(request.getId())).thenReturn(Optional.of(request));
+    when(confirmationRepositoryPort.findById(request.getConfirmationId()))
+        .thenReturn(Optional.empty());
+
+    handler.handle(new TtsRequestedEvent(request.getId(), confirmedText));
+
+    assertThat(captureSaved().getStatus()).isEqualTo(TtsRequestStatus.FAILED);
+    verify(ttsEnginePort, never()).synthesize(any());
+    verify(storagePort, never()).upload(any(), any());
   }
 }

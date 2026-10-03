@@ -39,8 +39,8 @@ public class TtsRequestJpaEntity {
   @Column(nullable = false)
   private TtsRequestStatus status;
 
-  @Column(nullable = true)
-  private String audioUrl;
+  @Column(name = "audio_url", nullable = true)
+  private String audioStorageKey;
 
   @Column(nullable = false)
   private LocalDateTime createdAt;
@@ -51,13 +51,13 @@ public class TtsRequestJpaEntity {
       UUID confirmationId,
       UUID idempotencyKey,
       TtsRequestStatus status,
-      String audioUrl,
+      String audioStorageKey,
       LocalDateTime createdAt) {
     this.id = id;
     this.confirmationId = confirmationId;
     this.idempotencyKey = idempotencyKey;
     this.status = status;
-    this.audioUrl = audioUrl;
+    this.audioStorageKey = audioStorageKey;
     this.createdAt = createdAt;
   }
 }

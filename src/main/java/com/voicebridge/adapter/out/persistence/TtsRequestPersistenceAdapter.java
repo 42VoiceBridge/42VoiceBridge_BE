@@ -28,7 +28,7 @@ public class TtsRequestPersistenceAdapter implements TtsRequestRepositoryPort {
                   .confirmationId(ttsRequest.getConfirmationId())
                   .idempotencyKey(ttsRequest.getIdempotencyKey())
                   .status(ttsRequest.getStatus())
-                  .audioUrl(ttsRequest.getAudioUrl())
+                  .audioStorageKey(ttsRequest.getAudioStorageKey())
                   .createdAt(ttsRequest.getCreatedAt())
                   .build());
       return toDomain(saved);
@@ -57,7 +57,7 @@ public class TtsRequestPersistenceAdapter implements TtsRequestRepositoryPort {
         entity.getConfirmationId(),
         entity.getIdempotencyKey(),
         entity.getStatus(),
-        entity.getAudioUrl(),
+        entity.getAudioStorageKey(),
         entity.getCreatedAt());
   }
 }

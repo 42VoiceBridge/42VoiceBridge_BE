@@ -678,9 +678,11 @@ Response (202): `{ "ttsId": "uuid", "status": "PENDING" }`
 
 대상 confirmation이 이미 무효화됐으면(`valid=false`) `INVALID_STATE_TRANSITION`(409)으로 거부한다 — “무효·미확인·취소된 문장은 절대 재생되지 않는다”는 불변조건을 지키는 지점이다. 같은 `idempotencyKey`로 재요청하면 같은 결과를 반환하고(중복 재생 방지), 다른 confirmationId에 이미 쓴 키를 재사용하면 `VALIDATION_FAILED`(400)로 거부한다.
 
+비동기 합성 직전에도 confirmation 유효성을 재검사한다. 확인이 없거나 무효화됐으면 NCP 합성·업로드를 건너뛰고 요청을 `FAILED`로 저장한다. 이후 결과 조회는 아래의 confirmation 오류 규칙(404·409)을 따른다. 검사 이후 진행 중인 합성의 취소까지 보장하지는 않는다.
+
 ### 6.2 TTS 결과 조회
 
-`GET /tts/{ttsId}`
+`GET /tts/{ttsId}` (인증 필요)
 
 Response (200):
 
@@ -690,9 +692,38 @@ Response (200):
   "data": {
     "ttsId": "uuid",
     "status": "COMPLETED",
-    "audioUrl": "https://s3.../tts/uuid.mp3"
+    "audioUrl": "https://bucket.s3.ap-northeast-2.amazonaws.com/recordings/uuid.mp3?X-Amz-..."
   }
 }
+```
+
+- `PENDING`·`FAILED`에서는 `audioUrl: null`이다. `COMPLETED`이면 본인 요청의 MP3 재생 URL을 반환한다.
+- 운영은 private S3의 presigned GET URL을 조회마다 생성한다. 기본 TTL은 10분(`voicebridge.tts.playback-url-ttl`)이며 자격증명·정책 조건에 따라 더 일찍 만료될 수 있다. 만료 후 이 API를 다시 조회한다. URL은 DB에 저장하지 않으며 DB의 기존 `audio_url` 컬럼에는 object key를 유지한다.
+- 응답은 `Cache-Control: no-store`다. URL을 로그·영구 저장소에 보존하지 않는다. URL 보유자는 유효기간 동안 접근할 수 있다.
+- confirmation이 무효화되면 새 URL 발급을 409로 거절한다. 이미 발급된 S3 URL은 TTL 내 즉시 철회되지 않는다. FE는 취소·무효화 이후 재생을 중지하고 이전 폴링 응답으로 재생하지 않아야 한다.
+- `local` 프로파일은 절대 URL `http://localhost:8080/api/v1/tts/{ttsId}/audio`를 반환한다. 실제 API 주소는 `voicebridge.tts.local-playback-base-url`로 지정한다. 이 URL은 Bearer 인증이 필요하므로 FE는 인증된 fetch 후 Blob URL로 재생한다.
+
+에러: `VALIDATION_FAILED`(400, 잘못된 요청 ID), `FORBIDDEN_ACCESS`(403, 타인 요청), `RESOURCE_NOT_FOUND`(404, 없는 요청·confirmation), `INVALID_STATE_TRANSITION`(409, 무효화된 confirmation), `INTERNAL_SERVER_ERROR`(500, 잘못된 저장 key·URL 생성 실패). URL 발급 실패는 저장된 TTS의 COMPLETED 상태를 변경하지 않는다. 인증 실패는 0.6절을 따른다. URL 발급 성공만으로 S3 파일 존재·접근 성공을 검증한 것은 아니다.
+
+### 6.3 로컬 TTS 오디오 조회
+
+`GET /tts/{ttsId}/audio` (`local` 프로파일 전용, 인증 필요)
+
+본인의 유효한 confirmation에 속한 COMPLETED 요청만 MP3를 제공한다. 정상 응답은 200 `Content-Type: audio/mpeg`, `Cache-Control: no-store`이며 본문은 파일 바이트다. 유효한 `Range` 요청은 206과 `Content-Range`를 반환한다. 만족할 수 없는 범위는 416이며 공통 JSON 오류 envelope가 아닌 파일 전송 응답이다.
+
+에러: `VALIDATION_FAILED`(400, 잘못된 ID), `FORBIDDEN_ACCESS`(403, 타인 요청), `RESOURCE_NOT_FOUND`(404, 없는 요청·confirmation·파일), `INVALID_STATE_TRANSITION`(409, 미완료 요청 또는 무효화된 confirmation), `INTERNAL_SERVER_ERROR`(500, 잘못된 저장 key·파일 읽기 실패). 인증 실패는 0.6절을 따른다. 운영에서는 파일 serving 엔드포인트를 등록하지 않으며 6.2의 S3 URL을 사용한다.
+
+로컬 FE 예시:
+
+```javascript
+const response = await fetch(audioUrl, {
+  headers: { Authorization: `Bearer ${accessToken}` },
+});
+if (!response.ok) throw new Error('TTS 음성 조회 실패');
+const playbackUrl = URL.createObjectURL(await response.blob());
+audio.src = playbackUrl;
+await audio.play();
+// 재생 종료·취소 후 URL.revokeObjectURL(playbackUrl)를 호출한다.
 ```
 
 ---
@@ -819,3 +850,5 @@ POST /v1/enroll/next-prompts
 | 2026-10-03 | 7.6 | AI 응답의 `pool_version`·`pool_sha256`을 제안 기록에 저장, 없으면 503 (AI 답변 R5) |
 | 2026-10-03 | 0.2, 0.6 | 토큰 없이 호출하면 403(본문 없음) → 401 `AUTH_REQUIRED`, 만료·무효 토큰은 401 `AUTH_TOKEN_EXPIRED`로 공통 응답 형식에 맞춤 |
 | 2026-10-03 | 0.5, 0.6 | 클라이언트 요청 실수가 500으로 나가던 것을 수정: 없는 주소 404 `RESOURCE_NOT_FOUND`, 받지 않는 메서드 405 `METHOD_NOT_ALLOWED`, 읽을 수 없는 JSON 400 `VALIDATION_FAILED`, 받지 않는 Content-Type 415 `UNSUPPORTED_MEDIA_TYPE` |
+| 2026-10-03 | 6.2, 6.3 | TTS object key와 재생 URL 분리, private S3 임시 GET URL 및 만료·무효화 규칙, 인증된 로컬 MP3·Range 조회 추가 |
+| 2026-10-03 | 6.1 | 합성 직전 confirmation 재검사 및 무효·누락 시 외부 호출 없이 FAILED 처리 (PR #49 리뷰 반영) |

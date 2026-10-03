@@ -103,3 +103,15 @@ SECRET_ARN=$(terraform output -raw rds_secret_arn)
 aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" \
   --query 'SecretString' --output text | jq -r .password
 ```
+
+
+## TTS 재생 URL 설정
+
+- `TTS_PLAYBACK_URL_TTL`: 기본 `10m`. 양수 정수 초, 최대 7일. 임시 AWS 자격증명 만료나 버킷 정책으로 실제 유효기간은 더 짧아질 수 있다.
+- `TTS_LOCAL_PLAYBACK_BASE_URL`: 기본 `http://localhost:8080`. local에서 FE가 접근하는 BE의 절대 HTTP(S) 주소이며 운영 S3 URL에는 사용하지 않는다.
+- private S3 URL은 조회 시 생성한다. EC2 역할에 해당 객체의 `s3:GetObject` 권한이 필요하며 bucket·region이 S3 클라이언트와 같아야 한다. KMS를 사용하면 해당 복호화 권한도 확인한다.
+- 기존 DB `tts_requests.audio_url` 컬럼은 유지하고 object key를 저장한다. 기존 값이 `recordings/{UUID}.mp3` 형식인지 배포 전 확인한다. 저장된 HTTP URL은 자동으로 다른 버킷에 서명하지 않는다.
+- MP3 업로드의 Content-Type은 audio/mpeg이며 기존 파일도 서명 응답의 Content-Type을 audio/mpeg로 지정한다.
+- local은 Bearer로 `/api/v1/tts/{ttsId}/audio`를 fetch한 뒤 Blob으로 재생한다. 운영은 presigned URL을 직접 재생한다. fetch·Web Audio·crossOrigin 사용 시 FE origin에 맞는 S3 CORS를 인프라에서 확인한다.
+- 브라우저에서 만료 전 GET 성공·만료 후 거절·재조회 URL로 재생 성공을 검증한다. URL 생성은 S3 접근 성공을 보장하지 않는다.
+- confirmation 무효화는 새 URL 발급을 막지만 이미 발급한 S3 URL은 만료 전 즉시 철회되지 않는다. 즉시 철회가 필수이면 별도의 serving 구조가 필요하다.
