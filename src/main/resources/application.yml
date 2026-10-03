@@ -73,6 +73,8 @@ voicebridge:
     bucket: ${S3_BUCKET:voicebridge-recordings}
     region: ${AWS_REGION:ap-northeast-2}
   tts:
+    playback-url-ttl: ${TTS_PLAYBACK_URL_TTL:10m}
+    local-playback-base-url: ${TTS_LOCAL_PLAYBACK_BASE_URL:http://localhost:8080}
     naver:
       base-url: https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts
       api-key-id: ${NCP_TTS_API_KEY_ID:}

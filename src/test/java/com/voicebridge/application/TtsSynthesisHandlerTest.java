@@ -58,7 +58,7 @@ class TtsSynthesisHandlerTest {
 
     TtsRequest saved = captureSaved();
     assertThat(saved.getStatus()).isEqualTo(TtsRequestStatus.COMPLETED);
-    assertThat(saved.getAudioUrl()).isEqualTo("tts/abc.mp3");
+    assertThat(saved.getAudioStorageKey()).isEqualTo("tts/abc.mp3");
   }
 
   @Test
@@ -71,7 +71,7 @@ class TtsSynthesisHandlerTest {
 
     TtsRequest saved = captureSaved();
     assertThat(saved.getStatus()).isEqualTo(TtsRequestStatus.FAILED);
-    assertThat(saved.getAudioUrl()).isNull();
+    assertThat(saved.getAudioStorageKey()).isNull();
   }
 
   @Test

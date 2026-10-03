@@ -57,7 +57,14 @@ public class S3StorageAdapter implements StoragePort {
     String key = StorageKeys.newKey(fileName);
     try {
       s3Client.putObject(
-          PutObjectRequest.builder().bucket(bucket).key(key).build(),
+          PutObjectRequest.builder()
+              .bucket(bucket)
+              .key(key)
+              .contentType(
+                  key.endsWith(".mp3")
+                      ? "audio/mpeg"
+                      : key.endsWith(".wav") ? "audio/wav" : "application/octet-stream")
+              .build(),
           RequestBody.fromBytes(fileBytes));
     } catch (SdkException e) {
       throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, "음성 파일 저장에 실패했습니다.");

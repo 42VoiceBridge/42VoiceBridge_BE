@@ -10,6 +10,16 @@ import software.amazon.awssdk.services.s3.S3Client;
 @Configuration
 public class S3Config {
 
+  @Bean(destroyMethod = "close")
+  @org.springframework.context.annotation.Profile("!local")
+  public software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner(
+      @Value("${voicebridge.s3.region}") String region) {
+    return software.amazon.awssdk.services.s3.presigner.S3Presigner.builder()
+        .region(Region.of(region))
+        .credentialsProvider(DefaultCredentialsProvider.create())
+        .build();
+  }
+
   // 크레덴셜은 코드에 두지 않는다. DefaultCredentialsProvider가 환경변수/~/.aws/credentials/IAM 역할
   // 순으로 알아서 찾는다.
   @Bean

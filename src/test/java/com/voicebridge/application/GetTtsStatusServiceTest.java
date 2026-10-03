@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class GetTtsStatusServiceTest {
   @Mock TtsRequestRepositoryPort ttsRequestRepositoryPort;
   @Mock ConfirmationRepositoryPort confirmationRepositoryPort;
+  @Mock com.voicebridge.port.out.AudioPlaybackUrlPort playbackUrls;
   GetTtsStatusService service;
 
   final UUID userId = UUID.randomUUID();
@@ -29,7 +30,10 @@ class GetTtsStatusServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new GetTtsStatusService(ttsRequestRepositoryPort, confirmationRepositoryPort);
+    service =
+        new GetTtsStatusService(
+            new TtsPlaybackAccess(ttsRequestRepositoryPort, confirmationRepositoryPort),
+            playbackUrls);
   }
 
   @Test
@@ -69,5 +73,52 @@ class GetTtsStatusServiceTest {
         .isInstanceOf(CustomException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.FORBIDDEN_ACCESS);
+  }
+
+  @Test
+  void completedRequestReturnsFreshUrlWithoutPersistingIt() {
+    var request = TtsRequest.create(confirmationId, UUID.randomUUID());
+    request.markCompleted("recordings/" + UUID.randomUUID() + ".mp3");
+    when(ttsRequestRepositoryPort.findById(request.getId())).thenReturn(Optional.of(request));
+    when(confirmationRepositoryPort.findById(confirmationId))
+        .thenReturn(Optional.of(Confirmation.create(UUID.randomUUID(), userId, "문장")));
+    when(playbackUrls.createUrl(request.getAudioStorageKey(), request.getId()))
+        .thenReturn("https://example.test/first", "https://example.test/second");
+    assertThat(service.getStatus(userId, request.getId()).audioUrl())
+        .isEqualTo("https://example.test/first");
+    assertThat(service.getStatus(userId, request.getId()).audioUrl())
+        .isEqualTo("https://example.test/second");
+    assertThat(request.getAudioStorageKey()).startsWith("recordings/");
+    org.mockito.Mockito.verify(ttsRequestRepositoryPort, org.mockito.Mockito.never())
+        .save(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void signingFailureDoesNotChangeCompletedState() {
+    var request = TtsRequest.create(confirmationId, UUID.randomUUID());
+    request.markCompleted("recordings/" + UUID.randomUUID() + ".mp3");
+    when(ttsRequestRepositoryPort.findById(request.getId())).thenReturn(Optional.of(request));
+    when(confirmationRepositoryPort.findById(confirmationId))
+        .thenReturn(Optional.of(Confirmation.create(UUID.randomUUID(), userId, "문장")));
+    when(playbackUrls.createUrl(request.getAudioStorageKey(), request.getId()))
+        .thenThrow(new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
+    assertThatThrownBy(() -> service.getStatus(userId, request.getId()))
+        .isInstanceOf(CustomException.class);
+    assertThat(request.getStatus())
+        .isEqualTo(com.voicebridge.domain.recognition.TtsRequestStatus.COMPLETED);
+  }
+
+  @Test
+  void invalidatedConfirmationDoesNotIssueUrl() {
+    var request = TtsRequest.create(confirmationId, UUID.randomUUID());
+    var confirmation = Confirmation.create(UUID.randomUUID(), userId, "문장");
+    confirmation.invalidate();
+    when(ttsRequestRepositoryPort.findById(request.getId())).thenReturn(Optional.of(request));
+    when(confirmationRepositoryPort.findById(confirmationId)).thenReturn(Optional.of(confirmation));
+    assertThatThrownBy(() -> service.getStatus(userId, request.getId()))
+        .isInstanceOf(CustomException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+    org.mockito.Mockito.verifyNoInteractions(playbackUrls);
   }
 }

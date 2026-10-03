@@ -28,7 +28,7 @@ class TtsRequestPersistenceAdapterTest {
     assertThat(row.getConfirmationId()).isEqualTo(ttsRequest.getConfirmationId());
     assertThat(row.getIdempotencyKey()).isEqualTo(ttsRequest.getIdempotencyKey());
     assertThat(row.getStatus()).isEqualTo(TtsRequestStatus.PENDING);
-    assertThat(row.getAudioUrl()).isNull();
+    assertThat(row.getAudioStorageKey()).isNull();
     assertThat(saved).usingRecursiveComparison().isEqualTo(ttsRequest);
   }
 

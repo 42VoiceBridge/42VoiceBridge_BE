@@ -10,7 +10,7 @@ public class TtsRequest {
   private final UUID confirmationId;
   private final UUID idempotencyKey;
   private TtsRequestStatus status;
-  private String audioUrl;
+  private String audioStorageKey;
   private final LocalDateTime createdAt;
 
   private TtsRequest(
@@ -18,13 +18,13 @@ public class TtsRequest {
       UUID confirmationId,
       UUID idempotencyKey,
       TtsRequestStatus status,
-      String audioUrl,
+      String audioStorageKey,
       LocalDateTime createdAt) {
     this.id = id;
     this.confirmationId = confirmationId;
     this.idempotencyKey = idempotencyKey;
     this.status = status;
-    this.audioUrl = audioUrl;
+    this.audioStorageKey = audioStorageKey;
     this.createdAt = createdAt;
   }
 
@@ -50,20 +50,20 @@ public class TtsRequest {
       UUID confirmationId,
       UUID idempotencyKey,
       TtsRequestStatus status,
-      String audioUrl,
+      String audioStorageKey,
       LocalDateTime createdAt) {
-    return new TtsRequest(id, confirmationId, idempotencyKey, status, audioUrl, createdAt);
+    return new TtsRequest(id, confirmationId, idempotencyKey, status, audioStorageKey, createdAt);
   }
 
   /** 합성이 끝나 저장된 오디오 경로를 반영한다. 비동기 합성이라 실패를 HTTP 응답으로 알릴 수 없어 상태로 남긴다. */
-  public void markCompleted(String audioUrl) {
+  public void markCompleted(String audioStorageKey) {
     if (status != TtsRequestStatus.PENDING) {
       throw new IllegalStateException("PENDING 상태인 요청만 완료 처리할 수 있습니다.");
     }
-    if (audioUrl == null || audioUrl.isBlank()) {
+    if (audioStorageKey == null || audioStorageKey.isBlank()) {
       throw new IllegalArgumentException("완료 처리에는 오디오 경로가 필요합니다.");
     }
-    this.audioUrl = audioUrl;
+    this.audioStorageKey = audioStorageKey;
     this.status = TtsRequestStatus.COMPLETED;
   }
 
@@ -90,8 +90,8 @@ public class TtsRequest {
     return status;
   }
 
-  public String getAudioUrl() {
-    return audioUrl;
+  public String getAudioStorageKey() {
+    return audioStorageKey;
   }
 
   public LocalDateTime getCreatedAt() {

@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** TTS 요청/조회 게이트. 실제 음성 합성은 아직 만들지 않았다(엔진 미정) — 요청은 항상 PENDING으로 접수되고 그 이상 진행되지 않는다. */
+/** 확인된 문장의 비동기 TTS 요청 및 재생 URL 조회 게이트. */
 @RestController
 @RequestMapping("/api/v1/tts")
 @RequiredArgsConstructor
@@ -38,9 +38,12 @@ public class TtsController {
   }
 
   @GetMapping("/{ttsId}")
-  public ApiResponse<TtsStatusResponse> getStatus(
+  public ResponseEntity<ApiResponse<TtsStatusResponse>> getStatus(
       @AuthenticationPrincipal UUID userId, @PathVariable("ttsId") UUID ttsId) {
-    return ApiResponse.success(
-        TtsStatusResponse.from(getTtsStatusUseCase.getStatus(userId, ttsId)));
+    return ResponseEntity.ok()
+        .cacheControl(org.springframework.http.CacheControl.noStore())
+        .body(
+            ApiResponse.success(
+                TtsStatusResponse.from(getTtsStatusUseCase.getStatus(userId, ttsId))));
   }
 }

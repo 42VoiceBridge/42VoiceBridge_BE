@@ -42,8 +42,8 @@ public class TtsSynthesisHandler {
 
     try {
       byte[] audio = ttsEnginePort.synthesize(event.confirmedText());
-      String audioUrl = storagePort.upload(audio, AUDIO_FILE_NAME);
-      ttsRequest.markCompleted(audioUrl);
+      String audioStorageKey = storagePort.upload(audio, AUDIO_FILE_NAME);
+      ttsRequest.markCompleted(audioStorageKey);
     } catch (Exception e) {
       log.error("[TTS 합성] 실패 ttsId={}", event.ttsId(), e);
       ttsRequest.markFailed();

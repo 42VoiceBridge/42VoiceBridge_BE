@@ -13,7 +13,7 @@ class TtsRequestTest {
     TtsRequest ttsRequest = TtsRequest.create(UUID.randomUUID(), UUID.randomUUID());
 
     assertThat(ttsRequest.getStatus()).isEqualTo(TtsRequestStatus.PENDING);
-    assertThat(ttsRequest.getAudioUrl()).isNull();
+    assertThat(ttsRequest.getAudioStorageKey()).isNull();
     assertThat(ttsRequest.getCreatedAt()).isNotNull();
   }
 
@@ -36,7 +36,7 @@ class TtsRequestTest {
     ttsRequest.markCompleted("tts/abc.mp3");
 
     assertThat(ttsRequest.getStatus()).isEqualTo(TtsRequestStatus.COMPLETED);
-    assertThat(ttsRequest.getAudioUrl()).isEqualTo("tts/abc.mp3");
+    assertThat(ttsRequest.getAudioStorageKey()).isEqualTo("tts/abc.mp3");
   }
 
   @Test
@@ -63,7 +63,7 @@ class TtsRequestTest {
     ttsRequest.markFailed();
 
     assertThat(ttsRequest.getStatus()).isEqualTo(TtsRequestStatus.FAILED);
-    assertThat(ttsRequest.getAudioUrl()).isNull();
+    assertThat(ttsRequest.getAudioStorageKey()).isNull();
   }
 
   @Test
