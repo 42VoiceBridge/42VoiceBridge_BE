@@ -30,6 +30,8 @@ voicebridge:
     jamo-stats:
       min-support: 10
   diagnosis:
+    # 테스트는 각자 필요한 문장을 직접 넣는다. 시드 문장이 섞이면 결과가 달라진다.
+    seed-sentences: false
     recognition:
       threads: 2
       queue-capacity: 200
