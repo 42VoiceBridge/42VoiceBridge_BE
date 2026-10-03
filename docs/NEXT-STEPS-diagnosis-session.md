@@ -51,12 +51,12 @@
 - 통계는 조회 시점에 스냅샷이 낡았는지(`isStale`) 보고 필요하면 다시 계산한다. 서비스에 `@Transactional`을 걸지 말 것 — AI 응답을 기다리는 동안 DB 연결을 붙잡게 된다.
 - 쌍은 **(세션, 문장)** 기준으로 묶는다. 문장 ID로만 묶으면 누적해도 표본이 늘지 않는다.
 - 무음 녹음은 뺀다(9/29 결정). 정답 텍스트는 반드시 문장 원문.
-- AI 호출 어댑터는 요청 본문을 버퍼링해야 한다(데모 서버가 chunked 본문을 읽지 못함).
-- **실제 AI 연결 전 필요**: 진단 녹음을 WAV로 변환하지 않으면 전부 `FAILED`가 되어 통계가 비어 있다(백엔드 B P02 머지 후 연결).
+- AI 호출 어댑터는 요청 본문을 버퍼링한다(데모 서버가 chunked 본문을 읽지 못했음. AI 서버도 10/3에 고쳤지만 버퍼링은 유지).
+- 진단 녹음은 **업로드할 때** WAV(PCM16·모노·16kHz)로 변환한다(`UploadDiagnosisRecordingService`, 변환기는 #39). 인식 단계로 옮기지 말 것 — 잘못된 녹음을 바로 알려줄 수 없고, 저장한 파일과 AI가 들은 파일이 달라진다.
 - 진단 인식은 **항상 기본 모델**(`RecordingRecognitionHandler.DIAGNOSIS_MODEL`, 9/29 결정). 개인화 모델로 바꾸지 말 것 — 누적 통계에 서로 다른 모델의 결과가 섞인다.
 - 진단 인식은 **전용 실행기**(`AsyncConfig.DIAGNOSIS_RECOGNITION_EXECUTOR`, 스레드 2·대기열 200)에서 돈다. 설정의 `spring.task.execution.mode: force`를 지우면 TTS 같은 다른 `@Async`까지 이 실행기로 몰린다(`AsyncExecutorRoutingTest`가 막음).
 - `min_support`는 10(설정값 `voicebridge.ai.jamo-stats.min-support`). AI 담당에게는 통계적으로 괜찮은지만 확인 요청.
-- 실패 사유 4가지(`AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`·`AI_UNAVAILABLE`)는 P02 연결 PR에서 구현한다.
+- 오디오 거절 이유는 업로드의 400 코드(`AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`)로 알린다. 그래서 `FAILED`는 AI 쪽 문제뿐이고 `failureReason` 필드는 두지 않는다(10/3 결정, 9/29의 "FAILED에 사유 4가지" 계획을 바꿈).
 
 ### 근거: 통계는 여러 세션을 누적해 계산한다 (2026-09-24 결정)
 

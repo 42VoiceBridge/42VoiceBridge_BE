@@ -51,7 +51,7 @@ public class DiagnosisRecordingRegistrar {
    * <p>여기서 거절되면 이미 올린 파일은 저장소에 남는다. 드물고 어떤 녹음도 가리키지 않는 파일이라 그대로 둔다.
    */
   @Transactional
-  public Recording register(UploadCommand command, String s3Path) {
+  public Recording register(UploadCommand command, String s3Path, byte[] wavBytes) {
     DiagnosisSession session =
         diagnosisSessionRepositoryPort
             .findByIdForUpdate(command.sessionId())
@@ -64,8 +64,8 @@ public class DiagnosisRecordingRegistrar {
     recording.markProcessing();
     Recording saved = recordingRepositoryPort.save(recording);
 
-    // 리스너는 AFTER_COMMIT에 걸려 있어 이 트랜잭션이 커밋된 뒤에 실행된다.
-    eventPublisher.publishEvent(new RecordingUploadedEvent(saved.getId(), command.audioBytes()));
+    // 리스너는 AFTER_COMMIT에 걸려 있어 이 트랜잭션이 커밋된 뒤에 실행된다. 인식에는 브라우저 원본이 아니라 변환된 WAV를 보낸다.
+    eventPublisher.publishEvent(new RecordingUploadedEvent(saved.getId(), wavBytes));
     return saved;
   }
 
