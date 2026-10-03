@@ -400,6 +400,13 @@
 - DB는 바꾸지 않아도 된다. 이 상태로 저장된 세션은 있을 수 없고, 운영의 스키마 검사(`ddl-auto: validate`)는 enum 컬럼의 값 목록을 비교하지 않는다. MySQL 컨테이너에서 `status` 컬럼에 `COMPLETED`를 남긴 채 `validate`로 기동되는 것을 확인했다.
 - "사용자가 결과를 확인함" 같은 다음 단계가 필요해지면 그때 의미와 API를 같이 정해 추가한다.
 
+### 27. 추천 기록에 문장 풀 버전·해시 저장 (feature/prompt-pool-version) — PR 대기
+
+- AI가 10/3 추천 응답에 `pool_version`(예: `script-pool-v1`, 문장 풀 파일을 바꿀 때 올림)과 `pool_sha256`(고른 문장 집합의 해시)을 추가하고, 제안한 문장마다 전략 버전·seed와 함께 저장해 달라고 요청했다(AI 답변 R5). 전략 버전·seed·`pool_sha256`이 모두 같아야 같은 문장이 다시 나온다. 풀이 바뀌면 같은 seed로도 다른 문장이 나오는 게 정상이다.
+- `shown_prompts`에 `pool_version`, `pool_sha256` 컬럼을 추가했다. 두 값이 없는 AI 응답은 계약 위반으로 503, 새 기록은 도메인(`ShownPrompt.create`)에서도 두 값을 요구한다. 컬럼 추가 전 기록은 null로 읽는다.
+- 개인화 녹음의 `promptPoolVersion`(#40)은 이 값(`ShownPrompt.getPoolVersion()`)으로 채울 수 있다. 개인화 쪽 코드라 여기서는 바꾸지 않았다.
+- **운영 DB**: `ALTER TABLE shown_prompts ADD COLUMN pool_version VARCHAR(255) NULL, ADD COLUMN pool_sha256 VARCHAR(255) NULL;` 이 없으면 `validate`에서 서버가 뜨지 않는다. MySQL 컨테이너에서 #37 DDL로 만든 테이블에 대해, 추가 전에는 `missing column`으로 기동 실패하고 추가 후에는 기동되며 기존 행은 null로 남는 것을 확인했다.
+
 ## 알려진 이슈 / 확인 필요 사항
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.
@@ -410,7 +417,7 @@
 - 자모 오류 통계: `min_support`는 진단 화면용으로 10으로 정했다(9/29). AI 담당에게는 통계적으로 괜찮은지만 확인을 요청한다. "모델이 다른 세션을 누적해도 되나"는 진단을 항상 기본 모델로 인식하기로 하면서 해소됐다(단 HTTP 어댑터가 `use_adapter`를 전달해야 실제로 고정됨).
 - **`S3StorageAdapter`는 실제로 검증하지 못했다.** 버킷과 크레덴셜이 없어 로컬 파일 어댑터로만 확인했다. 인프라 쪽에 프로비저닝 요청이 등록돼 있다.
 - **AI 서버에 문장 풀 파일(`data/script_pool.json`)이 없으면 추천이 항상 503이다.** AI 레포에 이 파일이 없다(AI-Hub 낭독 스크립트라 레포에 올리지 않은 것으로 보임). 서버에 넣는 방법(`PROMPT_POOL` 환경변수로 경로 지정 가능)을 AI 담당과 맞춰야 한다.
-- **운영 DB에 `shown_prompts` 테이블을 직접 만들어야 한다.** prod는 `ddl-auto: validate`이고 저장소에 스키마 관리 도구가 없다(기존 테이블도 같은 상황). DDL은 PR 본문 참고.
+- **운영 DB에 `shown_prompts` 테이블을 직접 만들어야 한다.** prod는 `ddl-auto: validate`이고 저장소에 스키마 관리 도구가 없다(기존 테이블도 같은 상황). DDL은 PR 본문 참고. 이미 만들었다면 문장 풀 컬럼 두 개를 추가해야 한다(작업 이력 27번).
 - 개인화 녹음(FR-7)이 받은 `promptId`를 검증하려면 `ShownPromptRepositoryPort`에 "이 사용자에게 제안한 문장인가" 조회를 추가하면 된다. 아직 쓰는 곳이 없어 만들지 않았다.
 
 - 아키텍처 감사(12번)에서 발견된 남은 참고 사항: `SecurityConfig`의 CORS가 `allowedOriginPatterns("*")` + `allowCredentials(true)` 조합 — 감사 체크리스트 항목엔 없어 수정하지 않았음, 운영 배포 전 재검토 필요.

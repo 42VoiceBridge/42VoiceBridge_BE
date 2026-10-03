@@ -95,7 +95,7 @@ graph TB
 - 음성 저장은 `StoragePort` 뒤에 있다. 로컬 프로파일은 파일시스템, 그 외에는 S3를 쓰므로 **AWS 크레덴셜 없이도 개발할 수 있다**. 사용자가 보낸 파일명은 저장 키에 쓰지 않고 허용 목록의 확장자만 추출한다
 
 ### 추천 문장 — 구현
-- `POST /api/v1/users/me/recommendations`: 개인화 등록용으로 읽을 문장을 추천. **문장 선택은 AI(`/v1/enroll/next-prompts`)가 하고**, 백엔드는 제안한 문장을 전략·버전·seed와 함께 `shown_prompts`에 기록한다(AI 계약 §1, §3.6)
+- `POST /api/v1/users/me/recommendations`: 개인화 등록용으로 읽을 문장을 추천. **문장 선택은 AI(`/v1/enroll/next-prompts`)가 하고**, 백엔드는 제안한 문장을 전략·버전·seed·문장 풀(버전·해시)과 함께 `shown_prompts`에 기록한다(AI 계약 §1, §3.6)
 - 문장 ID는 우리 `sentences` 테이블이 아니라 AI 문장 풀의 `promptId`다. 이미 제안한 문장은 다음 추천에서 빠진다
 - AI v1은 무작위(`random`) 선택만 지원한다. 오류 기반 선택은 AI 쪽 구현 이후
 - 로컬(`local` 프로파일)은 `StubEnrollmentPromptClient`가 고정 12문장에서 고른다

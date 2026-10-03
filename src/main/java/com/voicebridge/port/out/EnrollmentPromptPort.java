@@ -13,8 +13,17 @@ public interface EnrollmentPromptPort {
    */
   PromptBatch nextPrompts(UUID userId, int count, long seed, Collection<String> excludePromptIds);
 
-  /** strategy·strategyVersion·seed는 제안한 문장 기록에 그대로 남긴다. */
-  record PromptBatch(String strategy, String strategyVersion, long seed, List<Prompt> prompts) {}
+  /**
+   * strategy부터 poolSha256까지는 제안한 문장 기록에 그대로 남긴다. 전략 버전·seed·문장 풀 해시가 모두 같아야 같은 문장이 다시 나온다(AI 계약
+   * §3.6).
+   */
+  record PromptBatch(
+      String strategy,
+      String strategyVersion,
+      long seed,
+      String poolVersion,
+      String poolSha256,
+      List<Prompt> prompts) {}
 
   record Prompt(String promptId, String text) {}
 }

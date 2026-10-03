@@ -62,7 +62,8 @@ class HttpEnrollmentPromptClientTest {
     aiResponds(
         """
         {"strategy": "random", "strategy_version": "prompt-random-v1", "seed": 42,
-         "pool_size": 1807, "prompts": []}
+         "pool_size": 1807, "pool_version": "script-pool-v1", "pool_sha256": "0123456789abcdef",
+         "prompts": []}
         """);
 
     client.nextPrompts(userId, 10, 42L, List.of("02-03-0001"));
@@ -85,7 +86,7 @@ class HttpEnrollmentPromptClientTest {
     aiResponds(
         """
         {"strategy": "random", "strategy_version": "prompt-random-v1", "seed": 42,
-         "pool_size": 1807,
+         "pool_size": 1807, "pool_version": "script-pool-v1", "pool_sha256": "0123456789abcdef",
          "prompts": [{"prompt_id": "02-03-0001", "text": "식당이 어디예요?"},
                      {"prompt_id": "06-01-0100", "text": "서울역으로 가주세요."}]}
         """);
@@ -95,6 +96,8 @@ class HttpEnrollmentPromptClientTest {
     assertThat(batch.strategy()).isEqualTo("random");
     assertThat(batch.strategyVersion()).isEqualTo("prompt-random-v1");
     assertThat(batch.seed()).isEqualTo(42L);
+    assertThat(batch.poolVersion()).isEqualTo("script-pool-v1");
+    assertThat(batch.poolSha256()).isEqualTo("0123456789abcdef");
     assertThat(batch.prompts())
         .containsExactly(
             new Prompt("02-03-0001", "식당이 어디예요?"), new Prompt("06-01-0100", "서울역으로 가주세요."));
@@ -115,7 +118,8 @@ class HttpEnrollmentPromptClientTest {
   void 전략_버전이_없으면_기록할_수_없으므로_멈춘다() {
     aiResponds(
         """
-        {"strategy": "random", "seed": 42, "prompts": [{"prompt_id": "02-03-0001", "text": "가"}]}
+        {"strategy": "random", "seed": 42, "pool_version": "script-pool-v1",
+         "pool_sha256": "0123456789abcdef", "prompts": [{"prompt_id": "02-03-0001", "text": "가"}]}
         """);
 
     assertThatThrownBy(() -> client.nextPrompts(userId, 10, 42L, List.of()))
@@ -126,7 +130,8 @@ class HttpEnrollmentPromptClientTest {
 
   // 요청 seed는 42. 각 응답은 한 군데만 계약을 어긴다
   static Stream<Arguments> 계약을_어긴_응답() {
-    String ok = "\"strategy\": \"random\", \"strategy_version\": \"prompt-random-v1\"";
+    String pool = "\"pool_version\": \"script-pool-v1\", \"pool_sha256\": \"0123456789abcdef\"";
+    String ok = "\"strategy\": \"random\", \"strategy_version\": \"prompt-random-v1\", " + pool;
     return Stream.of(
         Arguments.of(
             "문장 원문(text)이 없음",
@@ -139,7 +144,17 @@ class HttpEnrollmentPromptClientTest {
         Arguments.of("요청과 다른 seed", "{" + ok + ", \"seed\": 7, \"prompts\": []}"),
         Arguments.of(
             "요청하지 않은 전략",
-            "{\"strategy\": \"error_based\", \"strategy_version\": \"v1\", \"seed\": 42,"
+            "{\"strategy\": \"error_based\", \"strategy_version\": \"v1\", \"seed\": 42, "
+                + pool
+                + ", \"prompts\": []}"),
+        Arguments.of(
+            "문장 풀 버전(pool_version)이 없음",
+            "{\"strategy\": \"random\", \"strategy_version\": \"prompt-random-v1\","
+                + " \"pool_sha256\": \"0123456789abcdef\", \"seed\": 42, \"prompts\": []}"),
+        Arguments.of(
+            "문장 풀 해시(pool_sha256)가 비어 있음",
+            "{\"strategy\": \"random\", \"strategy_version\": \"prompt-random-v1\","
+                + " \"pool_version\": \"script-pool-v1\", \"pool_sha256\": \"\", \"seed\": 42,"
                 + " \"prompts\": []}"));
   }
 

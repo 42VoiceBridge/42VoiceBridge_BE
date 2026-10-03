@@ -128,7 +128,10 @@ class PersonalizationRecordingIntegrationTest {
     UUID user = UUID.randomUUID();
     ShownPrompt shown =
         prompts
-            .saveAll(List.of(ShownPrompt.create(user, "p-validation", "문장", "random", "v1", 1)))
+            .saveAll(
+                List.of(
+                    ShownPrompt.create(
+                        user, "p-validation", "문장", "random", "v1", 1, "pool-v1", "pool-sha")))
             .get(0);
     for (String consent : new String[] {"false", "true"}) {
       mvc.perform(
@@ -191,7 +194,12 @@ class PersonalizationRecordingIntegrationTest {
   void uploadsTheExactRecommendationAndPersistsMetadata() throws Exception {
     UUID user = UUID.randomUUID();
     ShownPrompt shown =
-        prompts.saveAll(List.of(ShownPrompt.create(user, "p-1", "원문", "random", "v1", 1))).get(0);
+        prompts
+            .saveAll(
+                List.of(
+                    ShownPrompt.create(
+                        user, "p-1", "원문", "random", "v1", 1, "pool-v1", "pool-sha")))
+            .get(0);
     when(normalizer.normalize(any()))
         .thenReturn(
             new NormalizedAudio(
@@ -228,7 +236,12 @@ class PersonalizationRecordingIntegrationTest {
   void rejectsAnotherUsersRecommendationAndInvalidConsent() throws Exception {
     UUID owner = UUID.randomUUID();
     ShownPrompt shown =
-        prompts.saveAll(List.of(ShownPrompt.create(owner, "p-2", "문장", "random", "v1", 2))).get(0);
+        prompts
+            .saveAll(
+                List.of(
+                    ShownPrompt.create(
+                        owner, "p-2", "문장", "random", "v1", 2, "pool-v1", "pool-sha")))
+            .get(0);
     String url = "/api/v1/personalization/recordings";
     mvc.perform(
             multipart(url)
@@ -250,7 +263,12 @@ class PersonalizationRecordingIntegrationTest {
   void failedStorageDoesNotPublishRecording() throws Exception {
     UUID owner = UUID.randomUUID();
     ShownPrompt shown =
-        prompts.saveAll(List.of(ShownPrompt.create(owner, "p-3", "문장", "random", "v1", 3))).get(0);
+        prompts
+            .saveAll(
+                List.of(
+                    ShownPrompt.create(
+                        owner, "p-3", "문장", "random", "v1", 3, "pool-v1", "pool-sha")))
+            .get(0);
     when(normalizer.normalize(any()))
         .thenReturn(
             new NormalizedAudio(
@@ -273,7 +291,12 @@ class PersonalizationRecordingIntegrationTest {
   void deletionRevokesOwnRecordingAndRejectsAnotherUser() throws Exception {
     UUID owner = UUID.randomUUID();
     ShownPrompt shown =
-        prompts.saveAll(List.of(ShownPrompt.create(owner, "p-4", "문장", "random", "v1", 4))).get(0);
+        prompts
+            .saveAll(
+                List.of(
+                    ShownPrompt.create(
+                        owner, "p-4", "문장", "random", "v1", 4, "pool-v1", "pool-sha")))
+            .get(0);
     when(normalizer.normalize(any()))
         .thenReturn(
             new NormalizedAudio(

@@ -20,6 +20,8 @@ public class StubEnrollmentPromptClient implements EnrollmentPromptPort {
 
   // 버전을 실제와 다르게 두어, 로컬에서 쌓인 기록이 실제 AI 추천으로 오인되지 않게 한다
   private static final String STRATEGY_VERSION = "stub-random-v1";
+  private static final String POOL_VERSION = "stub-pool-v1";
+  private static final String POOL_SHA256 = "stub-pool-sha256";
 
   private static final List<Prompt> POOL =
       List.of(
@@ -51,6 +53,8 @@ public class StubEnrollmentPromptClient implements EnrollmentPromptPort {
         "random",
         STRATEGY_VERSION,
         seed,
+        POOL_VERSION,
+        POOL_SHA256,
         List.copyOf(candidates.subList(0, Math.min(count, candidates.size()))));
   }
 }

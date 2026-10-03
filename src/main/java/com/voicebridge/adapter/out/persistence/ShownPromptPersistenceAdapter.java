@@ -52,6 +52,8 @@ public class ShownPromptPersistenceAdapter implements ShownPromptRepositoryPort 
         .strategy(prompt.getStrategy())
         .strategyVersion(prompt.getStrategyVersion())
         .seed(prompt.getSeed())
+        .poolVersion(prompt.getPoolVersion())
+        .poolSha256(prompt.getPoolSha256())
         .shownAt(prompt.getShownAt())
         .build();
   }
@@ -65,6 +67,8 @@ public class ShownPromptPersistenceAdapter implements ShownPromptRepositoryPort 
         entity.getStrategy(),
         entity.getStrategyVersion(),
         entity.getSeed(),
+        entity.getPoolVersion(),
+        entity.getPoolSha256(),
         entity.getShownAt());
   }
 }
