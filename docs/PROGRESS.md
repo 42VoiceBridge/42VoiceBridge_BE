@@ -92,6 +92,7 @@
 
 ## 지금 상태 요약
 
+- **2026-10-03 기준**: 명세서의 엔드포인트가 모두 구현돼 `develop`에 병합됐다(개인화 학습 시작 4.2는 AI 계약 미지원으로 503). 백엔드 A 담당(인증·카카오 로그인, 진단 5개, 자모 오류 통계, 추천 문장)은 #41~#46까지 반영. 배포 전 운영 DB에 직접 적용할 DDL이 있다(아래 "알려진 이슈"). 아래 브랜치 목록은 초기(9/17 무렵) 기록이다.
 - `main`: `2b21d4a` — `.gitignore`, `CONTRIBUTING.md`만 반영된 상태. 실제 코드 없음.
   - `develop`: `7a1f937` — 헥사고날 스캐폴딩 + 패키지 `com.voicebridge` 리네임 + gradle wrapper + 테스트 H2 데이터소스 분리 + 인증 도메인(PR #5) + Spotless/Jacoco 코드 품질 툴링(PR #6) + 진단세션 계약(PR #7) + 개인화/인식 계약(PR #8) + **JPyRust 기반 AI 연동(PR #9)** + **sentences 시드 데이터(PR #10)** + **로그인/refresh token 버그 수정(PR #11)** + **아키텍처 감사 fail 2건 수정 — 영속성 예외 번역(PR #12), 인증 서비스 실패 케이스 테스트(PR #13)** + **문서 디렉토리 정리(PR #15)** + **Swagger(springdoc-openapi) API 문서화(PR #16)** + **로컬 개발용 docker-compose(PR #17)** + **refresh token 저장소 MySQL → Redis 이관(PR #18)** + **문서 전체 최신화(PR #19)** + **개인화 학습 상태 조회(PR #20)** + **`Recording` 도메인(PR #21)**까지 반영된 상태(현재 `2824ad6`). `./gradlew build`(spotlessCheck 포함) BUILD SUCCESSFUL 확인됨.
   - PR #18부터 **Redis가 로그인/refresh의 필수 인프라**가 됨 — 로컬은 `docker-compose up -d`로 MySQL과 함께 기동.
@@ -110,7 +111,7 @@
   - `chore/docker-compose-local`: `a746762` — 로컬 인프라(MySQL, Redis) `docker-compose.yml` 신규(애플리케이션은 여전히 `./gradlew bootRun`). `application-local.yml`의 `DB_PASSWORD` 빈 문자열 기본값과 compose의 `MYSQL_ROOT_PASSWORD` 기본값이 어긋나 있던 걸 발견해 `MYSQL_ALLOW_EMPTY_PASSWORD` 조합으로 맞춤. **PR #17 병합 완료**(`b44fe47`, 2026-09-18), 원격/로컬 브랜치 삭제 완료.
   - `feature/redis-refresh-token`: `1a1ffc3` — refresh token 저장소를 MySQL(`RefreshTokenJpaEntity`/`RefreshTokenJpaRepository`, 둘 다 삭제)에서 Redis(`StringRedisTemplate` + 기존 `TokenHasherPort`)로 이관. `RefreshTokenStorePort` 인터페이스는 변경 없음. Testcontainers Redis 기반 통합 테스트(`RefreshTokenStoreAdapterTest`, TTL 실측 포함) 5건 신규. **PR #18 병합 완료**(`7a1f937`, 2026-09-18), 원격/로컬 브랜치 삭제 완료. **이때부터 Redis가 로그인/refresh의 필수 인프라가 됨**.
   - `feature/recording-domain`: `24e2a98` — `Recording` 도메인 + `RecordingStatus` + `RecordingRepositoryPort` 신규, 단위 테스트 10건. **develop 최신(`01a99a2`)에서 새로 딴 브랜치** — 당초 지시는 `feature/diagnosis-session`에서 이어가는 것이었으나 그 브랜치가 `8df48bd`에 멈춰 있어 PR #9~#19가 빠진 상태였음(17번 항목 참고). **PR #21 병합 완료**(`2824ad6`, 2026-09-21). 브랜치 보존.
-  - 나머지 도메인 코드(취약 음소 분석 상세 로직, 인식 유스케이스가 AI 연동 어댑터를 실제로 호출하는 배선 등)는 아직 구현 전.
+  - (9/17 당시) 나머지 도메인 코드(취약 음소 분석 상세 로직, 인식 유스케이스가 AI 연동 어댑터를 실제로 호출하는 배선 등)는 구현 전이었다. 지금은 모두 구현됐다.
 
 ## 작업 이력
 
@@ -347,7 +348,7 @@
   - **리뷰 반영(9/30, 백엔드 B)**: AI 응답의 문장 항목을 검증하지 않아, AI가 `text`를 빼먹으면 `ShownPrompt`의 `IllegalArgumentException`이 전역 핸들러에서 **400(사용자 요청 오류)** 으로 나갔다. 사용자는 잘못한 게 없으므로 어댑터에서 문장 항목(null, 빈 `prompt_id`·`text`), `seed`(누락·요청과 불일치), 전략(`random` 외)을 확인해 어긋나면 503(`AI_INFERENCE_UNAVAILABLE`)으로 바꾼다. 응답 `seed`를 원시 타입 `long`으로 받아 누락 시 조용히 0이 기록되던 문제도 `Long`으로 바꿔 막았다. 수정 전 어댑터로 새 테스트 6건이 모두 실패하는 것을 확인했다.
   - 테스트 33건(AI 어댑터 10, 프로파일 연결 3, 도메인 6, 영속성 3, 서비스 7, 통합 4).
 
-### 23. 자모 오류 통계 — 구 취약 음소 분석 (feature/jamo-error-stats) — PR #38 리뷰 중
+### 23. 자모 오류 통계 — 구 취약 음소 분석 (feature/jamo-error-stats) — 완료 (PR #38 병합)
 
 - `GET /api/v1/users/me/jamo-error-stats`. 9/24 합의대로 **세션 하나가 아니라 사용자의 분석 완료 세션들을 누적**해 계산한다(세션 하나 5문장으로는 자모별 표본이 모이지 않음). 이름도 계약 변경안대로 바꿨다(`AnalyzeWeakPhonemesUseCase` 삭제 → `GetJamoErrorStatsUseCase`). 계산은 AI(`/v1/analysis/jamo-errors`)가 하고 백엔드는 정답·인식 결과 쌍을 모아 보내고 결과를 스냅샷으로 저장한다(AI 계약 §1).
   - **세션이 `ANALYZED`가 되는 규칙**: "**문장마다 가장 최근 녹음이 `DONE`**"(`DiagnosisSession.markAnalyzedIfAllSentencesDone`). 인식에 실패한 녹음이 남아 있어도 같은 문장을 다시 녹음해 `DONE`이면 끝날 수 있다(다시 녹음한 것이 가장 최근이 됨). `ANALYZED` 이후 업로드는 409(`ensureRecordable`). 처음엔 "문장마다 `DONE` 녹음이 하나라도"였는데 리뷰 반영 때 바꿨다(아래 리뷰 반영 참고).
@@ -374,7 +375,7 @@
     - **경합은 H2가 아니라 실제 MySQL(Testcontainers)로 검증한다.** H2는 늦은 INSERT가 잠금을 기다리지 않고 다른 예외(동시 수정)로 실패해서 운영과 다르게 동작했다. 테스트는 한쪽을 잠근 채 세워 두고, 다른 쪽이 잠금을 기다리기 시작한 걸 MySQL 잠금 표로 확인한 뒤 풀어서 순서를 고정한다(`DiagnosisRecordingRaceTest`, `JamoErrorSnapshotConcurrentSaveTest`). 수정을 하나씩 빼면 해당 테스트가 실패하는 것까지 확인했다. 이 과정에서 두 가지를 겪었다: `information_schema.innodb_trx`는 0.1초 안에 다시 읽으면 캐시를 갱신하지 않아 잠금 대기를 끝내 못 봤다(`performance_schema.data_locks`로 바꿈). 테스트가 중간에 실패해 직접 연 트랜잭션이 잠금을 쥔 채 남으면 테이블 삭제가 영원히 기다렸다(정리 단계에서 먼저 롤백, 컨테이너 잠금 대기 한도 10초).
   - 테스트: 최신 develop(PR #36·#37 포함)으로 리베이스 후 전체 317건 통과. MySQL 경합 테스트는 Redis 테스트처럼 Docker가 필요하다.
 
-### 24. 배포 환경 진단 문장 시드 (fix/seed-diagnosis-sentences) — PR 대기
+### 24. 배포 환경 진단 문장 시드 (fix/seed-diagnosis-sentences) — 완료 (PR #42 병합)
 
 - **증상**: 프론트 진행사항에 "진단용 문장 데이터가 없어 E2E 중단"으로 보고됨. 배포 서버에서 진단 세션 시작이 404("낭독할 문장이 아직 준비되지 않았습니다").
 - **원인**: 시드(`SentenceSeeder`)가 `@Profile("local")`이라 배포(`prod`) 환경에서는 돌지 않아 `sentences` 테이블이 비어 있었다.
@@ -384,7 +385,7 @@
 - **검증**: 빈 MySQL DB에 `prod` 프로필로 기동 → 문장 10개 삽입, 진단 세션 시작 201(문장 5개), 재기동 후에도 10개. 테스트 2건 추가(켜면 넣고 다시 돌려도 중복 없음, 끄거나 없으면 등록 안 됨). 전체 333건 통과.
 - **남은 것**: 10문장은 임시 세트다. 정식 세트로 바꿀 때는 이미 문장이 있는 환경이 자동으로 바뀌지 않으므로 교체 작업이 따로 필요하다.
 
-### 25. 진단 녹음 오디오 변환 (feature/diagnosis-audio-normalization) — PR 대기
+### 25. 진단 녹음 오디오 변환 (feature/diagnosis-audio-normalization) — 완료 (PR #43 병합)
 
 - 진단 업로드가 브라우저 원본(보통 WebM)을 그대로 AI에 보내서, 실제 AI에 연결하면 진단 녹음이 전부 `FAILED`였다. #39의 변환기(`AudioNormalizationPort`)를 진단 업로드에도 붙였다.
 - **업로드할 때 변환한다**: 확인(소유자·세션 상태·문장) → 변환 → 저장 → 등록. 거절할 요청에 변환기를 쓰지 않도록 확인을 먼저 한다. 인식 단계(비동기)에서 변환하면 사용자는 다음 문장을 녹음하는 중에야 실패를 알게 된다. #39가 변환기 대기(2초)와 503 분리를 넣어 동기로 해도 5문장 연속 업로드를 감당할 수 있게 됐다.
@@ -393,21 +394,21 @@
   - 9/29에는 `FAILED`에 실패 사유 4가지를 붙이기로 했는데, 업로드할 때 변환하면 오디오 문제 3가지는 업로드 순간에 거절되고 `FAILED`는 AI 문제뿐이라 `failureReason` 필드는 만들지 않았다.
 - **검증**: 실제 FFmpeg를 쓰는 통합 테스트 4건(WebM → WAV로 저장되고 AI에도 같은 WAV가 감, 짧음·김·깨진 파일은 각 코드로 거절되고 저장하지 않음), 서비스 단위 테스트(이유별 코드, 503 전달, 거절할 요청에는 변환기를 쓰지 않음). 로컬 실제 구동: 스테레오 Opus WebM 5문장 → 202, 전부 `DONE`, 세션 `ANALYZED`, 저장 파일은 PCM16·16kHz·모노 WAV, 0.1초 녹음 400 `AUDIO_TOO_SHORT`, 깨진 파일 400 `AUDIO_INVALID`. 일반 테스트 335건, FFmpeg 테스트 21건 통과.
 
-### 26. 진단 세션 `COMPLETED` 상태 제거 (refactor/remove-diagnosis-completed) — PR 대기
+### 26. 진단 세션 `COMPLETED` 상태 제거 (refactor/remove-diagnosis-completed) — 완료 (PR #44 병합)
 
 - 9/16 계약의 `IN_PROGRESS → ANALYZED → COMPLETED` 중 `COMPLETED`는 바꾸는 API도 호출하는 곳도 없어 도달할 수 없는 상태였다. 명세서에도 뜻이 없었다.
 - enum 값, `DiagnosisSession.complete()`, 명세서 2.2의 `COMPLETED`를 뺐다. 자모 오류 통계의 집계 대상은 `ANALYZED`만 남는다(실제 동작은 같음).
 - DB는 바꾸지 않아도 된다. 이 상태로 저장된 세션은 있을 수 없고, 운영의 스키마 검사(`ddl-auto: validate`)는 enum 컬럼의 값 목록을 비교하지 않는다. MySQL 컨테이너에서 `status` 컬럼에 `COMPLETED`를 남긴 채 `validate`로 기동되는 것을 확인했다.
 - "사용자가 결과를 확인함" 같은 다음 단계가 필요해지면 그때 의미와 API를 같이 정해 추가한다.
 
-### 27. 추천 기록에 문장 풀 버전·해시 저장 (feature/prompt-pool-version) — PR 대기
+### 27. 추천 기록에 문장 풀 버전·해시 저장 (feature/prompt-pool-version) — 완료 (PR #45 병합)
 
 - AI가 10/3 추천 응답에 `pool_version`(예: `script-pool-v1`, 문장 풀 파일을 바꿀 때 올림)과 `pool_sha256`(고른 문장 집합의 해시)을 추가하고, 제안한 문장마다 전략 버전·seed와 함께 저장해 달라고 요청했다(AI 답변 R5). 전략 버전·seed·`pool_sha256`이 모두 같아야 같은 문장이 다시 나온다. 풀이 바뀌면 같은 seed로도 다른 문장이 나오는 게 정상이다.
 - `shown_prompts`에 `pool_version`, `pool_sha256` 컬럼을 추가했다. 두 값이 없는 AI 응답은 계약 위반으로 503, 새 기록은 도메인(`ShownPrompt.create`)에서도 두 값을 요구한다. 컬럼 추가 전 기록은 null로 읽는다.
 - 개인화 녹음의 `promptPoolVersion`(#40)은 이 값(`ShownPrompt.getPoolVersion()`)으로 채울 수 있다. 개인화 쪽 코드라 여기서는 바꾸지 않았다.
 - **운영 DB**: `ALTER TABLE shown_prompts ADD COLUMN pool_version VARCHAR(255) NULL, ADD COLUMN pool_sha256 VARCHAR(255) NULL;` 이 없으면 `validate`에서 서버가 뜨지 않는다. MySQL 컨테이너에서 #37 DDL로 만든 테이블에 대해, 추가 전에는 `missing column`으로 기동 실패하고 추가 후에는 기동되며 기존 행은 null로 남는 것을 확인했다.
 
-### 28. 인증 실패를 401로 (fix/unauthenticated-401) — PR 대기
+### 28. 인증 실패를 401로 (fix/unauthenticated-401) — 완료 (PR #46 병합)
 
 - 토큰 없이 인증이 필요한 API를 부르면 본문 없는 403이 나갔다. 보안 설정에 인증 실패 응답(`AuthenticationEntryPoint`)이 없어 스프링 시큐리티 기본값이 쓰였기 때문이다. 명세서(0.5)는 401이다.
 - `JwtAuthenticationEntryPoint`를 추가해 401을 공통 응답 형식으로 돌려준다. 토큰이 없으면 `AUTH_REQUIRED`(새 코드), 토큰이 만료됐거나 위조됐으면 필터가 남긴 거절 이유 그대로 `AUTH_TOKEN_EXPIRED`다. 프론트는 `AUTH_TOKEN_EXPIRED`면 재발급, `AUTH_REQUIRED`면 로그인으로 보내면 된다.
@@ -420,25 +421,24 @@
 
 - **TTS 등 진단 외 `@Async`는 스프링 부트 기본 실행기(스레드 8개, 대기열 무제한)를 쓴다.** 스레드가 늘지는 않지만 대기열에 상한이 없어 작업이 몰리면 대기가 길어진다. 진단 인식은 전용 실행기로 분리했다(9/29, 작업 이력 23번). 나머지 설정은 담당자와 논의.
 - **비동기 인식 중 서버가 죽으면 해당 녹음이 `PROCESSING`에 갇힌다.** 재시도 경로가 없어, 사용자가 그 문장을 다시 녹음하기 전까지 세션이 끝나지 않는다(세션은 문장마다 가장 최근 녹음이 `DONE`이어야 `ANALYZED`가 됨). 같은 종류로, **세션 완료 판단(`DiagnosisSessionAnalysisTrigger`) 자체가 DB 오류 등으로 실패하면** 녹음은 이미 전부 `DONE`으로 커밋된 뒤라 다시 판단할 계기가 없어 세션이 `IN_PROGRESS`에 남는다. 둘을 묶어 복구 수단(재시도 API 또는 정리 스케줄러)을 만드는 것을 9/29 회의 안건으로 올렸다.
-- **운영 DB에 `jamo_error_snapshots`, `jamo_error_snapshot_tokens` 테이블과 `idx_diagnosis_sessions_user_status` 인덱스를 직접 만들어야 한다.** prod는 `ddl-auto: validate`이고 저장소에 스키마 관리 도구가 없다. DDL은 PR 본문 참고.
-- 자모 오류 통계: `min_support`는 진단 화면용으로 10으로 정했다(9/29). AI 담당에게는 통계적으로 괜찮은지만 확인을 요청한다. "모델이 다른 세션을 누적해도 되나"는 진단을 항상 기본 모델로 인식하기로 하면서 해소됐다(단 HTTP 어댑터가 `use_adapter`를 전달해야 실제로 고정됨).
+- **배포 전 운영 DB에 직접 적용할 DDL이 있다.** prod는 `ddl-auto: validate`라 테이블·컬럼이 코드와 다르면 서버가 뜨지 않고, 저장소에 스키마 관리 도구가 없다.
+  - `jamo_error_snapshots`, `jamo_error_snapshot_tokens` 테이블과 `idx_diagnosis_sessions_user_status` 인덱스 — PR #38 본문
+  - `shown_prompts` 테이블 — PR #37 본문, 문장 풀 컬럼 `pool_version`·`pool_sha256` 추가 — PR #45 본문(작업 이력 27번)
+  - 개인화 테이블 — [`PERSONALIZATION-RECORDING-SCHEMA.md`](./PERSONALIZATION-RECORDING-SCHEMA.md), [`PERSONALIZATION-JOB-ADAPTER-SCHEMA.md`](./PERSONALIZATION-JOB-ADAPTER-SCHEMA.md) (PR #40)
+- **배포된 AI 서버가 없다**(10/3 AI 쪽 문서). 배포 환경에서는 진단 인식이 `FAILED`, 자모 통계·추천이 503이다. 로컬은 스텁으로 동작한다. 데모 방식은 팀장 결정 대기.
+- 자모 오류 통계: `min_support`는 진단 화면용으로 10으로 정했다(9/29). AI 쪽 답(10/3, R2): 탐색용 화면으로는 괜찮지만 사용자 발음 판정처럼 보이면 안 되고, 오류율은 횟수와 함께 보여줘야 한다(프론트에 전달). 진단을 기본 모델로 고정하는 `use_adapter=false`는 #40에서 반영됐다.
 - **`S3StorageAdapter`는 실제로 검증하지 못했다.** 버킷과 크레덴셜이 없어 로컬 파일 어댑터로만 확인했다. 인프라 쪽에 프로비저닝 요청이 등록돼 있다.
-- **AI 서버에 문장 풀 파일(`data/script_pool.json`)이 없으면 추천이 항상 503이다.** AI 레포에 이 파일이 없다(AI-Hub 낭독 스크립트라 레포에 올리지 않은 것으로 보임). 서버에 넣는 방법(`PROMPT_POOL` 환경변수로 경로 지정 가능)을 AI 담당과 맞춰야 한다.
-- **운영 DB에 `shown_prompts` 테이블을 직접 만들어야 한다.** prod는 `ddl-auto: validate`이고 저장소에 스키마 관리 도구가 없다(기존 테이블도 같은 상황). DDL은 PR 본문 참고. 이미 만들었다면 문장 풀 컬럼 두 개를 추가해야 한다(작업 이력 27번).
-- 개인화 녹음(FR-7)이 받은 `promptId`를 검증하려면 `ShownPromptRepositoryPort`에 "이 사용자에게 제안한 문장인가" 조회를 추가하면 된다. 아직 쓰는 곳이 없어 만들지 않았다.
+- **AI 서버에 문장 풀 파일(`data/script_pool.json`)이 없으면 추천이 항상 503이다.** AI-Hub 낭독 스크립트라 레포에 올리지 않았고, 서버에 둬도 되는지 AI 쪽이 약관을 확인 중이다(10/3, R1). 확인되면 `PROMPT_POOL` 환경변수로 경로를 지정해 배포한다.
 
 - 아키텍처 감사(12번)에서 발견된 남은 참고 사항: `SecurityConfig`의 CORS가 `allowedOriginPatterns("*")` + `allowCredentials(true)` 조합 — 감사 체크리스트 항목엔 없어 수정하지 않았음, 운영 배포 전 재검토 필요.
-- 인식 유스케이스(녹음 업로드 → 실제 인식 → 결과 조회)가 아직 없어서 `JPyRustAiInferenceClient`(PR #9)는 인프라 배선만 완료된 상태 — API 레벨에서는 아직 아무 효과가 없음.
 - 테스트 커버리지 19% → 42.1%(PR #13) → **48.6%**(PR #18 기준, `jacocoTestReport` 실측: 266/547 라인)로 계속 개선 중이지만 `adapter.in.web`/`adapter.in.web.dto`/`adapter.out.persistence`는 여전히 0% — `jacocoTestCoverageVerification`은 여전히 `build`/`check`에 묶여 있지 않음(warn-only 유지 중).
 - `docker-compose.yml`(PR #17)은 **로컬 개발 전용**이다 — MySQL `MYSQL_ALLOW_EMPTY_PASSWORD` 등 프로덕션에 쓰면 안 되는 설정이 포함되어 있음. 운영 배포용 compose/매니페스트는 별도로 준비해야 한다(스코프 밖).
 - PR #18부터 Redis가 로그인/refresh의 필수 인프라가 됨 — 운영 배포 시 Redis 프로비저닝을 반드시 함께 계획해야 한다(현재 운영 Redis 이중화/영속성 정책은 미정).
 ## 다음 단계 후보
 
-- 백엔드 A가 진단 세션 나머지 4개 유스케이스(세션 조회/녹음 업로드/결과 조회/취약 음소 분석)를 **엔드포인트별 브랜치로 나눠** 이어서 구현. PR #21(`Recording` 도메인) 병합 후 develop에서 분기하며, 다음은 **녹음 업로드**(`UploadDiagnosisRecordingUseCase`) 차례.
-  - 업로드 구현 전 선행 필요: `build.gradle`에 AWS SDK(`software.amazon.awssdk:s3`) 추가, `port/out/StoragePort` 정의(`String upload(byte[] fileBytes, String fileName)`), `adapter/out/storage` 구현체 — 현재 이 패키지는 `package-info.java`만 있는 빈 상태.
-  - 미결정 사항 2건: (1) AI 인식 비동기 트리거 방식(동기 / `@Async` / 스프링 이벤트 + `@TransactionalEventListener`) — 팀장이 판단을 위임했고 코드리뷰에서 함께 논의 예정. 비동기 선택 시 서버 재시작으로 `PROCESSING`에 갇힌 녹음을 되살릴 복구 수단을 함께 설계할지 결정 필요. (2) 로컬 개발에서 S3를 어떻게 대체할지(실제 버킷 / LocalStack / 파일시스템 어댑터를 프로파일로 분리) — 인프라 담당 확인 필요.
+- 백엔드 A: `PROCESSING`에 갇힌 녹음과 완료 판단 실패의 복구 수단, 진단 녹음에 실제로 쓴 모델·`base_reason` 저장. 자세한 내용은 [`NEXT-STEPS-diagnosis-session.md`](./NEXT-STEPS-diagnosis-session.md)의 "남은 일".
 - `feature/diagnosis-session` 브랜치(보존 중)는 `8df48bd`에서 멈춰 있고 develop과 크게 벌어져 있음 — 더 쓰지 않을 거면 정리 여부를 팀에서 결정할 것.
-- 백엔드 B(태원으로 추정, 팀 R&R 미확정이라 단정은 보류)가 `feature/personalization-recognition` 브랜치(보존 중)에서 나머지 유스케이스(녹음 업로드/학습 트리거/학습 상태 조회/실사용 인식/인식 이력) 이어서 구현 — `JPyRustAiInferenceClient`(`feature/ai-inference-jpyrust` 브랜치, 보존 중)를 실제로 호출하는 배선이 핵심.
+- 백엔드 B: 개인화 녹음의 `promptPoolVersion`을 추천 기록의 문장 풀 버전(`ShownPrompt.getPoolVersion()`, #45)으로 채우기. 실사용 인식·개인화 업로드의 오디오 오류 코드를 진단처럼 나눌지는 팀장 결정 대기.
 - 컨트롤러/DTO/영속성 어댑터 계층 통합 테스트 보강(현재 0%) — 도메인/application 계층은 이미 양호한 수준.
 - `SecurityConfig` CORS 설정(`allowedOriginPatterns("*")` + `allowCredentials(true)`) 운영 배포 전 재검토.
 - 운영 배포용 인프라 정의(docker-compose는 로컬 전용) — 특히 Redis(PR #18부터 필수 의존성) 프로비저닝 계획 수립.

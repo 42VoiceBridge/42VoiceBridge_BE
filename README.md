@@ -75,7 +75,8 @@ graph TB
 
 ### 인증 — 완료
 - 이메일/비밀번호 회원가입·로그인
-- 카카오 로그인 (프론트가 카카오 SDK로 받은 accessToken을 백엔드가 그대로 카카오 API에 검증 요청 — 백엔드가 카카오 REST API 키를 가질 필요가 없는 설계)
+- 카카오 로그인 (인가 코드 방식, PR #41 — 프론트가 `Kakao.Auth.authorize()`로 받은 인가 코드를 백엔드가 카카오 토큰으로 교환해 사용자를 확인한다. 백엔드에 카카오 REST API 키와 Redirect URI 설정이 필요하다)
+- 인증이 필요한 API를 토큰 없이 부르면 401 `AUTH_REQUIRED`, 토큰이 만료·위조됐으면 401 `AUTH_TOKEN_EXPIRED`(PR #46)
 - JWT 액세스/리프레시 토큰 발급·재발급. refresh token은 SHA-256으로 별도 해싱해 **Redis**에 저장(사용자 비밀번호용 BCrypt와 관심사 분리 — BCrypt는 72바이트 제한이 있어 JWT 길이의 토큰에는 쓸 수 없음). Redis TTL로 만료를 자동 처리해 별도 정리(cleanup) 로직이 필요 없음 — **Redis가 기동되어 있지 않으면 로그인/refresh 자체가 실패**
 
 ### AI 음성 인식 연동 — HTTP 어댑터로 배선 완료
@@ -120,7 +121,7 @@ graph TB
 |---|---|---|---|
 | 1 | `POST /api/v1/auth/signup` | 불필요 | 이메일/비밀번호 회원가입 |
 | 2 | `POST /api/v1/auth/login` | 불필요 | 이메일/비밀번호 로그인 |
-| 3 | `POST /api/v1/auth/kakao` | 불필요 | 카카오 로그인 |
+| 3 | `POST /api/v1/auth/kakao` | 불필요 | 카카오 로그인. 본문 `{ "authorizationCode": "..." }` |
 | 4 | `POST /api/v1/auth/refresh` | 불필요 | 액세스/리프레시 토큰 재발급 |
 | 5 | `POST /api/v1/diagnosis-sessions` | JWT 필요 | 진단 세션 시작(낭독 문장 목록 반환) |
 | 6 | `GET /api/v1/diagnosis-sessions/{sessionId}` | JWT 필요 | 세션 조회(문장별 녹음 상태 포함) |

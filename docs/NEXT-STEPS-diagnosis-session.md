@@ -8,9 +8,15 @@
 |---|---|
 | POST /diagnosis-sessions | 완료 (PR #7) |
 | GET /diagnosis-sessions/{id} | 완료 |
-| POST /diagnosis-sessions/{id}/recordings | 완료 (PR #24) |
+| POST /diagnosis-sessions/{id}/recordings | 완료 (PR #24). 업로드 때 WAV 변환 (PR #43) |
 | GET .../recordings/{rid}/result | 완료 |
-| ~~GET .../weak-phonemes~~ → `GET /users/me/jamo-error-stats` | 완료 (PR #38 리뷰 중) — 세션 단위에서 사용자 단위 누적으로 계약 변경 |
+| ~~GET .../weak-phonemes~~ → `GET /users/me/jamo-error-stats` | 완료 (PR #38) — 세션 단위에서 사용자 단위 누적으로 계약 변경 |
+
+## 남은 일
+
+- **`PROCESSING`에 갇힌 녹음 복구.** 비동기 인식 중 서버가 죽으면 그 녹음이 `PROCESSING`에 남고, 사용자가 그 문장을 다시 녹음하기 전까지 세션이 끝나지 않는다. 세션 완료 판단(`DiagnosisSessionAnalysisTrigger`)이 DB 오류로 실패해도 다시 판단할 계기가 없다. 재시도 API나 정리 스케줄러 중 하나로 같이 해결한다(9/29 안건).
+- **진단 녹음에 실제로 쓴 모델 기록.** AI는 결과마다 모델(`model.adapter_id`)·`base_reason`·디코딩 설정을 함께 저장하라고 한다. 지금은 진단을 기본 모델로 요청만 하고 응답의 실제 값은 남기지 않는다. 자모 통계에 다른 조건의 결과가 섞이지 않았는지 확인하는 근거가 된다.
+- **진단 문장 10개는 임시 세트다.** 정식 세트로 바꿀 때는 이미 문장이 있는 환경이 자동으로 바뀌지 않으므로(시드는 테이블이 비었을 때만 넣음) 교체 작업이 따로 필요하다.
 
 ## 이미 갖춰진 기반
 
