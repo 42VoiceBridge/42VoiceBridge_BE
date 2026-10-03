@@ -21,11 +21,8 @@ class DiagnosisSessionPersistenceAdapterTest {
 
   private DiagnosisSession save(UUID userId, DiagnosisSessionStatus status) {
     DiagnosisSession session = DiagnosisSession.start(userId, List.of(UUID.randomUUID()));
-    if (status != DiagnosisSessionStatus.IN_PROGRESS) {
+    if (status == DiagnosisSessionStatus.ANALYZED) {
       session.markAnalyzed();
-    }
-    if (status == DiagnosisSessionStatus.COMPLETED) {
-      session.complete();
     }
     return adapter.save(session);
   }
@@ -35,7 +32,6 @@ class DiagnosisSessionPersistenceAdapterTest {
     UUID userId = UUID.randomUUID();
     save(userId, DiagnosisSessionStatus.IN_PROGRESS);
     DiagnosisSession analyzed = save(userId, DiagnosisSessionStatus.ANALYZED);
-    DiagnosisSession completed = save(userId, DiagnosisSessionStatus.COMPLETED);
     save(UUID.randomUUID(), DiagnosisSessionStatus.ANALYZED);
     entityManager.flush();
     entityManager.clear();
@@ -43,8 +39,6 @@ class DiagnosisSessionPersistenceAdapterTest {
     List<DiagnosisSession> found =
         adapter.findByUserIdAndStatusIn(userId, DiagnosisSessionStatus.aggregated());
 
-    assertThat(found)
-        .extracting(DiagnosisSession::getId)
-        .containsExactlyInAnyOrder(analyzed.getId(), completed.getId());
+    assertThat(found).extracting(DiagnosisSession::getId).containsExactly(analyzed.getId());
   }
 }

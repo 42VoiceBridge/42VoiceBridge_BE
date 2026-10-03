@@ -8,8 +8,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * 진단 세션 도메인 엔티티. 상태 전이 규칙(IN_PROGRESS → ANALYZED → COMPLETED)을 이 클래스가 직접 소유한다(Rich Domain Model) —
- * Service는 이 메서드들을 호출만 한다.
+ * 진단 세션 도메인 엔티티. 상태 전이 규칙(IN_PROGRESS → ANALYZED)을 이 클래스가 직접 소유한다(Rich Domain Model) — Service는 이
+ * 메서드들을 호출만 한다.
  */
 public class DiagnosisSession {
 
@@ -97,13 +97,6 @@ public class DiagnosisSession {
     if (status != DiagnosisSessionStatus.IN_PROGRESS) {
       throw new IllegalStateException("분석이 끝난 세션에는 녹음을 추가할 수 없습니다.");
     }
-  }
-
-  public void complete() {
-    if (status != DiagnosisSessionStatus.ANALYZED) {
-      throw new IllegalStateException("분석이 끝난 세션만 완료 처리할 수 있습니다.");
-    }
-    this.status = DiagnosisSessionStatus.COMPLETED;
   }
 
   public boolean isOwnedBy(UUID userId) {
