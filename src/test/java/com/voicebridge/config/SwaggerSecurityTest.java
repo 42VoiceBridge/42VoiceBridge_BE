@@ -28,6 +28,6 @@ class SwaggerSecurityTest {
 
   @Test
   void 기존_보호_엔드포인트는_swagger_permitAll에_영향받지않고_여전히_인증이_필요하다() throws Exception {
-    mockMvc.perform(get("/api/v1/users/me").with(csrf())).andExpect(status().isForbidden());
+    mockMvc.perform(get("/api/v1/users/me").with(csrf())).andExpect(status().isUnauthorized());
   }
 }
