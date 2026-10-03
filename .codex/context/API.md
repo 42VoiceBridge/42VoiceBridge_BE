@@ -81,6 +81,8 @@ https://{host}/api/v1
 | 401 | 인증 실패/토큰 만료 |
 | 403 | 권한 없음(타인 데이터 접근 등) |
 | 404 | 리소스 없음 |
+| 405 | 그 주소가 받지 않는 HTTP 메서드 |
+| 415 | 그 API가 받지 않는 Content-Type |
 | 409 | 상태 충돌(예: 이미 진행중인 학습 job에 재요청) |
 | 422 | 비즈니스 규칙 위반(예: 최소 녹음 개수 미충족) |
 | 500 | 서버 내부 오류 |
@@ -97,8 +99,10 @@ https://{host}/api/v1
 | `REFRESH_TOKEN_INVALID` | 리프레시 토큰이 위조·만료됐거나 이미 재발급에 쓰여 무효화됨 (HTTP 401) |
 | `KAKAO_AUTH_FAILED` | 카카오 로그인 실패 — 인가 코드 만료·재사용, redirect URI 불일치, 카카오 서버 장애 등 (HTTP 401) |
 | `EMAIL_ALREADY_EXISTS` | 이미 가입된 이메일 (HTTP 409). 카카오 계정 이메일이 기존 이메일 회원과 같을 때도 발생 |
-| `VALIDATION_FAILED` | 요청 검증 실패. 필수 파라미터·파일이 빠지면 메시지에 빠진 필드명이 담긴다(예: `필수 요청 값이 없습니다: audioFile`) |
-| `RESOURCE_NOT_FOUND` | 대상 리소스 없음 |
+| `VALIDATION_FAILED` | 요청 검증 실패. 필수 파라미터·파일이 빠지면 메시지에 빠진 필드명이 담긴다(예: `필수 요청 값이 없습니다: audioFile`). 읽을 수 없는 JSON 본문도 이 코드다 |
+| `RESOURCE_NOT_FOUND` | 대상 리소스 없음. 없는 API 주소도 404로 온다 |
+| `METHOD_NOT_ALLOWED` | 그 주소가 받지 않는 HTTP 메서드 (HTTP 405, `Allow` 헤더에 허용 메서드) |
+| `UNSUPPORTED_MEDIA_TYPE` | 그 API가 받지 않는 Content-Type (HTTP 415) |
 | `FORBIDDEN_ACCESS` | 본인 소유가 아닌 리소스 접근 |
 | `INVALID_STATE_TRANSITION` | 상태 머신 규칙 위반 (예: 분석이 끝난 진단 세션에 녹음 추가) |
 | `TRAINING_UNAVAILABLE` | 온라인 학습 계약과 AI job 조회 경로가 없어 학습 요청을 접수할 수 없음 (HTTP 503) |
@@ -814,3 +818,4 @@ POST /v1/enroll/next-prompts
 | 2026-10-03 | 2.2 | 진단 세션 `status`에서 `COMPLETED` 삭제. 전환하는 API가 없어 도달할 수 없는 값이었다 |
 | 2026-10-03 | 7.6 | AI 응답의 `pool_version`·`pool_sha256`을 제안 기록에 저장, 없으면 503 (AI 답변 R5) |
 | 2026-10-03 | 0.2, 0.6 | 토큰 없이 호출하면 403(본문 없음) → 401 `AUTH_REQUIRED`, 만료·무효 토큰은 401 `AUTH_TOKEN_EXPIRED`로 공통 응답 형식에 맞춤 |
+| 2026-10-03 | 0.5, 0.6 | 클라이언트 요청 실수가 500으로 나가던 것을 수정: 없는 주소 404 `RESOURCE_NOT_FOUND`, 받지 않는 메서드 405 `METHOD_NOT_ALLOWED`, 읽을 수 없는 JSON 400 `VALIDATION_FAILED`, 받지 않는 Content-Type 415 `UNSUPPORTED_MEDIA_TYPE` |
