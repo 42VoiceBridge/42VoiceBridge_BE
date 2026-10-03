@@ -50,7 +50,12 @@ class RecommendationIntegrationTest {
         .thenAnswer(
             invocation ->
                 new PromptBatch(
-                    "random", "prompt-random-v1", invocation.getArgument(2), List.of(prompts)));
+                    "random",
+                    "prompt-random-v1",
+                    invocation.getArgument(2),
+                    "script-pool-v1",
+                    "0123456789abcdef",
+                    List.of(prompts)));
   }
 
   @Test

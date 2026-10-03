@@ -688,10 +688,11 @@ POST /v1/analysis/jamo-errors
 ```
 POST /v1/enroll/next-prompts
 요청: { "user_id": "uuid", "n": 10, "strategy": "random", "seed": 호출마다 새 값, "exclude_prompt_ids": [이미 제안한 ID] }
-응답: strategy, strategy_version, seed, pool_size, prompts[{ prompt_id, text }]
+응답: strategy, strategy_version, seed, pool_size, pool_version, pool_sha256, prompts[{ prompt_id, text }]
 ```
 
 - `seed`가 같으면 같은 문장이 나오므로 호출마다 새로 뽑고 기록한다. `coverage`·`error_based` 전략은 501.
+- `strategy_version`·`seed`·`pool_sha256`이 모두 같아야 같은 문장이 다시 나온다(`pool_version`은 문장 풀 파일을 바꿀 때 올라간다). 네 값을 제안 기록(`shown_prompts`)에 함께 남긴다. `pool_version`이나 `pool_sha256`이 없으면 계약 위반으로 보고 503(`AI_INFERENCE_UNAVAILABLE`).
 - 서버에 문장 풀 파일(`data/script_pool.json`)이 없으면 503(`prompt_pool_missing`).
 - 구현: `HttpEnrollmentPromptClient` (로컬 프로파일은 `StubEnrollmentPromptClient`)
 
@@ -750,4 +751,5 @@ POST /v1/enroll/next-prompts
 | 2026-10-02 | 5.1 | 기본 모델 요청 시 `use_adapter=false` 전달, AI 응답의 adapter ID로 `modelUsed` 판정 및 요청·응답 불일치 503 처리 명시 |
 | 2026-10-03 | 4.1 | JSON Content-Type 파라미터 허용, metadata 크기·문자열 타입 검증 및 원인별 오류 메시지·Blob 예시 추가; 보관 설정 기준 명시 (PR #40 리뷰 반영) |
 | 2026-10-03 | 0.6, 2.3, 2.4 | 진단 업로드 시 WAV 변환. 녹음 문제는 `AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`(400), 변환 지연은 `AUDIO_PROCESSING_UNAVAILABLE`(503). `FAILED`는 AI 쪽 문제뿐이라 `failureReason` 계획 취소 (PR #43) |
+| 2026-10-03 | 7.6 | AI 응답의 `pool_version`·`pool_sha256`을 제안 기록에 저장, 없으면 503 (AI 답변 R5) |
 | 2026-10-03 | 2.2 | 진단 세션 `status`에서 `COMPLETED` 삭제. 전환하는 API가 없어 도달할 수 없는 값이었다 |

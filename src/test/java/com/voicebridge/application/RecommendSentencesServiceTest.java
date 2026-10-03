@@ -51,7 +51,12 @@ class RecommendSentencesServiceTest {
         .thenAnswer(
             invocation ->
                 new PromptBatch(
-                    "random", "prompt-random-v1", invocation.getArgument(2), List.of(prompts)));
+                    "random",
+                    "prompt-random-v1",
+                    invocation.getArgument(2),
+                    "script-pool-v1",
+                    "0123456789abcdef",
+                    List.of(prompts)));
   }
 
   private long capturedSeed() {
@@ -72,7 +77,7 @@ class RecommendSentencesServiceTest {
   }
 
   @Test
-  void 받은_문장을_AI에_보낸_seed와_함께_기록하고_돌려준다() {
+  void 받은_문장을_AI에_보낸_seed_문장_풀과_함께_기록하고_돌려준다() {
     when(shownPromptRepositoryPort.findPromptIdsByUserId(userId)).thenReturn(Set.of());
     aiReturns(new Prompt("02-03-0001", "식당이 어디예요?"), new Prompt("06-01-0003", "물 좀 주세요."));
 
@@ -95,6 +100,8 @@ class RecommendSentencesServiceTest {
             shown -> {
               assertThat(shown.getSeed()).isEqualTo(seed);
               assertThat(shown.getStrategyVersion()).isEqualTo("prompt-random-v1");
+              assertThat(shown.getPoolVersion()).isEqualTo("script-pool-v1");
+              assertThat(shown.getPoolSha256()).isEqualTo("0123456789abcdef");
               assertThat(shown.getUserId()).isEqualTo(userId);
             });
   }

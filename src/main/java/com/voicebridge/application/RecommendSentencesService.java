@@ -40,7 +40,9 @@ public class RecommendSentencesService implements RecommendSentencesUseCase {
                         prompt.text(),
                         batch.strategy(),
                         batch.strategyVersion(),
-                        batch.seed()))
+                        batch.seed(),
+                        batch.poolVersion(),
+                        batch.poolSha256()))
             .toList();
     // 문장 풀을 모두 본 사용자는 빈 목록을 받는다
     if (!shown.isEmpty()) {

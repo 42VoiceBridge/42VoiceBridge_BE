@@ -81,6 +81,8 @@ public class HttpEnrollmentPromptClient implements EnrollmentPromptPort {
         response.strategy(),
         response.strategyVersion(),
         response.seed(),
+        response.poolVersion(),
+        response.poolSha256(),
         response.prompts().stream().map(p -> new Prompt(p.promptId(), p.text())).toList());
   }
 
@@ -95,6 +97,10 @@ public class HttpEnrollmentPromptClient implements EnrollmentPromptPort {
     }
     if (isBlank(response.strategyVersion())) {
       return "strategy_version 없음";
+    }
+    // 문장 풀 파일이 바뀌면 같은 seed로도 다른 문장이 나온다. 풀 버전과 해시가 없으면 이 추천을 재현할 수 있는지 판단할 수 없다.
+    if (isBlank(response.poolVersion()) || isBlank(response.poolSha256())) {
+      return "pool_version이나 pool_sha256 없음";
     }
     // 원시 타입으로 받으면 seed가 빠졌을 때 조용히 0이 기록된다
     if (response.seed() == null || response.seed() != requestedSeed) {
@@ -124,6 +130,8 @@ public class HttpEnrollmentPromptClient implements EnrollmentPromptPort {
       String strategy,
       @JsonProperty("strategy_version") String strategyVersion,
       Long seed,
+      @JsonProperty("pool_version") String poolVersion,
+      @JsonProperty("pool_sha256") String poolSha256,
       List<PromptItem> prompts) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)

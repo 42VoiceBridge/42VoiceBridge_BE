@@ -48,7 +48,10 @@ class PersonalizationAudioIntegrationTest {
       UUID user = UUID.randomUUID();
       ShownPrompt shown =
           prompts
-              .saveAll(List.of(ShownPrompt.create(user, "p-" + i, "문장", "random", "v1", i)))
+              .saveAll(
+                  List.of(
+                      ShownPrompt.create(
+                          user, "p-" + i, "문장", "random", "v1", i, "pool-v1", "pool-sha")))
               .get(0);
       var meta =
           new MockMultipartFile(
