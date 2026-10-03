@@ -35,3 +35,13 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Env / Secrets ###
+.env
+*.log
+
+### JPyRust runtime artifacts ###
+*.pt
+
+# 로컬 개발용 업로드 저장소 (LocalFileStorageAdapter)
+uploads/

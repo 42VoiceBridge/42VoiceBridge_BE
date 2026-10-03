@@ -1,0 +1,159 @@
+name: Backend CI and image
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    # Match the runtime image's Ubuntu release and FFmpeg packages.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      IMAGE: ghcr.io/42voicebridge/42voicebridge_be
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Check Docker and install audio tools
+        run: |
+          docker info
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
+      - name: Build and test
+        run: ./gradlew --no-daemon clean build audioIntegrationTest
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/
+            build/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Prepare image context
+        shell: bash
+        run: |
+          set -euo pipefail
+          jar_count=$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | wc -l)
+          if [ "$jar_count" -ne 1 ]; then
+            echo "Expected exactly one executable JAR, found $jar_count" >&2
+            exit 1
+          fi
+          jar_path=$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' -print -quit)
+          mkdir -p build/image-context
+          cp "$jar_path" build/image-context/app.jar
+          cp Dockerfile build/image-context/Dockerfile
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build image for verification
+        uses: docker/build-push-action@v7
+        with:
+          context: build/image-context
+          load: true
+          push: false
+          platforms: linux/amd64
+          tags: ${{ env.IMAGE }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Verify runtime audio tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$IMAGE:sha-$GITHUB_SHA"
+          # Require the package tested by audioIntegrationTest in the runtime too.
+          host_version=$(dpkg-query -W -f='${Version}' ffmpeg)
+          image_version=$(docker run --rm --entrypoint dpkg-query "$image" -W -f='${Version}' ffmpeg)
+          test "$host_version" = "$image_version"
+          docker run --rm --entrypoint sh "$image" -ec '
+            test "$(id -u)" = 10001
+            test -r /app/app.jar
+            java -version
+            ffmpeg -version
+            ffprobe -version
+            ffmpeg -v error -f lavfi -i sine=frequency=440:duration=1 -ar 48000 -ac 2 /tmp/input.webm
+            ffmpeg -v error -i /tmp/input.webm -ar 16000 -ac 1 -c:a pcm_s16le /tmp/output.wav
+            actual=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate,channels -of csv=p=0 /tmp/output.wav)
+            test "$actual" = "pcm_s16le,16000,1"
+          '
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish verified image and record digest
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$IMAGE:sha-$GITHUB_SHA"
+          docker push "$image"
+          docker tag "$image" "$IMAGE:$GITHUB_REF_NAME"
+          docker push "$IMAGE:$GITHUB_REF_NAME"
+          digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")
+          test -n "$digest"
+          echo "### Deployable backend image" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$digest\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # Infra's deploy-backend workflow accepts only main and deploys sha-<SHA> to the BE EC2.
+      # github.sha here is the BE commit just published; Infra reads it from client_payload.
+      - name: Notify Infra after GHCR publish
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          INFRA_DISPATCH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+          EVENT_TYPE: deploy-backend
+          SOURCE_REF: ${{ github.ref }}
+          SOURCE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$INFRA_DISPATCH_TOKEN"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          jq -n --arg event_type "$EVENT_TYPE" --arg ref "$SOURCE_REF" --arg sha "$SOURCE_SHA" \
+            '{event_type:$event_type, client_payload:{ref:$ref, sha:$sha}}' |
+            curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer $INFRA_DISPATCH_TOKEN" \
+              'https://api.github.com/repos/42VoiceBridge/42VoiceBridge_Infra/dispatches' \
+              --data-binary @-
+          {
+            echo "### Infra dispatch"
+            echo "Sent \`$EVENT_TYPE\` for \`$SOURCE_REF\` at \`$SOURCE_SHA\`."
+            echo "This means Infra accepted the request, not that EC2 was deployed."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,64 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:voicebridge;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    # 테스트는 H2에 엔티티로 스키마를 만든다. 마이그레이션 검증은 FlywayMigrationTest가 MySQL로 한다.
+    enabled: false
+  task:
+    execution:
+      mode: force
+
+# 운영 설정(main application.yml)과 같게 둔다. 테스트 설정은 main 설정을 통째로 대신하므로 빠지면 헬스 테스트가 기본값을 검증하게 된다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+
+voicebridge:
+  personalization:
+    retention-days: 30
+    cleanup-delay-ms: 300000
+    scheduling-enabled: false
+  jwt:
+    secret: test-secret-key-for-jwt-signing-in-unit-tests-32chars-min
+    access-token-expire-seconds: 3600
+    refresh-token-expire-seconds: 1209600
+  kakao:
+    token-uri: https://kauth.kakao.com/oauth/token
+    user-info-uri: https://kapi.kakao.com/v2/user/me
+    client-id: test-kakao-client-id
+    redirect-uri: http://localhost:5173/oauth/kakao/callback
+    client-secret:
+  ai:
+    http:
+      base-url: http://127.0.0.1:8000
+      connect-timeout-ms: 3000
+      read-timeout-ms: 10000
+    jamo-stats:
+      min-support: 10
+  diagnosis:
+    # 테스트는 각자 필요한 문장을 직접 넣는다. 시드 문장이 섞이면 결과가 달라진다.
+    seed-sentences: false
+    recognition:
+      threads: 2
+      queue-capacity: 200
+  s3:
+    bucket: test-bucket
+    region: ap-northeast-2
+  tts:
+    naver:
+      base-url: https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts
+      api-key-id: test-api-key-id
+      api-key: test-api-key
+      speaker: nara
