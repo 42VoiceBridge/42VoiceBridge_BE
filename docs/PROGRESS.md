@@ -422,7 +422,13 @@
 - 검사 범위는 기본값(DB, Redis, 디스크)이다. 로그인·토큰 재발급이 Redis에 기대므로 Redis가 죽으면 503 DOWN이 맞다. AI·S3는 넣지 않았다(AI 장애가 BE 배포 실패로 번지지 않게).
 - 테스트: 실제 Redis 컨테이너로 200 UP·상세 정보 없음·다른 actuator 주소 비노출·POST 불가, 연결할 수 없는 Redis로 503 DOWN.
 - #48 CI 주석의 `cd-preflight` 설명을 `deploy-backend`로 고쳤다(Infra가 이벤트를 받는 워크플로가 바뀜).
-- 발견: 토큰이 있는 요청이 없는 주소로 가면 404가 아니라 500이 나간다. 전역 예외 처리에 `NoResourceFoundException` 처리가 없어 마지막 `Exception` 처리로 떨어지기 때문이다. 이 PR과 무관해 따로 고친다.
+- 작업 중 없는 주소가 404가 아니라 500으로 나가는 것을 발견해 따로 고쳤다(작업 이력 31번, PR #52).
+### 31. 클라이언트 요청 실수를 4xx로 (fix/not-found-404) — 완료 (PR #52 병합)
+
+- 헬스 엔드포인트 작업 중 발견. 인증을 통과한 요청 중 클라이언트 실수 네 가지가 모두 500(서버 고장)으로 나갔다. 전역 예외 처리에 해당 예외 처리가 없어 마지막 `Exception` 처리로 떨어졌기 때문이다.
+- 없는 주소(`NoResourceFoundException`) → 404 `RESOURCE_NOT_FOUND`, 받지 않는 메서드 → 405 `METHOD_NOT_ALLOWED`(`Allow` 헤더 포함), 읽을 수 없는 JSON → 400 `VALIDATION_FAILED`, 받지 않는 Content-Type → 415 `UNSUPPORTED_MEDIA_TYPE`. 405·415 코드는 새로 추가했다.
+- 토큰 없이 오면 지금처럼 보안 설정에서 401이 먼저 나간다.
+- 테스트: 네 경우를 인증된 MockMvc 요청으로 확인(`ClientErrorResponseIntegrationTest`). 수정 전에는 네 경우 모두 500임을 먼저 확인했다.
 
 ## 알려진 이슈 / 확인 필요 사항
 
