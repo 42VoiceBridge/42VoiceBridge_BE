@@ -2,6 +2,7 @@ package com.voicebridge.adapter.out.persistence;
 
 import java.util.List;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>프로필이 아니라 설정값으로 켜고 끈다. 테스트는 프로필 없이 돌아서 프로필로는 테스트에서만 끌 수 없고, 테스트가 각자 넣는 문장과 섞이면 안 된다.
  */
+@Slf4j
 @Component
 @ConditionalOnProperty(name = "voicebridge.diagnosis.seed-sentences", havingValue = "true")
 public class SentenceSeeder implements ApplicationRunner {
@@ -43,7 +45,10 @@ public class SentenceSeeder implements ApplicationRunner {
 
   @Override
   public void run(ApplicationArguments args) {
-    if (sentenceJpaRepository.count() > 0) {
+    // 배포 후 로그만으로 문장이 준비됐는지 확인할 수 있게 어느 쪽이든 남긴다.
+    long existing = sentenceJpaRepository.count();
+    if (existing > 0) {
+      log.info("[문장 시드] 진단 문장이 이미 {}개 있어 넣지 않습니다.", existing);
       return;
     }
 
@@ -52,5 +57,6 @@ public class SentenceSeeder implements ApplicationRunner {
             .map(text -> SentenceJpaEntity.builder().id(UUID.randomUUID()).text(text).build())
             .toList();
     sentenceJpaRepository.saveAll(entities);
+    log.info("[문장 시드] 진단 문장 {}개를 넣었습니다.", entities.size());
   }
 }
