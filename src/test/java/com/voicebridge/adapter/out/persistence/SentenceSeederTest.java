@@ -4,10 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
@@ -18,13 +21,14 @@ class SentenceSeederTest {
   @DataJpaTest
   @Import(SentenceSeeder.class)
   @TestPropertySource(properties = "voicebridge.diagnosis.seed-sentences=true")
+  @ExtendWith(OutputCaptureExtension.class)
   class 켜져_있으면 {
 
     @Autowired private SentenceSeeder seeder;
     @Autowired private SentenceJpaRepository sentenceJpaRepository;
 
     @Test
-    void 빈_DB에_진단_문장을_넣고_다시_돌려도_중복되지_않는다() {
+    void 빈_DB에_진단_문장을_넣고_다시_돌려도_중복되지_않는다(CapturedOutput output) {
       // 앱이 시작될 때 이미 한 번 돌았다
       assertThat(sentenceJpaRepository.count()).isEqualTo(10);
 
@@ -32,6 +36,8 @@ class SentenceSeederTest {
       seeder.run(null);
 
       assertThat(sentenceJpaRepository.count()).isEqualTo(10);
+      // 배포 후 로그로 문장 준비 상태를 확인할 수 있어야 한다
+      assertThat(output).contains("[문장 시드] 진단 문장이 이미 10개 있어 넣지 않습니다.");
     }
   }
 
