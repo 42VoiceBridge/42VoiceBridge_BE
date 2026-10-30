@@ -5,12 +5,15 @@ import com.voicebridge.common.response.ApiResponse;
 import com.voicebridge.port.in.GetJamoErrorStatsUseCase;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+// 기능 플래그가 꺼져 있으면(기본값) 등록하지 않는다. application.yml의 voicebridge.features 참고.
+@ConditionalOnProperty(name = "voicebridge.features.diagnosis", havingValue = "true")
 @RequestMapping("/api/v1/users/me")
 @RequiredArgsConstructor
 public class JamoErrorStatsController {

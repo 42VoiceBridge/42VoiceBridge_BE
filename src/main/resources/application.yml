@@ -41,6 +41,11 @@ server:
   port: 8080
 
 voicebridge:
+  features:
+    # 2026-10 방향 전환(자주 쓰는 문구 말하기)으로 개인화·진단 API를 공개하지 않는다. 꺼 두면 해당 컨트롤러를 등록하지 않아 404가 된다.
+    # 코드와 테이블은 그대로 두므로 다시 켜면 이전처럼 동작한다. diagnosis는 진단 세션·자모 오류 통계·추천 문장을 함께 묶는다.
+    personalization: ${FEATURE_PERSONALIZATION_ENABLED:false}
+    diagnosis: ${FEATURE_DIAGNOSIS_ENABLED:false}
   personalization:
     # createdAt 기준. 변경한 기간은 기존 녹음에도 적용된다. 팀·AI의 보관 기간 합의는 별도 확인이 필요하다.
     retention-days: ${PERSONALIZATION_RETENTION_DAYS:30}
