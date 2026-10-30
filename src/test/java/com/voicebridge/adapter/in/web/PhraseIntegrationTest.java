@@ -214,6 +214,14 @@ class PhraseIntegrationTest {
   }
 
   @Test
+  void UUID가_아닌_주소로는_삭제하지_않고_404다() throws Exception {
+    mvc.perform(as(me, delete(URL + "/suggestions")))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    assertThat(phrases.findById(greeting.getId())).isPresent();
+  }
+
+  @Test
   void 로그인하지_않으면_401이다() throws Exception {
     mvc.perform(get(URL)).andExpect(status().isUnauthorized());
     mvc.perform(

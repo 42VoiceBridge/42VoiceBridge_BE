@@ -4,7 +4,15 @@
 
 마지막 업데이트: 2026-10-30
 
-## 최신 작업 — 부록 B-1: LLM 포트·어댑터, 호출 상한 (2026-10-30)
+## 최신 작업 — 부록 B-2: 문장 확장·문구 추천 엔드포인트 (2026-10-30)
+
+- `POST /api/v1/phrases/suggestions` (`SuggestPhrasesUseCase` → `SuggestPhrasesService` → `PhraseSuggestionController`). 플래그 `voicebridge.features.suggestion`(기본 꺼짐, env `FEATURE_SUGGESTION_ENABLED`)이 꺼지면 컨트롤러를 등록하지 않아 404.
+- 판정 순서: 입력 검증(`Phrase.normalizeText`, `PhraseCategory.from` — 400, LLM·호출 횟수 안 씀) → 호출 상한(429) → LLM + `SuggestionPolicy.filter`(후보 0개면 503). 트랜잭션 없음, DB 쓰기 없음, 자동 TTS 없음. 로그는 후보 개수만.
+- `Phrase.normalize`를 `public normalizeText`로 열어 추천 입력에도 같은 규칙을 쓴다(규칙 중복 없음).
+- 문구 삭제 매핑을 `/{phraseId:[0-9a-fA-F-]{36}}`로 좁혔다. 안 그러면 플래그가 꺼졌을 때 `POST /phrases/suggestions`가 삭제 주소에 걸려 405가 된다. UUID가 아닌 ID 삭제는 400 → 404.
+- **운영에서 켜려면**: Infra `deploy-ec2.sh`가 `FEATURE_*` 변수를 넘기지 않는다. 시크릿에 `FEATURE_SUGGESTION_ENABLED=true`를 넣어도 컨테이너에 안 들어가므로 Infra 스크립트에 추가하거나 기본값을 바꿔야 한다. `ANTHROPIC_API_KEY`는 Infra PR #14로 전달된다.
+
+## 이전 작업 — 부록 B-1: LLM 포트·어댑터, 호출 상한 (2026-10-30)
 
 - `LlmSuggestionPort`(문장 확장) + `ClaudeSuggestionAdapter`(공식 Java SDK 3.2.0, `claude-haiku-5-5`, effort low, 구조화 출력 `{candidates: [string]}`, 타임아웃 8초·재시도 1회). 키(`ANTHROPIC_API_KEY`)가 없으면 클라이언트를 만들지 않고 호출 시 503.
 - 실패(거절·형식 깨짐·429·5xx·시간 초과·키 없음)는 모두 `SUGGESTION_UNAVAILABLE`(503). 입력·출력 텍스트는 로그에 남기지 않는다. 입력은 `<input>` 데이터 블록에 넣고 꺾쇠를 바꿔 블록을 닫지 못하게 한다.

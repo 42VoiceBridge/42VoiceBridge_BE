@@ -58,7 +58,7 @@ public class Phrase {
       throw new IllegalArgumentException("카테고리를 선택해 주세요.");
     }
     return new Phrase(
-        UUID.randomUUID(), ownerId, category, normalize(text), null, LocalDateTime.now());
+        UUID.randomUUID(), ownerId, category, normalizeText(text), null, LocalDateTime.now());
   }
 
   /** 영속성 어댑터가 DB에서 읽어온 값을 그대로 도메인 객체로 복원할 때만 사용한다. */
@@ -78,14 +78,18 @@ public class Phrase {
    */
   public static Optional<String> acceptableText(String text) {
     try {
-      return Optional.of(normalize(text));
+      return Optional.of(normalizeText(text));
     } catch (IllegalArgumentException e) {
       return Optional.empty();
     }
   }
 
+  /**
+   * 문구 규칙으로 텍스트를 정리한다(앞뒤 공백 제거). 규칙에 맞지 않으면 사용자에게 보여 줄 메시지와 함께 IllegalArgumentException을 던진다(400).
+   * 문구가 아닌 입력(문장 추천 입력 등)에도 같은 규칙을 쓸 때 부른다.
+   */
   // 줄바꿈·탭 같은 제어문자는 버튼 표시와 TTS 입력을 깨뜨리므로 받지 않는다. 길이는 UTF-16 단위가 아니라 글자(코드 포인트) 수로 센다.
-  private static String normalize(String text) {
+  public static String normalizeText(String text) {
     if (text == null || text.isBlank()) {
       throw new IllegalArgumentException("문구를 입력해 주세요.");
     }

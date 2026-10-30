@@ -6,10 +6,10 @@
 
 # AI 구음장애 보조 서비스 — API 명세서
 
-> 문서 버전: v1.2 (2026-10-30 갱신, 변경 이력은 9장)
+> 문서 버전: v1.3 (2026-10-30 갱신, 변경 이력은 9장)
 >
 
-> **2026-10-30 방향 전환**: 서비스의 중심을 “자주 쓰는 문구를 눌러 말하기”(10장)로 옮겼다. 개인화(4장)와 진단·자모 오류 통계·추천 문장(2·3장)은 기능 플래그(`voicebridge.features.personalization`, `voicebridge.features.diagnosis`)로 **꺼져 있고, 꺼진 동안 해당 주소는 404 `RESOURCE_NOT_FOUND`**다(토큰이 없으면 401이 먼저). 코드와 테이블은 남아 있어 플래그를 켜면 아래 내용대로 동작한다. 실사용 인식(5장)·확인/TTS(6장)는 그대로 공개한다.
+> **2026-10-30 방향 전환**: 서비스의 중심을 “자주 쓰는 문구를 눌러 말하기”(10장)로 옮겼다. 개인화(4장)와 진단·자모 오류 통계·추천 문장(2·3장)은 기능 플래그(`voicebridge.features.personalization`, `voicebridge.features.diagnosis`)로 **꺼져 있고, 꺼진 동안 해당 주소는 404 `RESOURCE_NOT_FOUND`**다(토큰이 없으면 401이 먼저). 코드와 테이블은 남아 있어 플래그를 켜면 아래 내용대로 동작한다. 실사용 인식(5장)·확인/TTS(6장)는 그대로 공개한다. 문장 추천(10.6)도 플래그(`voicebridge.features.suggestion`)로 **기본 꺼짐**이고 꺼진 동안 404다.
 >
 
 ---
@@ -89,8 +89,9 @@ https://{host}/api/v1
 | 415 | 그 API가 받지 않는 Content-Type |
 | 409 | 상태 충돌(예: 이미 진행중인 학습 job에 재요청, 중복 문구·문구 상한) |
 | 422 | 비즈니스 규칙 위반(예: 최소 녹음 개수 미충족) |
+| 429 | 호출 상한 초과(`TOO_MANY_REQUESTS`, 문장 추천 분당 10회) |
 | 500 | 서버 내부 오류 |
-| 502/503 | AI 추론/학습 서버 장애 (기본 모델 폴백 여부는 4.2절 참고), 음성 합성 서버 장애(`TTS_UNAVAILABLE`) |
+| 502/503 | AI 추론/학습 서버 장애 (기본 모델 폴백 여부는 4.2절 참고), 음성 합성 서버 장애(`TTS_UNAVAILABLE`), 문장 추천 LLM 장애(`SUGGESTION_UNAVAILABLE`) |
 | 503 | 음성 변환 슬롯 대기 또는 처리 시간 초과로 일시적 처리 불가 |
 
 ### 0.6 공통 에러 코드
@@ -119,6 +120,8 @@ https://{host}/api/v1
 | `DUPLICATE_PHRASE` | 같은 카테고리에 내가 이미 추가한 같은 문구 (HTTP 409) |
 | `PHRASE_LIMIT_EXCEEDED` | 직접 추가한 문구가 상한(100개)에 닿음 (HTTP 409). 쓰지 않는 문구를 지운 뒤 다시 추가 |
 | `TTS_UNAVAILABLE` | 음성 합성 서버(CLOVA Voice)를 쓸 수 없음 (HTTP 503). 아무것도 저장하지 않았으므로 잠시 후 같은 요청을 다시 보내면 된다 |
+| `SUGGESTION_UNAVAILABLE` | 문장 추천(LLM)을 쓸 수 없음 (HTTP 503). 장애·시간 초과·키 미설정·쓸 수 있는 후보 0개. 직접 입력하거나 잠시 후 다시 시도. 문구 저장·말하기는 영향 없음 |
+| `TOO_MANY_REQUESTS` | 호출 상한 초과 (HTTP 429). 문장 추천은 사용자당 분당 10회. 잠시 후 다시 시도 |
 | `AUDIO_PROCESSING_UNAVAILABLE` | 음성 변환 슬롯 대기 초과 또는 변환 처리 시간 초과로 일시적으로 처리할 수 없음 (HTTP 503). 실사용 인식·진단 업로드·개인화 업로드의 변환 경로에 공통 적용 |
 
 ---
@@ -839,8 +842,9 @@ POST /v1/enroll/next-prompts
 | DELETE | /phrases/{phraseId} | BE-A | O |
 | POST | /phrases/{phraseId}/speak | BE-B | O |
 | GET | /phrases/{phraseId}/audio (`local` 전용) | BE-B | O |
+| POST | /phrases/suggestions (플래그, 기본 꺼짐) | 팀장 | O |
 
-> 2·3·4장 주소(진단·자모 통계·추천·개인화)는 2026-10-30부터 기능 플래그로 꺼져 있어 404다.
+> 2·3·4장 주소(진단·자모 통계·추천·개인화)는 2026-10-30부터 기능 플래그로 꺼져 있어 404다. 10.6 문장 추천도 플래그로 기본 꺼짐(404)이다.
 
 ---
 
@@ -878,6 +882,7 @@ POST /v1/enroll/next-prompts
 | 2026-10-30 | 0, 2~4, 8 | 방향 전환: 개인화·진단(자모 통계·추천 포함) API를 기능 플래그로 끔. 꺼진 동안 404 `RESOURCE_NOT_FOUND` |
 | 2026-10-30 | 0.5, 0.6, 8, 10 | 자주 쓰는 문구 API 추가(목록·추가·삭제·말하기, local 음성 조회). `PHRASE_DUPLICATED`·`PHRASE_LIMIT_EXCEEDED`(409), `TTS_UNAVAILABLE`(503) 추가 |
 | 2026-10-30 | 0.6, 8, 10 | 계획서(PHRASE-TTS-PIVOT-PLAN 4장)에 맞춤: 상황별 카테고리 6개, 목록을 `?category=` 필터 + 평평한 배열(`id`, `category`, `text`, `isDefault`)로, 말하기 응답 `phraseId` → `id`, `PHRASE_DUPLICATED` → `DUPLICATE_PHRASE`(같은 카테고리 내 내 문구끼리만), 상한 50 → 100개 |
+| 2026-10-30 | 0.5, 0.6, 8, 10.3, 10.6 | 문장 확장·문구 추천 `POST /phrases/suggestions` 추가(플래그 기본 꺼짐). `SUGGESTION_UNAVAILABLE`(503), `TOO_MANY_REQUESTS`(429) 추가. 문구 삭제의 UUID가 아닌 ID는 400 → 404 |
 
 ---
 
@@ -972,7 +977,7 @@ Response: 204 (본문 없음)
 
 - 본인이 추가한 문구만 지울 수 있다. 그 문구로 만든 음성 파일도 함께 지운다.
 
-에러: `VALIDATION_FAILED`(400, 잘못된 ID 형식), `FORBIDDEN_ACCESS`(403, 기본 문구 — 메시지 "기본 문구는 삭제할 수 없습니다." / 다른 사용자의 문구), `RESOURCE_NOT_FOUND`(404, 없는 문구)
+에러: `FORBIDDEN_ACCESS`(403, 기본 문구 — 메시지 "기본 문구는 삭제할 수 없습니다." / 다른 사용자의 문구), `RESOURCE_NOT_FOUND`(404, 없는 문구. UUID 모양이 아닌 ID도 이 주소에 걸리지 않아 404다 — 10.6 `/phrases/suggestions`와 겹치지 않게 하려는 것)
 
 ### 10.4 문구 말하기
 
@@ -1004,3 +1009,38 @@ Response (200, `Cache-Control: no-store`):
 6.3과 같다. 200 `Content-Type: audio/mpeg`, `Cache-Control: no-store`, `Range` 지원(206/416). 아직 말하기(10.4)를 한 번도 하지 않은 문구는 409 `INVALID_STATE_TRANSITION`이다. 운영에서는 등록하지 않는다.
 
 에러: `VALIDATION_FAILED`(400), `FORBIDDEN_ACCESS`(403, 다른 사용자의 문구), `RESOURCE_NOT_FOUND`(404, 없는 문구·파일), `INVALID_STATE_TRANSITION`(409, 음성 없음), `INTERNAL_SERVER_ERROR`(500)
+
+### 10.6 문장 확장·문구 추천 (기능 플래그, 기본 꺼짐)
+
+`POST /phrases/suggestions` (인증 필요)
+
+짧게 쓴 말(예: "물")을 상황에 맞는 완성 문장 후보로 늘려 준다(Claude, 부록 B). **후보는 저장하지도 말하지도 않는다.** 사용자가 하나를 고르면 프론트가 문구 추가(10.2)로 저장하고, 말하기(10.4)를 눌러야 소리가 난다. 플래그 `voicebridge.features.suggestion`(env `FEATURE_SUGGESTION_ENABLED`)이 꺼져 있으면 404 `RESOURCE_NOT_FOUND`다.
+
+Request:
+
+```json
+{ "text": "물", "category": "RESTAURANT" }
+```
+
+| 필드 | 필수 | 설명 |
+| --- | --- | --- |
+| `text` | O | 늘릴 말. 문구 규칙(10장)과 같다 — 앞뒤 공백 제거, 공백뿐·제어문자·100자 초과는 400 |
+| `category` | X | 카테고리 코드(10장 표). 없으면 상황 없이 만든다. 없는 코드·소문자는 400 |
+
+Response (200, `Cache-Control: no-store`):
+
+```json
+{
+  "success": true,
+  "data": { "candidates": ["물 좀 주세요.", "물 한 잔 더 주실 수 있나요?"] }
+}
+```
+
+- 후보는 1~5개. 문구 규칙에 맞지 않는 후보(빈 값·줄바꿈·100자 초과)와 중복은 서버가 뺀다. 그래서 고른 후보를 그대로 10.2로 보내면 400이 나지 않는다(같은 카테고리에 이미 있으면 409 `DUPLICATE_PHRASE`).
+- 판정 순서: 입력 검증(400) → 호출 상한(429) → LLM(503). 잘못된 요청은 호출 횟수를 쓰지 않는다.
+- 호출 상한: 사용자당 분당 10회(가정값, D9).
+- 응답은 LLM을 부르므로 수 초 걸릴 수 있다(서버 타임아웃 8초). 응답이 올 때까지 버튼을 비활성화한다.
+- 🔒 입력 텍스트는 후보를 만들기 위해 **Anthropic(Claude)으로 전송**된다. 앱에 고지한다. 서버는 입력과 후보를 로그·DB에 남기지 않는다(후보 개수만 로그).
+- 추천이 실패해도 문구 저장·말하기는 그대로 된다. 503이면 "직접 입력해 주세요" 안내를 보여 준다.
+
+에러: `VALIDATION_FAILED`(400, 위 입력 규칙·본문 누락), `AUTH_REQUIRED`(401), `RESOURCE_NOT_FOUND`(404, 플래그 꺼짐), `TOO_MANY_REQUESTS`(429), `SUGGESTION_UNAVAILABLE`(503, LLM 장애·시간 초과·키 미설정·쓸 수 있는 후보 0개)
