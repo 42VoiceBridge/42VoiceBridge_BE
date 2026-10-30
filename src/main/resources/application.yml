@@ -89,6 +89,9 @@ voicebridge:
       # 진단 녹음 인식 전용 스레드 수와 대기열. AI 서버가 요청을 하나씩 처리하므로 스레드를 늘려도 빨라지지 않는다.
       threads: 2
       queue-capacity: 200
+  phrase:
+    # 기본 문구가 하나도 없을 때 시드 문구를 넣는다(PhraseSeeder). 로컬·배포 모두 켜 둔다. 이미 있으면 아무것도 하지 않는다.
+    seed-defaults: true
   s3:
     bucket: ${S3_BUCKET:voicebridge-recordings}
     region: ${AWS_REGION:ap-northeast-2}

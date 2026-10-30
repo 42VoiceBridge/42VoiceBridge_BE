@@ -85,6 +85,7 @@ class FeatureFlagTest {
     @Test
     void 남겨_둔_API는_그대로_동작한다() throws Exception {
       mvc.perform(asUser(get("/api/v1/recognitions"))).andExpect(status().isOk());
+      mvc.perform(asUser(get("/api/v1/phrases"))).andExpect(status().isOk());
     }
   }
 

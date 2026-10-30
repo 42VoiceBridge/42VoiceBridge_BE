@@ -57,6 +57,9 @@ voicebridge:
     recognition:
       threads: 2
       queue-capacity: 200
+  phrase:
+    # 테스트는 각자 필요한 문구를 직접 넣는다. 시드 문구가 섞이면 결과가 달라진다.
+    seed-defaults: false
   s3:
     bucket: test-bucket
     region: ap-northeast-2
