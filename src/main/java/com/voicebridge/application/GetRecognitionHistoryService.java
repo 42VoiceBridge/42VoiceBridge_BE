@@ -29,7 +29,8 @@ public class GetRecognitionHistoryService implements GetRecognitionHistoryUseCas
                         r.getId(),
                         r.getRecognizedText(),
                         r.getModelUsed().name(),
-                        r.getConfidence()))
+                        r.getConfidence(),
+                        r.getCreatedAt()))
             .toList();
     return new HistoryPage(content, page, size, result.totalElements(), result.totalPages());
   }

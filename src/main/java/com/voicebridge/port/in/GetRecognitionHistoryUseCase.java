@@ -1,5 +1,6 @@
 package com.voicebridge.port.in;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,5 +13,9 @@ public interface GetRecognitionHistoryUseCase {
       List<RecognitionView> content, int page, int size, long totalElements, int totalPages) {}
 
   record RecognitionView(
-      UUID recognitionId, String recognizedText, String modelUsed, Double confidence) {}
+      UUID recognitionId,
+      String recognizedText,
+      String modelUsed,
+      Double confidence,
+      LocalDateTime createdAt) {}
 }

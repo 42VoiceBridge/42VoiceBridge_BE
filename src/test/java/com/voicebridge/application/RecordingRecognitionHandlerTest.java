@@ -3,6 +3,7 @@ package com.voicebridge.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,6 +14,8 @@ import com.voicebridge.domain.diagnosis.Recording;
 import com.voicebridge.domain.diagnosis.RecordingStatus;
 import com.voicebridge.domain.recognition.ModelType;
 import com.voicebridge.port.out.AiInferenceClient;
+import com.voicebridge.port.out.AudioNormalizationPort;
+import com.voicebridge.port.out.InvalidAudioException;
 import com.voicebridge.port.out.RecordingRepositoryPort;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,17 +32,26 @@ class RecordingRecognitionHandlerTest {
 
   @Mock private RecordingRepositoryPort recordingRepositoryPort;
   @Mock private AiInferenceClient aiInferenceClient;
+  @Mock private AudioNormalizationPort audioNormalizationPort;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   private RecordingRecognitionHandler handler;
 
   private final UUID userId = UUID.randomUUID();
   private final byte[] audioBytes = new byte[] {1, 2, 3};
+  private final byte[] normalizedBytes = new byte[] {4, 5, 6};
 
   @BeforeEach
   void setUp() {
     handler =
-        new RecordingRecognitionHandler(recordingRepositoryPort, aiInferenceClient, eventPublisher);
+        new RecordingRecognitionHandler(
+            recordingRepositoryPort, aiInferenceClient, audioNormalizationPort, eventPublisher);
+    lenient()
+        .when(audioNormalizationPort.normalize(audioBytes))
+        .thenReturn(
+            new AudioNormalizationPort.NormalizedAudio(
+                normalizedBytes,
+                new AudioNormalizationPort.Metadata("webm", "opus", 48000, 1, 3, "a", "b", "v1")));
   }
 
   /** 업로드 서비스가 이미 PROCESSING으로 저장한 뒤 이벤트를 발행하므로, 핸들러가 보는 상태는 항상 PROCESSING이다. */
@@ -120,6 +132,7 @@ class RecordingRecognitionHandlerTest {
     handler.handle(new RecordingUploadedEvent(unknownId, audioBytes));
 
     verify(recordingRepositoryPort, never()).save(any());
+    verify(audioNormalizationPort, never()).normalize(any());
     verify(aiInferenceClient, never()).recognize(any(), any(), any());
   }
 
@@ -132,7 +145,24 @@ class RecordingRecognitionHandlerTest {
 
     handler.handle(new RecordingUploadedEvent(recording.getId(), audioBytes));
 
-    verify(aiInferenceClient).recognize(eq(audioBytes), eq(ModelType.BASE_ADAPTED), eq(userId));
+    verify(audioNormalizationPort).normalize(audioBytes);
+    verify(aiInferenceClient)
+        .recognize(eq(normalizedBytes), eq(ModelType.BASE_ADAPTED), eq(userId));
+  }
+
+  @Test
+  void 정규화에_실패하면_AI를_호출하지_않고_FAILED로_저장한다() {
+    Recording recording = processingRecording();
+    when(recordingRepositoryPort.findById(recording.getId())).thenReturn(Optional.of(recording));
+    when(audioNormalizationPort.normalize(audioBytes))
+        .thenThrow(
+            new InvalidAudioException(InvalidAudioException.Reason.INVALID, "Invalid audio"));
+
+    handler.handle(new RecordingUploadedEvent(recording.getId(), audioBytes));
+
+    assertThat(captureSaved().getStatus()).isEqualTo(RecordingStatus.FAILED);
+    verify(aiInferenceClient, never()).recognize(any(), any(), any());
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
   }
 
   @Test

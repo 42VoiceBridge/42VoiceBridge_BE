@@ -4,6 +4,7 @@ import com.voicebridge.config.AsyncConfig;
 import com.voicebridge.domain.diagnosis.Recording;
 import com.voicebridge.domain.recognition.ModelType;
 import com.voicebridge.port.out.AiInferenceClient;
+import com.voicebridge.port.out.AudioNormalizationPort;
 import com.voicebridge.port.out.RecordingRepositoryPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class RecordingRecognitionHandler {
 
   private final RecordingRepositoryPort recordingRepositoryPort;
   private final AiInferenceClient aiInferenceClient;
+  private final AudioNormalizationPort audioNormalizationPort;
   private final ApplicationEventPublisher eventPublisher;
 
   /**
@@ -50,8 +52,11 @@ public class RecordingRecognitionHandler {
     }
 
     try {
+      // 업로드 원본은 저장하되, AI에는 실사용 인식과 동일한 PCM16/mono/16 kHz WAV만 전달한다.
+      var normalized = audioNormalizationPort.normalize(event.audioBytes());
       AiInferenceClient.RecognitionResult result =
-          aiInferenceClient.recognize(event.audioBytes(), DIAGNOSIS_MODEL, recording.getUserId());
+          aiInferenceClient.recognize(
+              normalized.wavBytes(), DIAGNOSIS_MODEL, recording.getUserId());
       recording.markProcessed(result.recognizedText(), result.confidence());
     } catch (Exception e) {
       log.error("[인식] 실패 recordingId={}", event.recordingId(), e);

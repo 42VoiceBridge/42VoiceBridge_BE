@@ -30,6 +30,7 @@ public class GetRecognitionDetailService implements GetRecognitionDetailUseCase 
         recognition.getId(),
         recognition.getRecognizedText(),
         recognition.getModelUsed().name(),
-        recognition.getConfidence());
+        recognition.getConfidence(),
+        recognition.getCreatedAt());
   }
 }

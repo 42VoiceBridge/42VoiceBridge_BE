@@ -50,6 +50,7 @@ class RecognitionQueryIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.content", hasSize(2)))
         .andExpect(jsonPath("$.data.content[0].recognitionId").value(latest.toString()))
+        .andExpect(jsonPath("$.data.content[0].createdAt").value("2026-09-23T12:00:03"))
         .andExpect(jsonPath("$.data.content[1].recognitionId").value(middle.toString()))
         .andExpect(jsonPath("$.data.page").value(0))
         .andExpect(jsonPath("$.data.size").value(2))
@@ -112,6 +113,7 @@ class RecognitionQueryIntegrationTest {
         .andExpect(jsonPath("$.data.recognizedText").value("안녕하세요"))
         .andExpect(jsonPath("$.data.modelUsed").value("BASE_ADAPTED"))
         .andExpect(jsonPath("$.data.confidence").value(0.8))
+        .andExpect(jsonPath("$.data.createdAt").value("2026-09-23T12:00:01"))
         .andExpect(jsonPath("$.data.userId").doesNotExist());
   }
 
