@@ -52,7 +52,7 @@
 - `port/out/LlmSuggestionPort`: 메서드 `expand(String text, PhraseCategory category)`. 대화 모드와 같은 포트를 쓰고 메서드만 추가한다(C의 `replyTo`).
 - `adapter/out/llm/ClaudeSuggestionAdapter`: LLM 호출. 생성자에서 설정값만 주입받고 네트워크 호출은 하지 않는다(키 없는 CI에서도 빌드 가능, `NaverClovaVoiceAdapter`와 같은 방식).
 - `adapter/in/web/PhraseSuggestionController`, `dto/`
-- 설정: `voicebridge.suggestion.*`(모델 ID, 타임아웃, 후보 개수 상한). 키는 `LLM_API_KEY` 환경변수.
+- 설정: `voicebridge.suggestion.*`(모델 ID, 타임아웃, 후보 개수 상한). 키는 `ANTHROPIC_API_KEY` 환경변수(공식 SDK 기본 이름, 배포는 Secrets Manager `voicebridge/dev/app`).
 
 ### 3.3 규칙과 안전장치
 
