@@ -4,6 +4,15 @@
 
 마지막 업데이트: 2026-10-30
 
+## 최신 작업 — API 명세서 v1.5 코드 대조와 문서 정리 (2026-10-30)
+
+- `.codex/context/API.md`를 main(`6acffdb`, #62) 코드와 한 절씩 대조해 v1.5로 갱신. 코드는 바꾸지 않았다.
+- 문서 오류 정정: 5.2 인식 이력 항목에 `createdAt`이 있다고 적혀 있었으나 응답 DTO(`RecognitionResponse`)에는 없다. 2.1 `sentenceId` 예시(`s-001`)를 UUID로, 모든 시각 예시의 `Z`를 제거(서버는 오프셋 없는 `LocalDateTime`). 7.3의 AI job 주소를 `/v1/jobs/{job_id}`로.
+- 보강: 0.7 시각 형식(JVM 시간대 미지정이라 운영 값이 UTC인지 확인 필요), 0.2 인증 없는 `/actuator/health`·Swagger, `AUDIO_*`가 대화 턴에도 쓰임, 호출 상한 3종, 꺼진 기능의 404, 7.7 외부 서비스 표(CLOVA Voice·CSR·Claude, 타임아웃·실패 매핑), 8 요약표에 local `GET /tts/{ttsId}/audio`.
+- 발견한 후속 과제: `NaverClovaVoiceAdapter`에 타임아웃이 지정돼 있지 않다. 네이버가 응답하지 않으면 문구 말하기·후보 말하기 요청이 오래 묶일 수 있다.
+- 명세 기준 정리: Notion 「3. API 명세서」는 10/03(v1.3) 이후 갱신되지 않아 이 저장소 문서를 최신으로 명시(README, `CLAUDE.md` 0·7·10장).
+- README API 목록에 빠져 있던 7개(`GET /users/me`, 인식 이력 2개, 문장 추천, 대화 모드 2개, 개인화 4개 묶음)를 추가. `docs/DEPLOYMENT.md`에 기능 플래그 4개를 추가하고, CSR 키 전달이 Infra #15로 이미 들어갔음을 반영(아래 C-2 항목의 "운영에서 켜려면 Infra에 추가" 부분은 그때 기준이다).
+
 ## 최신 작업 — 부록 C-2: 대화 모드 턴·후보 말하기 (2026-10-30)
 
 - `POST /conversation/turns`(녹음 → 정규화 → 상한 → CSR 받아쓰기 → `LlmSuggestionPort.replyTo` → `SuggestionPolicy.filter` → Redis 턴 저장) / `POST /conversation/turns/{turnId}/candidates/{candidateId}/speak`(턴·소유자·후보 확인 → 상한 → TTS mp3 바로 응답). 플래그 `voicebridge.features.conversation`(기본 꺼짐).
