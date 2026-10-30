@@ -51,14 +51,14 @@ class FlywayMigrationTest {
         jdbc.queryForList(
             "SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank",
             String.class);
-    assertThat(applied).startsWith("1");
+    assertThat(applied).startsWith("1", "2");
 
     Integer tables =
         jdbc.queryForObject(
             "SELECT COUNT(*) FROM information_schema.TABLES"
                 + " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME <> 'flyway_schema_history'",
             Integer.class);
-    assertThat(tables).isEqualTo(14);
+    assertThat(tables).isEqualTo(15);
   }
 
   @Test

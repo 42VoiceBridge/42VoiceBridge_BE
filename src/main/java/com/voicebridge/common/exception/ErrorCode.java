@@ -25,6 +25,9 @@ public enum ErrorCode {
   AUDIO_TOO_SHORT(HttpStatus.BAD_REQUEST, "녹음이 너무 짧습니다. 조금 더 길게 다시 녹음해 주세요."),
   AUDIO_TOO_LONG(HttpStatus.BAD_REQUEST, "녹음이 너무 깁니다. 30초 이내로 다시 녹음해 주세요."),
   AUDIO_INVALID(HttpStatus.BAD_REQUEST, "녹음 파일을 읽을 수 없습니다. 다시 녹음해 주세요."),
+  PHRASE_DUPLICATED(HttpStatus.CONFLICT, "이미 목록에 있는 문구입니다."),
+  PHRASE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "더 이상 문구를 추가할 수 없습니다."),
+  TTS_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "음성 합성 서버를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."),
   INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
   private final HttpStatus status;

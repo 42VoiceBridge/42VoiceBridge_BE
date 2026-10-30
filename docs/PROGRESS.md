@@ -2,9 +2,18 @@
 
 > 매 작업이 끝날 때마다 이 문서를 갱신한다. 새 대화를 시작할 때 이 문서부터 읽으면 이전 지시사항이 어떻게 끝났는지 복사-붙여넣기 없이 파악할 수 있다.
 
-마지막 업데이트: 2026-09-30
+마지막 업데이트: 2026-10-30
 
-## 최신 작업 — 네이버 클로바 보이스 TTS 엔진 연동 (2026-09-26)
+## 최신 작업 — 방향 전환: 자주 쓰는 문구 말하기 (2026-10-30)
+
+- 브랜치 `claude/trusting-carson-08d3c2`에 계획서 6장의 PR 단위대로 커밋 4개(플래그 → 문구 CRUD → 말하기 → 문서). PR은 아직 만들지 않았다.
+- **플래그**: `voicebridge.features.personalization` / `diagnosis`(기본 꺼짐, env `FEATURE_*_ENABLED`). 꺼지면 해당 컨트롤러를 등록하지 않아 404. 진단 플래그는 진단 세션·자모 통계·추천을 묶는다(D4). 테스트 설정은 켜서 기존 테스트를 그대로 돌리고, 꺼진 상태는 `FeatureFlagTest`가 본다.
+- **문구**: `Phrase`/`PhraseCategory` 도메인, `V2__phrases.sql`(`(owner_id, text)` 유니크), `PhraseSeeder`(멱등). 검증값(100자, 50개, 제어문자)은 도메인에만 둔다.
+- **말하기**: 클로바·업로드는 트랜잭션 밖. 실패하면 503 `TTS_UNAVAILABLE`, 캐시 미저장. 합성 중 다른 요청이 먼저 붙였으면 방금 올린 음성을 지운다. `AudioPlaybackUrlPort.createPhraseUrl` 추가, local은 `GET /phrases/{id}/audio`. 문구를 지우면 음성도 지우도록 `StoragePort.delete`가 mp3 음성 key도 받는다(진단 녹음 wav는 여전히 거절).
+- 검증: 이 세션 컨테이너는 Docker가 없고 Maven Central·jitpack이 막혀, Google Maven 미러 + JPyRust 컴파일 스텁 + JDK 21(`--release 17`)로 돌렸다. Testcontainers(MySQL·Redis) 테스트는 여기서 돌지 않는다 — `PhrasePersistenceAdapterTest`·`FlywayMigrationTest`(테이블 15개)는 CI에서 확인해야 한다.
+- **남은 것**: 클로바 실제 키 왕복 수동 검증, S3 실검증, Notion 명세서 반영, 개인화 코드 삭제 여부(D5), 기본 문구 목록 확정(D1).
+
+## 이전 작업 — 네이버 클로바 보이스 TTS 엔진 연동 (2026-09-26)
 
 - `feature/naver-clova-tts`에서 `TtsEnginePort`의 실제 구현체(`NaverClovaVoiceAdapter`, CLOVA Voice
   TTS Premium)를 추가하고, `TtsRequest`가 `PENDING → COMPLETED/FAILED`로 전이하는 비동기 합성 흐름을
@@ -444,13 +453,20 @@
 - 넣었을 때 "진단 문장 N개를 넣었습니다", 이미 있을 때 "진단 문장이 이미 N개 있어 넣지 않습니다"를 INFO로 남긴다.
 - 운영 기동 확인은 `docker logs voicebridge-be`에서 `Successfully applied 1 migration`(Flyway), `[문장 시드]`, `Started VoiceBridgeApplication` 세 줄과 `GET /actuator/health`의 `{"status":"UP"}`로 한다.
 
+### 33. 방향 전환 — 개인화·진단 플래그, 자주 쓰는 문구 (claude/trusting-carson-08d3c2) — PR 대기
+
+- 맨 위 "최신 작업" 참고. API 명세서 v1.2(10장 신규, 2~4장 비공개 표기).
+
 ## 알려진 이슈 / 확인 필요 사항
+
+- **문구 말하기를 동시에 두 번 보내면 합성이 두 번 일어날 수 있다.** 결과는 먼저 붙은 음성 하나로 정리되고 나머지는 지운다. 잠금은 두지 않았다(3주 챌린지, 프론트에서 응답 전 버튼 비활성화). 문구 삭제와 말하기가 겹치면 음성 파일이 하나 남을 수 있다(재생에는 쓰이지 않음).
+- **기본 문구를 바꿔도 이미 넣은 환경에는 반영되지 않는다**(시더는 기본 문구가 하나라도 있으면 넣지 않음). 기획이 목록을 확정하면 교체 작업이 따로 필요하다.
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.
 
 - **TTS 등 진단 외 `@Async`는 스프링 부트 기본 실행기(스레드 8개, 대기열 무제한)를 쓴다.** 스레드가 늘지는 않지만 대기열에 상한이 없어 작업이 몰리면 대기가 길어진다. 진단 인식은 전용 실행기로 분리했다(9/29, 작업 이력 23번). 나머지 설정은 담당자와 논의.
 - **비동기 인식 중 서버가 죽으면 해당 녹음이 `PROCESSING`에 갇힌다.** 재시도 경로가 없어, 사용자가 그 문장을 다시 녹음하기 전까지 세션이 끝나지 않는다(세션은 문장마다 가장 최근 녹음이 `DONE`이어야 `ANALYZED`가 됨). 같은 종류로, **세션 완료 판단(`DiagnosisSessionAnalysisTrigger`) 자체가 DB 오류 등으로 실패하면** 녹음은 이미 전부 `DONE`으로 커밋된 뒤라 다시 판단할 계기가 없어 세션이 `IN_PROGRESS`에 남는다. 둘을 묶어 복구 수단(재시도 API 또는 정리 스케줄러)을 만드는 것을 9/29 회의 안건으로 올렸다.
-- **운영 DB 스키마는 Flyway가 만든다**(작업 이력 29번). 앱이 처음 뜰 때 `db/migration/V1__init.sql`이 빈 DB에 테이블 14개를 만들고, Hibernate가 `validate`로 엔티티와 맞는지 확인한다. 예전 PR 본문(#37·#38·#45)과 개인화 스키마 문서의 수동 DDL은 기록용이다. 이미 테이블이 있는 DB에는 Flyway가 적용되지 않으니(시작 거부) 운영 DB가 비어 있는지 먼저 확인한다.
+- **운영 DB 스키마는 Flyway가 만든다**(작업 이력 29번). 앱이 처음 뜰 때 `db/migration/V1__init.sql`이 빈 DB에 테이블 14개를, `V2__phrases.sql`이 `phrases`를 만들고(총 15개), Hibernate가 `validate`로 엔티티와 맞는지 확인한다. 예전 PR 본문(#37·#38·#45)과 개인화 스키마 문서의 수동 DDL은 기록용이다. 이미 테이블이 있는 DB에는 Flyway가 적용되지 않으니(시작 거부) 운영 DB가 비어 있는지 먼저 확인한다.
 - **배포된 AI 서버가 없다**(10/3 AI 쪽 문서). 배포 환경에서는 진단 인식이 `FAILED`, 자모 통계·추천이 503이다. 로컬은 스텁으로 동작한다. 데모 방식은 팀장 결정 대기.
 - 자모 오류 통계: `min_support`는 진단 화면용으로 10으로 정했다(9/29). AI 쪽 답(10/3, R2): 탐색용 화면으로는 괜찮지만 사용자 발음 판정처럼 보이면 안 되고, 오류율은 횟수와 함께 보여줘야 한다(프론트에 전달). 진단을 기본 모델로 고정하는 `use_adapter=false`는 #40에서 반영됐다.
 - **`S3StorageAdapter`는 실제로 검증하지 못했다.** 버킷과 크레덴셜이 없어 로컬 파일 어댑터로만 확인했다. 인프라 쪽에 프로비저닝 요청이 등록돼 있다.

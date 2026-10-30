@@ -34,6 +34,25 @@ class S3AudioPlaybackUrlAdapterTest {
   }
 
   @Test
+  void signsPhraseAudioTheSameWay() {
+    try (var presigner =
+        S3Presigner.builder()
+            .region(Region.AP_NORTHEAST_2)
+            .credentialsProvider(
+                StaticCredentialsProvider.create(
+                    AwsBasicCredentials.create("test-access", "test-secret")))
+            .build()) {
+      var adapter = new S3AudioPlaybackUrlAdapter(presigner, "test-bucket", Duration.ofMinutes(10));
+      var url = java.net.URI.create(adapter.createPhraseUrl(key, UUID.randomUUID()));
+      assertThat(url.getPath()).isEqualTo("/" + key);
+      assertThat(url.getRawQuery())
+          .contains("X-Amz-Expires=600", "X-Amz-Signature=", "response-content-type=audio%2Fmpeg");
+      assertThatThrownBy(() -> adapter.createPhraseUrl("../file.mp3", UUID.randomUUID()))
+          .isInstanceOf(CustomException.class);
+    }
+  }
+
+  @Test
   void rejectsInvalidKeyAndTtl() {
     var presigner = mock(S3Presigner.class);
     var adapter = new S3AudioPlaybackUrlAdapter(presigner, "bucket", Duration.ofMinutes(10));
