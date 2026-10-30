@@ -1,17 +1,30 @@
 package com.voicebridge.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.voicebridge.adapter.out.persistence.PhraseJpaRepository;
 import com.voicebridge.domain.phrase.Phrase;
 import com.voicebridge.domain.phrase.PhraseCategory;
+import com.voicebridge.port.out.AudioPlaybackUrlPort;
 import com.voicebridge.port.out.PhraseRepositoryPort;
+import com.voicebridge.port.out.StoragePort;
+import com.voicebridge.port.out.TtsEnginePort;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,10 +34,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-// 서비스와 DB는 실제 빈을 쓴다. 검증 규칙이 도메인에 있어서 서비스를 가짜로 두면 400·409를 HTTP 수준에서 확인할 수 없다.
+// 서비스와 DB는 실제 빈을 쓰고 클로바·S3만 가짜로 둔다. 검증 규칙이 도메인에 있어서 서비스를 가짜로 두면 400·409를 HTTP 수준에서 확인할 수 없다.
+// 가짜 클로바 테스트는 실제 클로바 동작을 보장하지 않는다. 실제 키로 하는 왕복 확인은 따로 수동으로 한다.
 // 같은 컨텍스트를 쓰는 다른 테스트와 기본 문구가 섞이지 않게 시작할 때 문구 테이블을 비운다.
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -35,6 +50,9 @@ class PhraseIntegrationTest {
   @Autowired MockMvc mvc;
   @Autowired PhraseRepositoryPort phrases;
   @Autowired PhraseJpaRepository phraseJpaRepository;
+  @MockitoBean TtsEnginePort ttsEngine;
+  @MockitoBean StoragePort storage;
+  @MockitoBean AudioPlaybackUrlPort playbackUrls;
 
   private final UUID me = UUID.randomUUID();
   private final UUID other = UUID.randomUUID();
@@ -193,5 +211,110 @@ class PhraseIntegrationTest {
         .andExpect(status().isUnauthorized());
     mvc.perform(delete(URL + "/" + greeting.getId())).andExpect(status().isUnauthorized());
     assertThat(phrases.countCustomByOwner(me)).isZero();
+  }
+
+  // ---- 말하기
+
+  private static final String AUDIO_KEY = "recordings/0b6f1c2e-1111-4222-8333-944445555666.mp3";
+
+  private void clovaAndS3Work() {
+    // 앞에서 예외를 던지게 해 둔 목도 다시 정할 수 있게 doReturn을 쓴다(when(...)은 목을 한 번 호출한다).
+    doReturn(new byte[] {1, 2, 3}).when(ttsEngine).synthesize(anyString());
+    when(storage.upload(any(), anyString())).thenReturn(AUDIO_KEY);
+    when(playbackUrls.createPhraseUrl(eq(AUDIO_KEY), any()))
+        .thenReturn("https://example.test/audio.mp3?signature=test");
+  }
+
+  @Test
+  void 두_번_눌러도_합성은_한_번이고_같은_음성을_재생한다() throws Exception {
+    clovaAndS3Work();
+
+    for (int i = 0; i < 2; i++) {
+      mvc.perform(as(me, post(URL + "/" + greeting.getId() + "/speak")))
+          .andExpect(status().isOk())
+          .andExpect(header().string("Cache-Control", "no-store"))
+          .andExpect(jsonPath("$.data.phraseId").value(greeting.getId().toString()))
+          .andExpect(
+              jsonPath("$.data.audioUrl").value("https://example.test/audio.mp3?signature=test"));
+    }
+
+    verify(ttsEngine, times(1)).synthesize("안녕하세요.");
+    verify(storage, times(1)).upload(any(), anyString());
+    assertThat(phrases.findById(greeting.getId()).orElseThrow().getAudioStorageKey())
+        .isEqualTo(AUDIO_KEY);
+  }
+
+  @Test
+  void 기본_문구의_음성은_다른_사용자도_다시_합성하지_않고_쓴다() throws Exception {
+    clovaAndS3Work();
+
+    mvc.perform(as(me, post(URL + "/" + greeting.getId() + "/speak"))).andExpect(status().isOk());
+    mvc.perform(as(other, post(URL + "/" + greeting.getId() + "/speak")))
+        .andExpect(status().isOk());
+
+    verify(ttsEngine, times(1)).synthesize(anyString());
+  }
+
+  @Test
+  void 클로바가_실패하면_503이고_아무것도_저장하지_않는다() throws Exception {
+    when(ttsEngine.synthesize(anyString())).thenThrow(new IllegalStateException("clova down"));
+
+    mvc.perform(as(me, post(URL + "/" + greeting.getId() + "/speak")))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.error.code").value("TTS_UNAVAILABLE"));
+
+    verify(storage, never()).upload(any(), anyString());
+    assertThat(phrases.findById(greeting.getId()).orElseThrow().hasAudio()).isFalse();
+
+    // 다음에 누르면 다시 합성을 시도한다
+    clovaAndS3Work();
+    mvc.perform(as(me, post(URL + "/" + greeting.getId() + "/speak"))).andExpect(status().isOk());
+    assertThat(phrases.findById(greeting.getId()).orElseThrow().hasAudio()).isTrue();
+  }
+
+  @Test
+  void 다른_사람의_문구는_말하기를_거절하고_합성하지_않는다() throws Exception {
+    Phrase theirs = phrases.save(Phrase.createCustom(other, PhraseCategory.DAILY, "다른 사람 문구"));
+
+    mvc.perform(as(me, post(URL + "/" + theirs.getId() + "/speak")))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error.code").value("FORBIDDEN_ACCESS"));
+
+    verifyNoInteractions(ttsEngine, storage, playbackUrls);
+  }
+
+  @Test
+  void 내_문구는_말할_수_있다() throws Exception {
+    clovaAndS3Work();
+    Phrase mine = phrases.save(Phrase.createCustom(me, PhraseCategory.DAILY, "물 좀 주세요."));
+
+    mvc.perform(as(me, post(URL + "/" + mine.getId() + "/speak"))).andExpect(status().isOk());
+
+    verify(ttsEngine).synthesize("물 좀 주세요.");
+  }
+
+  @Test
+  void 없는_문구를_말하면_404다() throws Exception {
+    mvc.perform(as(me, post(URL + "/" + UUID.randomUUID() + "/speak")))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    verifyNoInteractions(ttsEngine);
+  }
+
+  @Test
+  void 로그인하지_않으면_말하기도_401이고_합성하지_않는다() throws Exception {
+    mvc.perform(post(URL + "/" + greeting.getId() + "/speak")).andExpect(status().isUnauthorized());
+    verifyNoInteractions(ttsEngine);
+  }
+
+  @Test
+  void 음성이_있는_문구를_삭제하면_음성도_지운다() throws Exception {
+    clovaAndS3Work();
+    Phrase mine = phrases.save(Phrase.createCustom(me, PhraseCategory.DAILY, "물 좀 주세요."));
+    mvc.perform(as(me, post(URL + "/" + mine.getId() + "/speak"))).andExpect(status().isOk());
+
+    mvc.perform(as(me, delete(URL + "/" + mine.getId()))).andExpect(status().isNoContent());
+
+    verify(storage).delete(AUDIO_KEY);
   }
 }

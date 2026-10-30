@@ -38,6 +38,16 @@ public class S3AudioPlaybackUrlAdapter implements AudioPlaybackUrlPort {
 
   @Override
   public String createUrl(String storageKey, UUID ttsId) {
+    return presign(storageKey);
+  }
+
+  // 문구 음성도 TTS 음성과 같은 버킷·key 형식·TTL을 쓴다. 재생 URL은 저장하지 않고 요청마다 새로 만든다.
+  @Override
+  public String createPhraseUrl(String storageKey, UUID phraseId) {
+    return presign(storageKey);
+  }
+
+  private String presign(String storageKey) {
     TtsAudioKeys.validate(storageKey);
     try {
       return presigner
