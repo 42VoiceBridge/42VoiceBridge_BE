@@ -62,8 +62,9 @@ graph LR
 | `AWS_REGION` | S3 클라이언트 리전 | Infra 각 레이어에 `apply`할 때 쓴 `aws_region` 입력값과 동일(기본 `ap-northeast-2`) — Terraform output이 아니라 배포 시 동일하게 맞추기만 하면 됨 | 🟢 리전을 바꾸지 않았다면 로컬 기본값 그대로 둬도 됨 |
 | `NCP_TTS_API_KEY_ID` | 네이버 클라우드 CLOVA Voice 인증 키 ID | NCP 콘솔에서 수동 발급(Infra/Terraform 범위 밖) | 🔴 배포 필수(로컬 기본값은 빈 문자열 — TTS 기능을 실제로 테스트하려면 로컬에서도 값 필요) |
 | `NCP_TTS_API_KEY` | 네이버 클라우드 CLOVA Voice 인증 키 | NCP 콘솔에서 수동 발급(Infra/Terraform 범위 밖) | 🔴 배포 필수(위와 동일) |
-| `CLOVA_STT_API_KEY_ID` / `CLOVA_STT_API_KEY` | 네이버 클라우드 CLOVA Speech Recognition 키(대화 모드에서 상대의 말 받아쓰기) | NCP 콘솔에서 수동 발급. Application에 CSR을 선택해야 한다(안 하면 429). TTS 키와 같은 값을 쓸 수 있는지는 확인 전. Infra `deploy-ec2.sh` 전달은 아직 없음(대화 모드를 켤 때 `FEATURE_CONVERSATION_ENABLED`와 함께 추가) | 🟡 선택(없으면 받아쓰기만 503) |
-| `ANTHROPIC_API_KEY` | Claude API 키(문장 확장·문구 추천) | Claude Console에서 발급. 배포는 AWS Secrets Manager `voicebridge/dev/app`의 선택 필드(Infra `deploy-ec2.sh`가 있을 때만 전달) | 🟡 선택(없으면 문장 추천만 503, 나머지 기능은 동작) |
+| `CLOVA_STT_API_KEY_ID` / `CLOVA_STT_API_KEY` | 네이버 클라우드 CLOVA Speech Recognition 키(대화 모드에서 상대의 말 받아쓰기) | NCP 콘솔에서 수동 발급. Application에 CSR을 선택해야 한다(안 하면 429). TTS 키와 같은 값을 쓸 수 있는지는 확인 전. 배포는 Secrets Manager `voicebridge/dev/app`의 선택 필드(Infra #15부터 `deploy-ec2.sh`가 있을 때만 전달) | 🟡 선택(없으면 대화 모드 받아쓰기만 503) |
+| `ANTHROPIC_API_KEY` | Claude API 키(문장 확장·문구 추천, 대화 모드 답변 후보) | Claude Console에서 발급. 배포는 AWS Secrets Manager `voicebridge/dev/app`의 선택 필드(Infra `deploy-ec2.sh`가 있을 때만 전달) | 🟡 선택(없으면 문장 추천은 503, 대화 모드는 후보 없이 200. 나머지 기능은 동작) |
+| `FEATURE_PERSONALIZATION_ENABLED` / `FEATURE_DIAGNOSIS_ENABLED` / `FEATURE_SUGGESTION_ENABLED` / `FEATURE_CONVERSATION_ENABLED` | 기능 플래그. 꺼진 기능의 API는 404 | Secrets Manager `voicebridge/dev/app`의 선택 필드. **문자열 `"true"`/`"false"`**로 넣는다(JSON boolean이면 Infra 배포가 실패). 바꾸면 BE를 다시 배포해야 반영된다 | 🟡 선택(없으면 모두 꺼짐. 문장 추천·대화 모드를 쓰려면 앞의 두 개는 그대로 두고 뒤의 두 개를 `"true"`로) |
 | `KAKAO_CLIENT_ID` | 카카오 로그인 토큰 교환에 쓰는 앱 키 | 카카오 개발자 콘솔 [앱] > [플랫폼 키] > **REST API 키**(JavaScript 키 아님) | 🔴 배포 필수(기본값 없음 — 비어 있으면 카카오 로그인이 실패) |
 | `KAKAO_REDIRECT_URI` | 카카오 인가 코드를 받는 프론트 주소 | 프론트가 `Kakao.Auth.authorize({ redirectUri })`에 넘기는 값과 **정확히 같아야 함**(다르면 카카오가 KOE303으로 거절). 카카오 콘솔의 Redirect URI에도 등록 | 🔴 배포 필수(로컬과 배포 주소가 다르므로 환경마다 따로 지정) |
 | `KAKAO_CLIENT_SECRET` | 카카오 토큰 교환용 클라이언트 시크릿 | 카카오 개발자 콘솔에서 Client Secret을 **사용함**으로 켠 경우에만 발급값 입력 | 🟢 선택(콘솔에서 켰다면 필수 — 빠지면 KOE010으로 모든 카카오 로그인 실패. 켤 때는 이 값을 먼저 넣은 뒤 콘솔에서 켤 것) |
