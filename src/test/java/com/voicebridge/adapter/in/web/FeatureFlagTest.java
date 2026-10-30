@@ -25,7 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
- * 개인화·진단·문장 추천 기능 플래그. 테스트 설정은 기존 테스트를 위해 개인화·진단 플래그를 켜 두므로, 여기서 끈 상태를 따로 확인한다.
+ * 개인화·진단·문장 추천·대화 모드 기능 플래그. 테스트 설정은 기존 테스트를 위해 개인화·진단 플래그를 켜 두므로, 여기서 끈 상태를 따로 확인한다.
  *
  * <p>로그인한 사용자 기준이다. 토큰이 없으면 주소가 있든 없든 보안 필터가 먼저 401을 돌려준다.
  */
@@ -95,6 +95,19 @@ class FeatureFlagTest {
     }
 
     @Test
+    void 대화_모드_API는_404다() throws Exception {
+      UUID id = UUID.randomUUID();
+      for (MockHttpServletRequestBuilder request :
+          List.of(
+              post("/api/v1/conversation/turns"),
+              post("/api/v1/conversation/turns/" + id + "/candidates/" + id + "/speak"))) {
+        mvc.perform(asUser(request))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+      }
+    }
+
+    @Test
     void 남겨_둔_API는_그대로_동작한다() throws Exception {
       mvc.perform(asUser(get("/api/v1/recognitions"))).andExpect(status().isOk());
       mvc.perform(asUser(get("/api/v1/phrases"))).andExpect(status().isOk());
@@ -110,7 +123,8 @@ class FeatureFlagTest {
                 DiagnosisSessionController.class,
                 JamoErrorStatsController.class,
                 RecommendationController.class,
-                PhraseSuggestionController.class);
+                PhraseSuggestionController.class,
+                ConversationController.class);
 
     runner.run(
         context ->
@@ -119,7 +133,8 @@ class FeatureFlagTest {
                 .doesNotHaveBean(DiagnosisSessionController.class)
                 .doesNotHaveBean(JamoErrorStatsController.class)
                 .doesNotHaveBean(RecommendationController.class)
-                .doesNotHaveBean(PhraseSuggestionController.class));
+                .doesNotHaveBean(PhraseSuggestionController.class)
+                .doesNotHaveBean(ConversationController.class));
   }
 
   @Test
@@ -136,5 +151,7 @@ class FeatureFlagTest {
         .hasToString("${FEATURE_DIAGNOSIS_ENABLED:false}");
     assertThat(main.getProperty("voicebridge.features.suggestion"))
         .hasToString("${FEATURE_SUGGESTION_ENABLED:false}");
+    assertThat(main.getProperty("voicebridge.features.conversation"))
+        .hasToString("${FEATURE_CONVERSATION_ENABLED:false}");
   }
 }
