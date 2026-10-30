@@ -111,3 +111,10 @@ voicebridge:
       api-key-id: ${NCP_TTS_API_KEY_ID:}
       api-key: ${NCP_TTS_API_KEY:}
       speaker: nara
+  stt:
+    # 대화 모드(부록 C)에서 상대의 말을 받아쓰는 CLOVA Speech Recognition. 키는 환경변수로만 받는다(없으면 호출 시 503).
+    naver:
+      base-url: https://naveropenapi.apigw.ntruss.com/recog/v1/stt
+      api-key-id: ${CLOVA_STT_API_KEY_ID:}
+      api-key: ${CLOVA_STT_API_KEY:}
+      timeout: 5s

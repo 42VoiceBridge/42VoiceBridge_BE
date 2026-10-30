@@ -75,3 +75,10 @@ voicebridge:
       api-key-id: test-api-key-id
       api-key: test-api-key
       speaker: nara
+  stt:
+    # 테스트는 실제 CSR을 부르지 않는다. 어댑터 테스트는 WireMock 주소와 가짜 키를 직접 넣는다.
+    naver:
+      base-url: https://naveropenapi.apigw.ntruss.com/recog/v1/stt
+      api-key-id:
+      api-key:
+      timeout: 5s
