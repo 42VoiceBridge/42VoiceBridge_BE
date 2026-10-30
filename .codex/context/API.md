@@ -6,7 +6,10 @@
 
 # AI 구음장애 보조 서비스 — API 명세서
 
-> 문서 버전: v1.4 (2026-10-30 갱신, 변경 이력은 9장)
+> 문서 버전: v1.5 (2026-10-30 코드 대조 갱신, 변경 이력은 9장)
+>
+
+> **이 문서가 최신 API 명세다.** Notion 「3. API 명세서」(v1.3, 2026-10-03)는 이후 갱신되지 않았고 10·11장(문구·문장 추천·대화 모드)이 없다. 둘이 다르면 이 문서를 따른다.
 >
 
 > **2026-10-30 방향 전환**: 서비스의 중심을 “자주 쓰는 문구를 눌러 말하기”(10장)로 옮겼다. 개인화(4장)와 진단·자모 오류 통계·추천 문장(2·3장)은 기능 플래그(`voicebridge.features.personalization`, `voicebridge.features.diagnosis`)로 **꺼져 있고, 꺼진 동안 해당 주소는 404 `RESOURCE_NOT_FOUND`**다(토큰이 없으면 401이 먼저). 코드와 테이블은 남아 있어 플래그를 켜면 아래 내용대로 동작한다. 실사용 인식(5장)·확인/TTS(6장)는 그대로 공개한다. 문장 추천(10.6)과 대화 모드(11장)도 플래그(`voicebridge.features.suggestion`, `voicebridge.features.conversation`)로 **기본 꺼짐**이고 꺼진 동안 404다.
@@ -28,6 +31,7 @@ https://{host}/api/v1
 - 헤더: `Authorization: Bearer {accessToken}`
 - 인증이 필요한 API에 토큰이 없으면 401 `AUTH_REQUIRED`, 토큰이 만료됐거나 유효하지 않으면 401 `AUTH_TOKEN_EXPIRED`다. 둘 다 공통 응답 형식(0.3)으로 온다. 인증이 필요 없는 API는 만료된 토큰을 붙여 보내도 막지 않는다.
 - 인증이 필요 없는 API: `POST /auth/signup`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/kakao`
+- `/api/v1` 밖에서 인증 없이 열려 있는 주소: `GET /actuator/health`(배포 상태 확인용, 상세 정보 없음), `/swagger-ui/**`, `/v3/api-docs/**`(API 문서)
 
 ### 0.3 공통 응답 포맷
 
@@ -91,7 +95,7 @@ https://{host}/api/v1
 | 422 | 비즈니스 규칙 위반(예: 최소 녹음 개수 미충족) |
 | 429 | 호출 상한 초과(`TOO_MANY_REQUESTS`, 문장 추천 분당 10회, 대화 턴 분당 10회, 대화 말하기 분당 20회) |
 | 500 | 서버 내부 오류 |
-| 502/503 | AI 추론/학습 서버 장애 (기본 모델 폴백 여부는 4.2절 참고), 음성 합성 서버 장애(`TTS_UNAVAILABLE`), 문장 추천 LLM 장애(`SUGGESTION_UNAVAILABLE`), 음성인식 장애(`STT_UNAVAILABLE`) |
+| 502/503 | AI 추론 서버 장애, 개인화 학습 미지원(`TRAINING_UNAVAILABLE`), 음성 합성 서버 장애(`TTS_UNAVAILABLE`), 문장 추천 LLM 장애(`SUGGESTION_UNAVAILABLE`), 음성인식 장애(`STT_UNAVAILABLE`) |
 | 503 | 음성 변환 슬롯 대기 또는 처리 시간 초과로 일시적 처리 불가 |
 
 ### 0.6 공통 에러 코드
@@ -105,25 +109,30 @@ https://{host}/api/v1
 | `KAKAO_AUTH_FAILED` | 카카오 로그인 실패 — 인가 코드 만료·재사용, redirect URI 불일치, 카카오 서버 장애 등 (HTTP 401) |
 | `EMAIL_ALREADY_EXISTS` | 이미 가입된 이메일 (HTTP 409). 카카오 계정 이메일이 기존 이메일 회원과 같을 때도 발생 |
 | `VALIDATION_FAILED` | 요청 검증 실패. 필수 파라미터·파일이 빠지면 메시지에 빠진 필드명이 담긴다(예: `필수 요청 값이 없습니다: audioFile`). 읽을 수 없는 JSON 본문도 이 코드다 |
-| `RESOURCE_NOT_FOUND` | 대상 리소스 없음. 없는 API 주소도 404로 온다 |
+| `RESOURCE_NOT_FOUND` | 대상 리소스 없음. 없는 API 주소, 기능 플래그로 꺼진 API(2·3·4장, 10.6, 11장)도 404로 온다 |
 | `METHOD_NOT_ALLOWED` | 그 주소가 받지 않는 HTTP 메서드 (HTTP 405, `Allow` 헤더에 허용 메서드) |
 | `UNSUPPORTED_MEDIA_TYPE` | 그 API가 받지 않는 Content-Type (HTTP 415) |
 | `FORBIDDEN_ACCESS` | 본인 소유가 아닌 리소스 접근 |
 | `INVALID_STATE_TRANSITION` | 상태 머신 규칙 위반 (예: 분석이 끝난 진단 세션에 녹음 추가) |
-| `TRAINING_UNAVAILABLE` | 온라인 학습 계약과 AI job 조회 경로가 없어 학습 요청을 접수할 수 없음 (HTTP 503) |
+| `TRAINING_UNAVAILABLE` | 백엔드가 개인화 학습을 접수하지 않음 (HTTP 503). 2026-10-30 개인화 중단 이후 4장 플래그를 켜도 학습 시작은 이 코드다 |
 | `INSUFFICIENT_RECORDINGS` | 개인화 학습에 필요한 최소 녹음 수 미충족 |
 | `AI_INFERENCE_UNAVAILABLE` | AI 서버를 쓸 수 없음 (장애, 타임아웃, 계약과 다른 응답, 서버에 문장 풀 파일 없음) |
 | `INTERNAL_SERVER_ERROR` | 처리되지 않은 서버 오류 (HTTP 500) |
-| `AUDIO_TOO_SHORT` | 진단 녹음이 0.3초 미만 (HTTP 400). 조금 더 길게 다시 녹음 |
-| `AUDIO_TOO_LONG` | 진단 녹음이 30초 초과 (HTTP 400). 짧게 끊어서 다시 녹음 |
-| `AUDIO_INVALID` | 진단 녹음 파일이 손상됐거나 지원하지 않는 형식 (HTTP 400). 다시 녹음 |
+| `AUDIO_TOO_SHORT` | 녹음이 0.3초 미만 (HTTP 400). 진단 업로드(2.3)와 대화 턴(11.1)에서 쓴다. 조금 더 길게 다시 녹음 |
+| `AUDIO_TOO_LONG` | 녹음이 30초 초과 (HTTP 400). 진단 업로드와 대화 턴에서 쓴다. 짧게 끊어서 다시 녹음 |
+| `AUDIO_INVALID` | 녹음 파일이 손상됐거나 지원하지 않는 형식 (HTTP 400). 진단 업로드와 대화 턴에서 쓴다. 실사용 인식(5.1)·개인화 업로드(4.1)는 같은 상황을 `VALIDATION_FAILED`로 준다 |
 | `DUPLICATE_PHRASE` | 같은 카테고리에 내가 이미 추가한 같은 문구 (HTTP 409) |
 | `PHRASE_LIMIT_EXCEEDED` | 직접 추가한 문구가 상한(100개)에 닿음 (HTTP 409). 쓰지 않는 문구를 지운 뒤 다시 추가 |
 | `TTS_UNAVAILABLE` | 음성 합성 서버(CLOVA Voice)를 쓸 수 없음 (HTTP 503). 아무것도 저장하지 않았으므로 잠시 후 같은 요청을 다시 보내면 된다 |
 | `SUGGESTION_UNAVAILABLE` | 문장 추천(LLM)을 쓸 수 없음 (HTTP 503). 장애·시간 초과·키 미설정·쓸 수 있는 후보 0개. 직접 입력하거나 잠시 후 다시 시도. 문구 저장·말하기는 영향 없음 |
 | `STT_UNAVAILABLE` | 상대의 말 받아쓰기(CLOVA Speech Recognition)를 쓸 수 없음 (HTTP 503). 장애·시간 초과·키 미설정·빈 인식. 다시 녹음하거나 문구함으로 대답 |
-| `TOO_MANY_REQUESTS` | 호출 상한 초과 (HTTP 429). 문장 추천은 사용자당 분당 10회. 잠시 후 다시 시도 |
+| `TOO_MANY_REQUESTS` | 호출 상한 초과 (HTTP 429). 사용자당 분당 문장 추천 10회, 대화 턴 10회, 대화 후보 말하기 20회. 잠시 후 다시 시도 |
 | `AUDIO_PROCESSING_UNAVAILABLE` | 음성 변환 슬롯 대기 초과 또는 변환 처리 시간 초과로 일시적으로 처리할 수 없음 (HTTP 503). 실사용 인식·진단 업로드·개인화 업로드의 변환 경로에 공통 적용 |
+
+### 0.7 시각 형식
+
+- `createdAt`·`confirmedAt`·`startedAt`·`completedAt`·`trainedAt`은 **오프셋이 없는** ISO-8601 문자열이다(예: `2026-10-30T09:00:00`). 서버의 `LocalDateTime`을 그대로 직렬화하므로 초 아래 자릿수가 붙을 수 있다(예: `2026-10-30T09:00:00.123456`).
+- 시간대: 코드·BE 이미지(`eclipse-temurin`)·배포 스크립트 어디에도 JVM 시간대를 지정하지 않아 JVM 기본값을 따른다. 운영 값이 UTC인지 한국 시간인지는 **확인 필요**다. 화면에 시각을 보여 주기 전에 실제 응답으로 확인한다.
 
 ---
 
@@ -286,10 +295,10 @@ Response (201):
     "sessionId": "uuid",
     "status": "IN_PROGRESS",
     "sentences": [
-      { "sentenceId": "s-001", "text": "오늘 날씨가 좋습니다." },
-      { "sentenceId": "s-002", "text": "물을 마시고 싶습니다." }
+      { "sentenceId": "uuid", "text": "오늘 날씨가 좋습니다." },
+      { "sentenceId": "uuid", "text": "물을 마시고 싶습니다." }
     ],
-    "createdAt": "2026-09-14T09:00:00Z"
+    "createdAt": "2026-09-14T09:00:00"
   }
 }
 ```
@@ -550,7 +559,7 @@ Response (202, 본인 녹음): 본인 녹음을 즉시 학습 대상에서 제�
 
 `POST /personalization/train` (인증 필요)
 
-현재 AI v1의 train은 501이고 job 조회 경로가 없다. 서버는 job을 만들거나 202로 접수하지 않으며 503 `TRAINING_UNAVAILABLE`을 반환한다. 온라인 학습 계약과 적격 녹음의 정답 검토·동의·분할·전달 방식이 준비되면 202 계약을 별도 변경한다.
+서버는 job을 만들거나 202로 접수하지 않으며 503 `TRAINING_UNAVAILABLE`을 반환한다. AI 쪽에는 학습 경로가 있지만(7.2) 2026-10-30 개인화 중단으로 백엔드는 연동하지 않는다. 다시 연동하려면 정답 검토·동의·분할·녹음 전달 방식을 정하고 이 계약을 별도로 바꾼다.
 
 ### 4.3 개인화 학습 상태 조회
 
@@ -565,7 +574,7 @@ Response (200):
     "jobId": "uuid",
     "status": "IN_PROGRESS",
     "progress": null,
-    "startedAt": "2026-09-14T09:00:00Z",
+    "startedAt": "2026-09-14T09:00:00",
     "completedAt": null,
     "failureReason": null
   }
@@ -588,7 +597,7 @@ Response (200):
   "data": {
     "hasPersonalizedModel": true,
     "modelVersion": "v3",
-    "trainedAt": "2026-09-14T10:00:00Z",
+    "trainedAt": "2026-09-14T10:00:00",
     "trainingRecordingCount": 12
   }
 }
@@ -620,13 +629,17 @@ Response (200):
   "data": {
     "recognitionId": "uuid",
     "recognizedText": "병원에 가고 싶어요",
-    "modelUsed": "PERSONALIZED",
-    "confidence": 0.91
+    "modelUsed": "BASE_ADAPTED",
+    "confidence": null
   }
 }
 ```
 
 `modelUsed`: `PERSONALIZED` | `BASE_ADAPTED`
+
+- 2026-10-30 개인화 중단 이후 활성 adapter가 없으므로 현재는 항상 `BASE_ADAPTED`(기본 Whisper-small)다.
+- `confidence`: AI v1은 점수를 주지 않아 `null`이다. 값이 오면 0~1 사이다. 화면에 표시하지 않는다.
+- AI 서버: 2026-10-30 백엔드 EC2에서 `GET /v1/health`로 확인(`ai-contract-v1`, `openai/whisper-small` revision `973afd2496…`, 어댑터 없음). 기록은 `docs/PHRASE-TTS-PIVOT-PLAN-2026-10-30.md`.
 
 에러:
 
@@ -639,7 +652,7 @@ Response (200):
 
 `GET /recognitions?page=0&size=20`
 
-Response (200): 0.4절 공통 페이지네이션 포맷 + 각 항목은 5.1 응답과 동일 필드 + `createdAt`
+Response (200): 0.4절 공통 페이지네이션 포맷. `content`의 각 항목은 5.1 응답과 같은 4개 필드다(`recognitionId`, `recognizedText`, `modelUsed`, `confidence`). **`createdAt`은 오지 않는다.** `page` 기본 0, `size` 기본 20.
 
 ### 5.3 인식 이력 상세 조회
 
@@ -675,7 +688,7 @@ Response (201):
   "data": {
     "confirmationId": "uuid",
     "confirmedText": "물 좀 주세요",
-    "confirmedAt": "2026-09-26T09:00:00Z"
+    "confirmedAt": "2026-09-26T09:00:00"
   }
 }
 ```
@@ -769,11 +782,11 @@ await audio.play();
 
 ### 7.2 개인화 학습 트리거
 
-현재 AI `POST /v1/adapters/train`은 501 `not_implemented_in_demo`만 정의·제공한다. BE는 AI 학습 요청을 보내거나 job을 만들지 않으며 공개 `POST /api/v1/personalization/train`에 503 `TRAINING_UNAVAILABLE`을 반환한다. 성공 요청·응답 형식과 녹음 전달 방식은 미확정이다(4.2절).
+AI 쪽 `POST /v1/adapters/train`은 2026-09-29부터 202와 job 레코드를 돌려준다(AI 레포 `docs/AI_ANSWERS_TO_BACKEND_2026-10-03_EN.md` T1·T2). AI 문서도 "로컬에서만 구현"이라고 적고 있고, 학습 녹음은 AI 서버 파일시스템(`ENROLL_DIR/<user_id>/`)에서 읽어 백엔드가 전달할 방법이 없다. 2026-10-30 개인화 중단으로 BE는 이 경로를 부르지 않으며, 공개 `POST /api/v1/personalization/train`은 503 `TRAINING_UNAVAILABLE`이다(4.2절).
 
 ### 7.3 학습 상태 조회
 
-AI `GET /v1/adapters/jobs/{job_id}` 경로는 현재 없다(404). BE 공개 `GET /api/v1/personalization/train/{jobId}`는 본인의 BE DB job만 읽는다. 응답의 `progress`는 실측값이 없어 `null`이며, 외부 worker의 진행이나 활성 adapter를 뜻하지 않는다(4.3절).
+AI 쪽 job 조회 경로는 `GET /v1/jobs/{job_id}`다(이전 문서의 `/v1/adapters/jobs/{job_id}`는 틀린 주소). BE는 이 경로를 부르지 않는다. BE 공개 `GET /api/v1/personalization/train/{jobId}`는 본인의 BE DB job만 읽는다. 응답의 `progress`는 실측값이 없어 `null`이며, 외부 worker의 진행이나 활성 adapter를 뜻하지 않는다(4.3절).
 
 ### 7.4 (2차 목표) TTS 변환
 
@@ -810,6 +823,18 @@ POST /v1/enroll/next-prompts
 > 7.5·7.6 공통: AI 데모 서버는 `Content-Length`로만 요청 본문을 읽는다. JSON을 조각(chunked)으로 보내면 빈 요청으로 처리되므로(422) 본문을 모아서 보낸다.
 >
 
+### 7.7 외부 서비스 (AI 서버 밖)
+
+BE가 직접 부르는 외부 API다. 키는 모두 환경변수로만 받고, 키가 없으면 그 기능만 503이다. 요청 텍스트·음성은 로그에 남기지 않는다.
+
+| 서비스 | 쓰는 곳 | 주소 | 환경변수 | 타임아웃 | 실패 시 |
+| --- | --- | --- | --- | --- | --- |
+| NCP CLOVA Voice (TTS Premium) | 6.1 TTS, 10.4 문구 말하기, 11.2 후보 말하기 | `https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts`, 화자 `nara`, mp3 | `NCP_TTS_API_KEY_ID`, `NCP_TTS_API_KEY` | 5초(`voicebridge.tts.naver.timeout`, 연결·응답 각각) | 10.4·11.2는 503 `TTS_UNAVAILABLE`, 6.1은 비동기라 `FAILED` |
+| NCP CLOVA Speech Recognition (CSR) | 11.1 상대의 말 받아쓰기 | `https://naveropenapi.apigw.ntruss.com/recog/v1/stt?lang=Kor`, 본문은 16kHz WAV 바이트 | `CLOVA_STT_API_KEY_ID`, `CLOVA_STT_API_KEY` | 5초 | 503 `STT_UNAVAILABLE`. NCP Application에 CSR을 선택하지 않으면 네이버가 429를 주고 BE는 503으로 바꾼다 |
+| Anthropic Claude | 10.6 문장 추천, 11.1 답변 후보 | Messages API, 모델 `claude-haiku-5-5` | `ANTHROPIC_API_KEY` | 8초(SDK 재시도 1회 포함 시 최대 약 두 배) | 10.6은 503 `SUGGESTION_UNAVAILABLE`, 11.1은 후보 빈 배열로 200 |
+
+기능 플래그(`FEATURE_SUGGESTION_ENABLED` 등)와 키는 운영에서 Secrets Manager `voicebridge/dev/app`의 선택 필드로 들어간다. 플래그 값은 문자열 `"true"`여야 한다(Infra `docs/ENVIRONMENT-VARIABLES.md`).
+
 ---
 
 ## 8. 엔드포인트 요약표
@@ -838,6 +863,7 @@ POST /v1/enroll/next-prompts
 | POST | /recognitions/{id}/confirm | 주영 | O |
 | POST | /tts | 주영(stretch) | O |
 | GET | /tts/{id} | 주영(stretch) | O |
+| GET | /tts/{ttsId}/audio (`local` 전용) | 주영 | O |
 | GET | /phrases?category= | 팀장 | O |
 | POST | /phrases | BE-A | O |
 | DELETE | /phrases/{phraseId} | BE-A | O |
@@ -847,7 +873,7 @@ POST /v1/enroll/next-prompts
 | POST | /conversation/turns (플래그, 기본 꺼짐) | 팀장 | O |
 | POST | /conversation/turns/{turnId}/candidates/{candidateId}/speak (플래그, 기본 꺼짐) | 팀장 | O |
 
-> 2·3·4장 주소(진단·자모 통계·추천·개인화)는 2026-10-30부터 기능 플래그로 꺼져 있어 404다. 10.6 문장 추천과 11장 대화 모드도 플래그로 기본 꺼짐(404)이다.
+> 2·3·4장 주소(진단·자모 통계·추천·개인화)는 2026-10-30부터 기능 플래그로 꺼져 있어 404다. 10.6 문장 추천과 11장 대화 모드도 플래그로 기본 꺼짐(404)이다. 이 밖에 `GET /actuator/health`(인증 없음)가 있다(0.2).
 
 ---
 
@@ -887,6 +913,8 @@ POST /v1/enroll/next-prompts
 | 2026-10-30 | 0.6, 8, 10 | 계획서(PHRASE-TTS-PIVOT-PLAN 4장)에 맞춤: 상황별 카테고리 6개, 목록을 `?category=` 필터 + 평평한 배열(`id`, `category`, `text`, `isDefault`)로, 말하기 응답 `phraseId` → `id`, `PHRASE_DUPLICATED` → `DUPLICATE_PHRASE`(같은 카테고리 내 내 문구끼리만), 상한 50 → 100개 |
 | 2026-10-30 | 0.5, 0.6, 8, 10.3, 10.6 | 문장 확장·문구 추천 `POST /phrases/suggestions` 추가(플래그 기본 꺼짐). `SUGGESTION_UNAVAILABLE`(503), `TOO_MANY_REQUESTS`(429) 추가. 문구 삭제의 UUID가 아닌 ID는 400 → 404 |
 | 2026-10-30 | 0, 0.5, 0.6, 8, 11 | 대화 모드 추가(턴 만들기·후보 말하기, 플래그 기본 꺼짐). `STT_UNAVAILABLE`(503) 추가 |
+| 2026-10-30 | 0, 0.2, 0.5~0.7, 2.1, 4.2~4.4, 5.1, 5.2, 6.0, 7, 8 | v1.5 코드 대조 정리. 이 문서를 최신 명세로 명시(Notion v1.3은 갱신 중단). 인증 없는 `/actuator/health`·Swagger 명시. 시각 형식(0.7, 오프셋 없음) 추가하고 예시의 `Z` 제거. `AUDIO_*`가 대화 턴에도 쓰임, 호출 상한 3종 명시, 꺼진 기능의 404 명시. 2.1 `sentenceId` 예시를 UUID로. 5.1 현재 항상 `BASE_ADAPTED`·`confidence: null`. **5.2 이력 항목에 `createdAt` 없음**(문서 오류 정정). 7.2·7.3 AI 학습 경로 현황 정정(`/v1/jobs/{job_id}`), 7.7 외부 서비스(CLOVA Voice·CSR·Claude) 추가. 8 요약표에 `GET /tts/{ttsId}/audio` 추가 |
+| 2026-10-30 | 7.7 | CLOVA Voice 호출에 타임아웃 5초 추가. 넘으면 10.4·11.2는 503 `TTS_UNAVAILABLE`, 6.1은 `FAILED`(기존 실패 처리와 같음) |
 
 ---
 

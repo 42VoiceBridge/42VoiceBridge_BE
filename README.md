@@ -4,7 +4,9 @@ GSIA SW 챌린지(3주) — **AI 구음장애 보조 서비스**의 백엔드입
 
 > 개인화 학습과 진단(진단 세션·자모 오류 통계·추천 문장)은 기능 플래그 `voicebridge.features.personalization` / `voicebridge.features.diagnosis`로 **꺼 두었고, 꺼진 동안 해당 API는 404**입니다. 코드와 테이블은 남아 있어 환경변수 `FEATURE_PERSONALIZATION_ENABLED=true` / `FEATURE_DIAGNOSIS_ENABLED=true`로 다시 켤 수 있습니다.
 
-> 목표/타겟층/TTS 우선순위 등 서비스 기획 일부는 팀 회의로 확정 중입니다. 최신 요구사항은 Notion 문서를 우선 참고하세요.
+> 목표/타겟층/TTS 우선순위 등 서비스 기획 일부는 팀 회의로 확정 중입니다. 기획·요구사항은 Notion 문서를 참고하세요.
+
+> **API 명세의 최신 기준은 이 저장소의 [`.codex/context/API.md`](.codex/context/API.md)(v1.5, 2026-10-30 코드 대조)입니다.** Notion 「3. API 명세서」는 2026-10-03(v1.3) 이후 갱신되지 않았고 문구·문장 추천·대화 모드가 없습니다.
 
 ## 기술 스택
 
@@ -147,10 +149,19 @@ graph TB
 | 17 | `POST /api/v1/phrases` | JWT 필요 | 문구 추가. 본문 `{ "category": "RESTAURANT", "text": "물 좀 주세요." }` (`201`) |
 | 18 | `DELETE /api/v1/phrases/{phraseId}` | JWT 필요 | 내 문구 삭제 (`204`) |
 | 19 | `POST /api/v1/phrases/{phraseId}/speak` | JWT 필요 | 문구 말하기. 재생 URL 반환, 합성 음성은 문구마다 1회만 만든다 |
+| 20 | `GET /api/v1/users/me` | JWT 필요 | 내 정보 조회 |
+| 21 | `GET /api/v1/recognitions?page=&size=` | JWT 필요 | 인식 이력 목록(페이지네이션). 항목에 `createdAt`은 없다 |
+| 22 | `GET /api/v1/recognitions/{recognitionId}` | JWT 필요 | 인식 이력 상세 |
+| 23 | `POST /api/v1/phrases/suggestions` | JWT 필요 | 문장 확장·문구 추천(Claude). 본문 `{ "text": "물", "category": "RESTAURANT" }`. 후보는 저장·말하기 안 함. 플래그 `FEATURE_SUGGESTION_ENABLED` |
+| 24 | `POST /api/v1/conversation/turns` | JWT 필요 | 대화 모드 턴: 상대의 말 녹음(`audioFile`) → 받아쓰기(CLOVA CSR) + 답변 후보. 플래그 `FEATURE_CONVERSATION_ENABLED` |
+| 25 | `POST /api/v1/conversation/turns/{turnId}/candidates/{candidateId}/speak` | JWT 필요 | 서버가 발급한 후보만 TTS로 말하기(`audio/mpeg` 바이트). 플래그 위와 같음 |
+| 26 | `POST /api/v1/personalization/recordings`, `DELETE .../{recordingId}`, `POST /api/v1/personalization/train`, `GET /api/v1/personalization/train/{jobId}` | JWT 필요 | 개인화 녹음·학습(학습 시작은 항상 503) |
 
-> 5~9, 14, 15번(진단·개인화·추천·자모 통계)은 2026-10-30부터 기능 플래그로 꺼져 있어 404입니다.
+> 5~9, 14, 15, 26번(진단·개인화·추천·자모 통계)은 2026-10-30부터 기능 플래그로 꺼져 있어 404입니다. 23~25번(문장 추천·대화 모드)도 기본은 꺼짐(404)이고 운영 시크릿에서 켭니다.
 
-> `/api/v1/auth/**`를 제외한 모든 API는 JWT 인증이 필요합니다(`POST /api/v1/auth/login`으로 발급, `Authorization: Bearer {token}` 헤더로 호출).
+> `local` 프로파일에는 재생용 `GET /api/v1/tts/{ttsId}/audio`, `GET /api/v1/phrases/{phraseId}/audio`가 더 있습니다. 요청·응답·에러 코드 전체는 [API 명세서](.codex/context/API.md)를 보세요.
+
+> `/api/v1/auth/**`를 제외한 모든 API는 JWT 인증이 필요합니다(`POST /api/v1/auth/login`으로 발급, `Authorization: Bearer {token}` 헤더로 호출). 인증 없이 열린 것은 그 밖에 `GET /actuator/health`와 Swagger(`/swagger-ui/**`, `/v3/api-docs/**`)뿐입니다.
 
 ## 실사용 인식 업로드
 
