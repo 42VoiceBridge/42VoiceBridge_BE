@@ -829,7 +829,7 @@ BE가 직접 부르는 외부 API다. 키는 모두 환경변수로만 받고, �
 
 | 서비스 | 쓰는 곳 | 주소 | 환경변수 | 타임아웃 | 실패 시 |
 | --- | --- | --- | --- | --- | --- |
-| NCP CLOVA Voice (TTS Premium) | 6.1 TTS, 10.4 문구 말하기, 11.2 후보 말하기 | `https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts`, 화자 `nara`, mp3 | `NCP_TTS_API_KEY_ID`, `NCP_TTS_API_KEY` | **지정 안 됨**. 네이버가 응답하지 않으면 요청이 오래 묶일 수 있다(후속 과제) | 10.4·11.2는 503 `TTS_UNAVAILABLE`, 6.1은 비동기라 `FAILED` |
+| NCP CLOVA Voice (TTS Premium) | 6.1 TTS, 10.4 문구 말하기, 11.2 후보 말하기 | `https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts`, 화자 `nara`, mp3 | `NCP_TTS_API_KEY_ID`, `NCP_TTS_API_KEY` | 5초(`voicebridge.tts.naver.timeout`, 연결·응답 각각) | 10.4·11.2는 503 `TTS_UNAVAILABLE`, 6.1은 비동기라 `FAILED` |
 | NCP CLOVA Speech Recognition (CSR) | 11.1 상대의 말 받아쓰기 | `https://naveropenapi.apigw.ntruss.com/recog/v1/stt?lang=Kor`, 본문은 16kHz WAV 바이트 | `CLOVA_STT_API_KEY_ID`, `CLOVA_STT_API_KEY` | 5초 | 503 `STT_UNAVAILABLE`. NCP Application에 CSR을 선택하지 않으면 네이버가 429를 주고 BE는 503으로 바꾼다 |
 | Anthropic Claude | 10.6 문장 추천, 11.1 답변 후보 | Messages API, 모델 `claude-haiku-5-5` | `ANTHROPIC_API_KEY` | 8초(SDK 재시도 1회 포함 시 최대 약 두 배) | 10.6은 503 `SUGGESTION_UNAVAILABLE`, 11.1은 후보 빈 배열로 200 |
 
@@ -914,6 +914,7 @@ BE가 직접 부르는 외부 API다. 키는 모두 환경변수로만 받고, �
 | 2026-10-30 | 0.5, 0.6, 8, 10.3, 10.6 | 문장 확장·문구 추천 `POST /phrases/suggestions` 추가(플래그 기본 꺼짐). `SUGGESTION_UNAVAILABLE`(503), `TOO_MANY_REQUESTS`(429) 추가. 문구 삭제의 UUID가 아닌 ID는 400 → 404 |
 | 2026-10-30 | 0, 0.5, 0.6, 8, 11 | 대화 모드 추가(턴 만들기·후보 말하기, 플래그 기본 꺼짐). `STT_UNAVAILABLE`(503) 추가 |
 | 2026-10-30 | 0, 0.2, 0.5~0.7, 2.1, 4.2~4.4, 5.1, 5.2, 6.0, 7, 8 | v1.5 코드 대조 정리. 이 문서를 최신 명세로 명시(Notion v1.3은 갱신 중단). 인증 없는 `/actuator/health`·Swagger 명시. 시각 형식(0.7, 오프셋 없음) 추가하고 예시의 `Z` 제거. `AUDIO_*`가 대화 턴에도 쓰임, 호출 상한 3종 명시, 꺼진 기능의 404 명시. 2.1 `sentenceId` 예시를 UUID로. 5.1 현재 항상 `BASE_ADAPTED`·`confidence: null`. **5.2 이력 항목에 `createdAt` 없음**(문서 오류 정정). 7.2·7.3 AI 학습 경로 현황 정정(`/v1/jobs/{job_id}`), 7.7 외부 서비스(CLOVA Voice·CSR·Claude) 추가. 8 요약표에 `GET /tts/{ttsId}/audio` 추가 |
+| 2026-10-30 | 7.7 | CLOVA Voice 호출에 타임아웃 5초 추가. 넘으면 10.4·11.2는 503 `TTS_UNAVAILABLE`, 6.1은 `FAILED`(기존 실패 처리와 같음) |
 
 ---
 
