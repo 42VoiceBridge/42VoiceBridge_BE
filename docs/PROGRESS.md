@@ -8,7 +8,9 @@
 
 - 브랜치 `claude/trusting-carson-08d3c2`에 계획서 6장의 PR 단위대로 커밋 4개(플래그 → 문구 CRUD → 말하기 → 문서). PR은 아직 만들지 않았다.
 - **플래그**: `voicebridge.features.personalization` / `diagnosis`(기본 꺼짐, env `FEATURE_*_ENABLED`). 꺼지면 해당 컨트롤러를 등록하지 않아 404. 진단 플래그는 진단 세션·자모 통계·추천을 묶는다(D4). 테스트 설정은 켜서 기존 테스트를 그대로 돌리고, 꺼진 상태는 `FeatureFlagTest`가 본다.
-- **문구**: `Phrase`/`PhraseCategory` 도메인, `V2__phrases.sql`(`(owner_id, text)` 유니크), `PhraseSeeder`(멱등). 검증값(100자, 50개, 제어문자)은 도메인에만 둔다.
+- **문구**: `Phrase`/`PhraseCategory` 도메인, `V2__phrases.sql`, `PhraseSeeder`(멱등). 검증값(100자, 100개, 제어문자)은 도메인에만 둔다.
+- **계획서 정렬(PR #56 머지 후)**: 계획서 원문(`docs/PHRASE-TTS-PIVOT-PLAN-2026-10-30.md`)을 늦게 받아 #56이 원문과 달랐다. 운영 적용 전이라 V2를 그 자리에서 고쳐 맞췄다 — 상황별 카테고리 6개, `?category=` 필터 + 평평한 목록(`id`, `isDefault`), 중복은 `(owner_id, category, text_sha256)` 유니크(같은 카테고리 내 내 문구끼리, 대소문자 구분), 상한 100개, `DUPLICATE_PHRASE`. 별도 `(owner_id, category)` 인덱스는 유니크 키 앞부분과 겹쳐 두지 않았다.
+- **AI 서버**: 2026-10-30 백엔드 EC2에서 `GET /v1/health` 확인(`ai-contract-v1`, `transformers+peft`, whisper-small `973afd2496…`, 어댑터 없음). D4(진단·자모 통계·추천 끔)는 그대로 유지하기로 확정.
 - **말하기**: 클로바·업로드는 트랜잭션 밖. 실패하면 503 `TTS_UNAVAILABLE`, 캐시 미저장. 합성 중 다른 요청이 먼저 붙였으면 방금 올린 음성을 지운다. `AudioPlaybackUrlPort.createPhraseUrl` 추가, local은 `GET /phrases/{id}/audio`. 문구를 지우면 음성도 지우도록 `StoragePort.delete`가 mp3 음성 key도 받는다(진단 녹음 wav는 여전히 거절).
 - 검증: 이 세션 컨테이너는 Docker가 없고 Maven Central·jitpack이 막혀, Google Maven 미러 + JPyRust 컴파일 스텁 + JDK 21(`--release 17`)로 돌렸다. Testcontainers(MySQL·Redis) 테스트는 여기서 돌지 않는다 — `PhrasePersistenceAdapterTest`·`FlywayMigrationTest`(테이블 15개)는 CI에서 확인해야 한다.
 - **남은 것**: 클로바 실제 키 왕복 수동 검증, S3 실검증, Notion 명세서 반영, 개인화 코드 삭제 여부(D5), 기본 문구 목록 확정(D1).

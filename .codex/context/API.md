@@ -116,8 +116,8 @@ https://{host}/api/v1
 | `AUDIO_TOO_SHORT` | 진단 녹음이 0.3초 미만 (HTTP 400). 조금 더 길게 다시 녹음 |
 | `AUDIO_TOO_LONG` | 진단 녹음이 30초 초과 (HTTP 400). 짧게 끊어서 다시 녹음 |
 | `AUDIO_INVALID` | 진단 녹음 파일이 손상됐거나 지원하지 않는 형식 (HTTP 400). 다시 녹음 |
-| `PHRASE_DUPLICATED` | 추가하려는 문구가 이미 목록(기본 문구 또는 내가 추가한 문구)에 있음 (HTTP 409). 카테고리가 달라도 텍스트가 같으면 중복 |
-| `PHRASE_LIMIT_EXCEEDED` | 직접 추가한 문구가 상한(50개)에 닿음 (HTTP 409). 쓰지 않는 문구를 지운 뒤 다시 추가 |
+| `DUPLICATE_PHRASE` | 같은 카테고리에 내가 이미 추가한 같은 문구 (HTTP 409) |
+| `PHRASE_LIMIT_EXCEEDED` | 직접 추가한 문구가 상한(100개)에 닿음 (HTTP 409). 쓰지 않는 문구를 지운 뒤 다시 추가 |
 | `TTS_UNAVAILABLE` | 음성 합성 서버(CLOVA Voice)를 쓸 수 없음 (HTTP 503). 아무것도 저장하지 않았으므로 잠시 후 같은 요청을 다시 보내면 된다 |
 | `AUDIO_PROCESSING_UNAVAILABLE` | 음성 변환 슬롯 대기 초과 또는 변환 처리 시간 초과로 일시적으로 처리할 수 없음 (HTTP 503). 실사용 인식·진단 업로드·개인화 업로드의 변환 경로에 공통 적용 |
 
@@ -834,7 +834,7 @@ POST /v1/enroll/next-prompts
 | POST | /recognitions/{id}/confirm | 주영 | O |
 | POST | /tts | 주영(stretch) | O |
 | GET | /tts/{id} | 주영(stretch) | O |
-| GET | /phrases | 팀장 | O |
+| GET | /phrases?category= | 팀장 | O |
 | POST | /phrases | BE-A | O |
 | DELETE | /phrases/{phraseId} | BE-A | O |
 | POST | /phrases/{phraseId}/speak | BE-B | O |
@@ -877,65 +877,69 @@ POST /v1/enroll/next-prompts
 | 2026-10-03 | 6.1 | 합성 직전 confirmation 재검사 및 무효·누락 시 외부 호출 없이 FAILED 처리 (PR #49 리뷰 반영) |
 | 2026-10-30 | 0, 2~4, 8 | 방향 전환: 개인화·진단(자모 통계·추천 포함) API를 기능 플래그로 끔. 꺼진 동안 404 `RESOURCE_NOT_FOUND` |
 | 2026-10-30 | 0.5, 0.6, 8, 10 | 자주 쓰는 문구 API 추가(목록·추가·삭제·말하기, local 음성 조회). `PHRASE_DUPLICATED`·`PHRASE_LIMIT_EXCEEDED`(409), `TTS_UNAVAILABLE`(503) 추가 |
+| 2026-10-30 | 0.6, 8, 10 | 계획서(PHRASE-TTS-PIVOT-PLAN 4장)에 맞춤: 상황별 카테고리 6개, 목록을 `?category=` 필터 + 평평한 배열(`id`, `category`, `text`, `isDefault`)로, 말하기 응답 `phraseId` → `id`, `PHRASE_DUPLICATED` → `DUPLICATE_PHRASE`(같은 카테고리 내 내 문구끼리만), 상한 50 → 100개 |
 
 ---
 
 ## 10. 자주 쓰는 문구 (2026-10-30 신규)
 
-> 사용자가 자주 하는 말을 버튼으로 두고, 누르면 TTS로 읽어 준다. 카테고리는 고정이고(사용자가 만들 수 없음) 그 안에 **기본 문구**(모든 사용자 공통)와 **내가 추가한 문구**가 있다. 문구 수정은 v1에 없다(지우고 다시 추가). 기본 카테고리·문구 목록은 기획 확정 전 초안이다.
+> 병원·식당 같은 상황의 문구를 누르면 TTS가 대신 말해 준다. 카테고리는 고정이고(사용자가 만들 수 없음) 그 안에 **기본 문구**(모든 사용자 공통)와 **내가 추가한 문구**가 있다. 문구 수정은 v1에 없다(지우고 다시 추가). 기본 카테고리·문구 목록은 계획서(`docs/PHRASE-TTS-PIVOT-PLAN-2026-10-30.md` 4.7) 초안이며 기획 확정 전이다.
 >
 
-> 🔒 개인정보: 말하기를 누르면 문구 텍스트가 음성 합성을 위해 **네이버 클라우드 CLOVA Voice로 전송**된다. 직접 추가하는 문구에 이름·연락처·주소 같은 개인정보를 넣지 않도록 화면에서 안내한다. 서버 로그에는 문구 텍스트를 남기지 않는다.
+> 🔒 개인정보: 말하기를 누르면 문구 텍스트가 음성 합성을 위해 **네이버 클라우드 CLOVA Voice로 전송**된다. 앱에 "입력한 문구는 음성 합성을 위해 외부 서비스로 전송됩니다"를 고지하고, 직접 추가하는 문구에 병명·주소 같은 개인정보를 넣지 않도록 안내한다. 서버 로그에는 문구 텍스트를 남기지 않는다.
 >
 
-카테고리 코드(선언 순서 = 화면 순서):
+카테고리 코드(선언 순서 = 목록 순서):
 
-| code | label |
+| code | 화면 이름 |
 | --- | --- |
-| `GREETING` | 인사 |
-| `REQUEST` | 부탁 |
-| `DAILY` | 일상 |
-| `HEALTH` | 병원·건강 |
-| `EMERGENCY` | 긴급 |
+| `HOSPITAL` | 병원 |
+| `RESTAURANT` | 식당 |
+| `PHARMACY` | 약국 |
+| `STORE` | 마트·편의점 |
+| `TRANSPORT` | 교통 |
+| `DAILY` | 일상·긴급 |
+
+화면 이름은 응답에 오지 않는다. 프론트가 위 표로 코드를 표시한다.
 
 문구 규칙(서버 도메인 기준, 프론트는 같은 값을 안내 문구로만 쓴다):
 
 - 앞뒤 공백은 지우고 저장한다. 공백뿐이면 400.
 - 줄바꿈·탭 같은 제어문자는 400.
 - 최대 100자(이모지도 한 글자로 센다).
-- 직접 추가한 문구는 사용자당 최대 50개(기본 문구는 세지 않음).
-- 기본 문구나 내 문구와 텍스트가 같으면 중복(카테고리가 달라도).
+- 직접 추가한 문구는 사용자당 최대 100개(기본 문구는 세지 않음).
+- **같은 카테고리에 내가 이미 추가한 같은 문구**만 중복이다. 카테고리가 다르거나 기본 문구와 같은 텍스트는 추가된다. 대소문자가 다르면 다른 문구다.
+
+공통 응답 항목(10.1·10.2):
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | UUID | 문구 ID |
+| `category` | string | 카테고리 코드 |
+| `text` | string | 문구 |
+| `isDefault` | boolean | `true`면 기본 문구(삭제 불가), `false`면 내가 추가한 문구 |
 
 ### 10.1 문구 목록
 
-`GET /phrases` (인증 필요)
+`GET /phrases?category={code}` (인증 필요, `category` 생략 시 전체)
 
 Response (200):
 
 ```json
 {
   "success": true,
-  "data": {
-    "categories": [
-      {
-        "category": "GREETING",
-        "label": "인사",
-        "phrases": [
-          { "phraseId": "uuid", "text": "안녕하세요.", "custom": false },
-          { "phraseId": "uuid", "text": "반가워요.", "custom": true }
-        ]
-      },
-      { "category": "REQUEST", "label": "부탁", "phrases": [] }
-    ]
-  }
+  "data": [
+    { "id": "uuid", "category": "HOSPITAL", "text": "접수하고 싶어요.", "isDefault": true },
+    { "id": "uuid", "category": "HOSPITAL", "text": "예약했어요.", "isDefault": false },
+    { "id": "uuid", "category": "RESTAURANT", "text": "메뉴판 주세요.", "isDefault": true }
+  ]
 }
 ```
 
-- 모든 카테고리가 위 표의 순서로 항상 온다. 문구가 없는 카테고리도 `phrases: []`로 온다(그 카테고리에 추가할 수 있게).
-- 카테고리 안에서는 기본 문구(`custom: false`)가 먼저, 그다음 내가 추가한 문구가 추가한 순서대로 온다.
-- 다른 사용자가 추가한 문구는 오지 않는다.
+- 순서: 카테고리 표 순서 → 카테고리 안에서는 기본 문구 먼저 → 추가한 순서.
+- 다른 사용자가 추가한 문구는 오지 않는다. 문구가 없으면 빈 배열이다.
 
-에러: 인증 실패는 0.6절을 따른다.
+에러: `VALIDATION_FAILED`(400, 없는 카테고리 코드). 인증 실패는 0.6절을 따른다.
 
 ### 10.2 문구 추가
 
@@ -944,7 +948,7 @@ Response (200):
 Request:
 
 ```json
-{ "category": "DAILY", "text": "물 좀 주세요." }
+{ "category": "RESTAURANT", "text": "물 좀 주세요." }
 ```
 
 Response (201):
@@ -952,13 +956,13 @@ Response (201):
 ```json
 {
   "success": true,
-  "data": { "phraseId": "uuid", "category": "DAILY", "text": "물 좀 주세요.", "custom": true }
+  "data": { "id": "uuid", "category": "RESTAURANT", "text": "물 좀 주세요.", "isDefault": false }
 }
 ```
 
 - `text`는 앞뒤 공백을 지운 값으로 돌아온다. 화면에는 응답의 `text`를 쓴다.
 
-에러: `VALIDATION_FAILED`(400, 빈 문구·제어문자·100자 초과·없는 카테고리 코드·본문 누락), `PHRASE_LIMIT_EXCEEDED`(409, 50개 상한), `PHRASE_DUPLICATED`(409, 이미 있는 문구). 400이 409보다 먼저 판정된다.
+에러: `VALIDATION_FAILED`(400, 빈 문구·제어문자·100자 초과·없는 카테고리 코드·본문 누락), `PHRASE_LIMIT_EXCEEDED`(409, 100개 상한), `DUPLICATE_PHRASE`(409, 같은 카테고리에 이미 추가한 문구). 400이 409보다 먼저 판정된다.
 
 ### 10.3 문구 삭제
 
@@ -980,7 +984,7 @@ Response (200, `Cache-Control: no-store`):
 {
   "success": true,
   "data": {
-    "phraseId": "uuid",
+    "id": "uuid",
     "audioUrl": "https://bucket.s3.ap-northeast-2.amazonaws.com/recordings/uuid.mp3?X-Amz-..."
   }
 }
