@@ -4,6 +4,14 @@
 
 마지막 업데이트: 2026-10-30
 
+## 최신 작업 — 부록 B-1: LLM 포트·어댑터, 호출 상한 (2026-10-30)
+
+- `LlmSuggestionPort`(문장 확장) + `ClaudeSuggestionAdapter`(공식 Java SDK 3.2.0, `claude-haiku-5-5`, effort low, 구조화 출력 `{candidates: [string]}`, 타임아웃 8초·재시도 1회). 키(`ANTHROPIC_API_KEY`)가 없으면 클라이언트를 만들지 않고 호출 시 503.
+- 실패(거절·형식 깨짐·429·5xx·시간 초과·키 없음)는 모두 `SUGGESTION_UNAVAILABLE`(503). 입력·출력 텍스트는 로그에 남기지 않는다. 입력은 `<input>` 데이터 블록에 넣고 꺾쇠를 바꿔 블록을 닫지 못하게 한다.
+- `CallRateLimitPort` + `RedisCallRateLimitAdapter`(Lua로 INCR+PEXPIRE 원자 처리, Redis 장애 시 막는 쪽으로 실패). 정책값은 `SuggestionPolicy`(후보 5개, 분당 10회 — D9 가정값). 후보 거르기는 `Phrase` 규칙 재사용.
+- 엔드포인트는 B-2. 플래그 `voicebridge.features.suggestion`(기본 꺼짐)만 미리 둠.
+- SDK 3.2.0은 키를 `Authorization: Bearer`로 보낸다(WireMock으로 확인). 실제 API 왕복은 실제 키로 아직 확인 전.
+
 ## 최신 작업 — 방향 전환: 자주 쓰는 문구 말하기 (2026-10-30)
 
 - 브랜치 `claude/trusting-carson-08d3c2`에 계획서 6장의 PR 단위대로 커밋 4개(플래그 → 문구 CRUD → 말하기 → 문서). PR은 아직 만들지 않았다.

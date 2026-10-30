@@ -1,6 +1,7 @@
 package com.voicebridge.domain.phrase;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -69,6 +70,18 @@ public class Phrase {
       String audioStorageKey,
       LocalDateTime createdAt) {
     return new Phrase(id, ownerId, category, text, audioStorageKey, createdAt);
+  }
+
+  /**
+   * 문구로 쓸 수 있는 텍스트면 정리한 값(앞뒤 공백 제거)을, 아니면 빈 값을 돌려준다. AI가 만든 문장 후보처럼 예외 없이 걸러야 할 때 쓴다. 규칙은 문구를 만들 때와
+   * 같다.
+   */
+  public static Optional<String> acceptableText(String text) {
+    try {
+      return Optional.of(normalize(text));
+    } catch (IllegalArgumentException e) {
+      return Optional.empty();
+    }
   }
 
   // 줄바꿈·탭 같은 제어문자는 버튼 표시와 TTS 입력을 깨뜨리므로 받지 않는다. 길이는 UTF-16 단위가 아니라 글자(코드 포인트) 수로 센다.

@@ -121,4 +121,13 @@ class PhraseTest {
     assertThatThrownBy(() -> PhraseCategory.from(null))
         .isInstanceOf(IllegalArgumentException.class);
   }
+
+  @Test
+  void acceptableText는_규칙을_통과하면_정리한_값을_아니면_빈_값을_준다() {
+    assertThat(Phrase.acceptableText("  물 좀 주세요. ")).contains("물 좀 주세요.");
+    assertThat(Phrase.acceptableText(" ")).isEmpty();
+    assertThat(Phrase.acceptableText(null)).isEmpty();
+    assertThat(Phrase.acceptableText("물\n주세요")).isEmpty();
+    assertThat(Phrase.acceptableText("가".repeat(Phrase.MAX_TEXT_LENGTH + 1))).isEmpty();
+  }
 }

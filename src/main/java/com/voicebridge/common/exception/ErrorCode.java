@@ -28,6 +28,9 @@ public enum ErrorCode {
   DUPLICATE_PHRASE(HttpStatus.CONFLICT, "이 카테고리에 이미 같은 문구가 있습니다."),
   PHRASE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "더 이상 문구를 추가할 수 없습니다."),
   TTS_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "음성 합성 서버를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."),
+  SUGGESTION_UNAVAILABLE(
+      HttpStatus.SERVICE_UNAVAILABLE, "문장 추천을 지금 사용할 수 없습니다. 직접 입력하거나 잠시 후 다시 시도해 주세요."),
+  TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
   INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
   private final HttpStatus status;
