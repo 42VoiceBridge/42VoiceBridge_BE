@@ -61,7 +61,7 @@ class PhraseIntegrationTest {
   @BeforeEach
   void setUp() {
     phraseJpaRepository.deleteAllInBatch();
-    greeting = phrases.save(Phrase.createDefault(PhraseCategory.GREETING, "안녕하세요."));
+    greeting = phrases.save(Phrase.createDefault(PhraseCategory.HOSPITAL, "접수하고 싶어요."));
   }
 
   private MockHttpServletRequestBuilder as(UUID userId, MockHttpServletRequestBuilder request) {
@@ -76,42 +76,55 @@ class PhraseIntegrationTest {
   }
 
   @Test
-  void 목록은_모든_카테고리를_순서대로_보여주고_기본_문구_다음에_내_문구가_온다() throws Exception {
-    phrases.save(Phrase.createCustom(me, PhraseCategory.GREETING, "반가워요."));
-    phrases.save(Phrase.createCustom(other, PhraseCategory.GREETING, "다른 사람 문구"));
+  void 목록은_카테고리_순서대로_기본_문구_다음에_내_문구가_오고_다른_사람_문구는_없다() throws Exception {
+    Phrase restaurant = phrases.save(Phrase.createDefault(PhraseCategory.RESTAURANT, "메뉴판 주세요."));
+    // 기본 문구보다 먼저 추가했어도 같은 카테고리 안에서는 기본 문구 다음에 온다
+    Phrase mine = phrases.save(Phrase.createForUser(me, PhraseCategory.HOSPITAL, "예약했어요."));
+    phrases.save(Phrase.createForUser(other, PhraseCategory.HOSPITAL, "다른 사람 문구"));
 
     mvc.perform(as(me, get(URL)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.categories.length()").value(PhraseCategory.values().length))
-        .andExpect(jsonPath("$.data.categories[0].category").value("GREETING"))
-        .andExpect(jsonPath("$.data.categories[0].label").value("인사"))
-        .andExpect(jsonPath("$.data.categories[0].phrases.length()").value(2))
-        .andExpect(
-            jsonPath("$.data.categories[0].phrases[0].phraseId").value(greeting.getId().toString()))
-        .andExpect(jsonPath("$.data.categories[0].phrases[0].text").value("안녕하세요."))
-        .andExpect(jsonPath("$.data.categories[0].phrases[0].custom").value(false))
-        .andExpect(jsonPath("$.data.categories[0].phrases[1].text").value("반가워요."))
-        .andExpect(jsonPath("$.data.categories[0].phrases[1].custom").value(true))
-        // 문구가 없는 카테고리도 빈 목록으로 온다(그 카테고리에 추가할 수 있게)
-        .andExpect(jsonPath("$.data.categories[4].category").value("EMERGENCY"))
-        .andExpect(jsonPath("$.data.categories[4].phrases.length()").value(0));
+        .andExpect(jsonPath("$.data.length()").value(3))
+        .andExpect(jsonPath("$.data[0].id").value(greeting.getId().toString()))
+        .andExpect(jsonPath("$.data[0].category").value("HOSPITAL"))
+        .andExpect(jsonPath("$.data[0].text").value("접수하고 싶어요."))
+        .andExpect(jsonPath("$.data[0].isDefault").value(true))
+        .andExpect(jsonPath("$.data[1].id").value(mine.getId().toString()))
+        .andExpect(jsonPath("$.data[1].isDefault").value(false))
+        .andExpect(jsonPath("$.data[2].id").value(restaurant.getId().toString()))
+        .andExpect(jsonPath("$.data[2].category").value("RESTAURANT"));
+  }
+
+  @Test
+  void 카테고리로_거를_수_있고_없는_카테고리는_400이다() throws Exception {
+    phrases.save(Phrase.createDefault(PhraseCategory.RESTAURANT, "메뉴판 주세요."));
+    phrases.save(Phrase.createForUser(me, PhraseCategory.RESTAURANT, "포장이요."));
+    phrases.save(Phrase.createForUser(other, PhraseCategory.RESTAURANT, "다른 사람 문구"));
+
+    mvc.perform(as(me, get(URL).param("category", "RESTAURANT")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(2))
+        .andExpect(jsonPath("$.data[0].text").value("메뉴판 주세요."))
+        .andExpect(jsonPath("$.data[1].text").value("포장이요."));
+    mvc.perform(as(me, get(URL).param("category", "FOOD")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
 
   @Test
   void 문구를_추가하면_201이고_내_목록에_보인다() throws Exception {
     mvc.perform(addRequest(me, "DAILY", "  물 좀 주세요.  "))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.data.phraseId").isNotEmpty())
+        .andExpect(jsonPath("$.data.id").isNotEmpty())
         .andExpect(jsonPath("$.data.category").value("DAILY"))
         .andExpect(jsonPath("$.data.text").value("물 좀 주세요."))
-        .andExpect(jsonPath("$.data.custom").value(true));
+        .andExpect(jsonPath("$.data.isDefault").value(false));
 
-    mvc.perform(as(me, get(URL)))
-        .andExpect(jsonPath("$.data.categories[2].category").value("DAILY"))
-        .andExpect(jsonPath("$.data.categories[2].phrases[0].text").value("물 좀 주세요."));
+    mvc.perform(as(me, get(URL).param("category", "DAILY")))
+        .andExpect(jsonPath("$.data[0].text").value("물 좀 주세요."));
     // 다른 사람 목록에는 없다
-    mvc.perform(as(other, get(URL)))
-        .andExpect(jsonPath("$.data.categories[2].phrases.length()").value(0));
+    mvc.perform(as(other, get(URL).param("category", "DAILY")))
+        .andExpect(jsonPath("$.data.length()").value(0));
   }
 
   @Test
@@ -135,17 +148,16 @@ class PhraseIntegrationTest {
   }
 
   @Test
-  void 이미_있는_문구는_409다() throws Exception {
+  void 같은_카테고리에_이미_추가한_문구는_409다() throws Exception {
     mvc.perform(addRequest(me, "DAILY", "물 좀 주세요.")).andExpect(status().isCreated());
 
-    // 내 문구와 같으면 카테고리가 달라도 중복이다
-    mvc.perform(addRequest(me, "HEALTH", "물 좀 주세요."))
+    mvc.perform(addRequest(me, "DAILY", "물 좀 주세요."))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.error.code").value("PHRASE_DUPLICATED"));
-    // 기본 문구와 같아도 중복이다
-    mvc.perform(addRequest(me, "GREETING", "안녕하세요."))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.error.code").value("PHRASE_DUPLICATED"));
+        .andExpect(jsonPath("$.error.code").value("DUPLICATE_PHRASE"));
+    // 카테고리가 다르면 추가된다
+    mvc.perform(addRequest(me, "RESTAURANT", "물 좀 주세요.")).andExpect(status().isCreated());
+    // 기본 문구와 같은 텍스트도 추가된다(내 문구끼리만 막는다)
+    mvc.perform(addRequest(me, "HOSPITAL", "접수하고 싶어요.")).andExpect(status().isCreated());
     // 다른 사람은 같은 문구를 추가할 수 있다
     mvc.perform(addRequest(other, "DAILY", "물 좀 주세요.")).andExpect(status().isCreated());
   }
@@ -153,7 +165,7 @@ class PhraseIntegrationTest {
   @Test
   void 상한에_닿으면_409다() throws Exception {
     for (int i = 0; i < Phrase.MAX_CUSTOM_PHRASES_PER_USER; i++) {
-      phrases.save(Phrase.createCustom(me, PhraseCategory.DAILY, "문구 " + i));
+      phrases.save(Phrase.createForUser(me, PhraseCategory.DAILY, "문구 " + i));
     }
 
     mvc.perform(addRequest(me, "DAILY", "하나 더"))
@@ -166,7 +178,7 @@ class PhraseIntegrationTest {
 
   @Test
   void 내_문구를_삭제하면_204이고_목록에서_사라진다() throws Exception {
-    Phrase mine = phrases.save(Phrase.createCustom(me, PhraseCategory.DAILY, "물 좀 주세요."));
+    Phrase mine = phrases.save(Phrase.createForUser(me, PhraseCategory.DAILY, "물 좀 주세요."));
 
     mvc.perform(as(me, delete(URL + "/" + mine.getId()))).andExpect(status().isNoContent());
 
@@ -175,7 +187,7 @@ class PhraseIntegrationTest {
 
   @Test
   void 다른_사람의_문구는_삭제할_수_없다() throws Exception {
-    Phrase theirs = phrases.save(Phrase.createCustom(other, PhraseCategory.DAILY, "다른 사람 문구"));
+    Phrase theirs = phrases.save(Phrase.createForUser(other, PhraseCategory.DAILY, "다른 사람 문구"));
 
     mvc.perform(as(me, delete(URL + "/" + theirs.getId())))
         .andExpect(status().isForbidden())
@@ -233,12 +245,12 @@ class PhraseIntegrationTest {
       mvc.perform(as(me, post(URL + "/" + greeting.getId() + "/speak")))
           .andExpect(status().isOk())
           .andExpect(header().string("Cache-Control", "no-store"))
-          .andExpect(jsonPath("$.data.phraseId").value(greeting.getId().toString()))
+          .andExpect(jsonPath("$.data.id").value(greeting.getId().toString()))
           .andExpect(
               jsonPath("$.data.audioUrl").value("https://example.test/audio.mp3?signature=test"));
     }
 
-    verify(ttsEngine, times(1)).synthesize("안녕하세요.");
+    verify(ttsEngine, times(1)).synthesize("접수하고 싶어요.");
     verify(storage, times(1)).upload(any(), anyString());
     assertThat(phrases.findById(greeting.getId()).orElseThrow().getAudioStorageKey())
         .isEqualTo(AUDIO_KEY);
@@ -274,7 +286,7 @@ class PhraseIntegrationTest {
 
   @Test
   void 다른_사람의_문구는_말하기를_거절하고_합성하지_않는다() throws Exception {
-    Phrase theirs = phrases.save(Phrase.createCustom(other, PhraseCategory.DAILY, "다른 사람 문구"));
+    Phrase theirs = phrases.save(Phrase.createForUser(other, PhraseCategory.DAILY, "다른 사람 문구"));
 
     mvc.perform(as(me, post(URL + "/" + theirs.getId() + "/speak")))
         .andExpect(status().isForbidden())
@@ -286,7 +298,7 @@ class PhraseIntegrationTest {
   @Test
   void 내_문구는_말할_수_있다() throws Exception {
     clovaAndS3Work();
-    Phrase mine = phrases.save(Phrase.createCustom(me, PhraseCategory.DAILY, "물 좀 주세요."));
+    Phrase mine = phrases.save(Phrase.createForUser(me, PhraseCategory.DAILY, "물 좀 주세요."));
 
     mvc.perform(as(me, post(URL + "/" + mine.getId() + "/speak"))).andExpect(status().isOk());
 
@@ -310,7 +322,7 @@ class PhraseIntegrationTest {
   @Test
   void 음성이_있는_문구를_삭제하면_음성도_지운다() throws Exception {
     clovaAndS3Work();
-    Phrase mine = phrases.save(Phrase.createCustom(me, PhraseCategory.DAILY, "물 좀 주세요."));
+    Phrase mine = phrases.save(Phrase.createForUser(me, PhraseCategory.DAILY, "물 좀 주세요."));
     mvc.perform(as(me, post(URL + "/" + mine.getId() + "/speak"))).andExpect(status().isOk());
 
     mvc.perform(as(me, delete(URL + "/" + mine.getId()))).andExpect(status().isNoContent());

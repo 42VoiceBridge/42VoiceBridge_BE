@@ -32,7 +32,7 @@ class GetPhraseAudioServiceTest {
 
   @Test
   void 음성이_있는_내_문구는_파일을_읽는다() {
-    Phrase mine = Phrase.createCustom(me, PhraseCategory.DAILY, "물 좀 주세요.");
+    Phrase mine = Phrase.createForUser(me, PhraseCategory.DAILY, "물 좀 주세요.");
     String key = "recordings/" + UUID.randomUUID() + ".mp3";
     mine.attachAudio(key);
     when(phrases.findById(mine.getId())).thenReturn(Optional.of(mine));
@@ -43,7 +43,7 @@ class GetPhraseAudioServiceTest {
 
   @Test
   void 음성이_아직_없으면_409다() {
-    Phrase mine = Phrase.createCustom(me, PhraseCategory.DAILY, "물 좀 주세요.");
+    Phrase mine = Phrase.createForUser(me, PhraseCategory.DAILY, "물 좀 주세요.");
     when(phrases.findById(mine.getId())).thenReturn(Optional.of(mine));
 
     assertThatThrownBy(() -> service().getAudio(me, mine.getId()))
@@ -55,7 +55,7 @@ class GetPhraseAudioServiceTest {
 
   @Test
   void 다른_사람의_문구는_403이고_파일을_읽지_않는다() {
-    Phrase theirs = Phrase.createCustom(UUID.randomUUID(), PhraseCategory.DAILY, "다른 사람 문구");
+    Phrase theirs = Phrase.createForUser(UUID.randomUUID(), PhraseCategory.DAILY, "다른 사람 문구");
     theirs.attachAudio("recordings/" + UUID.randomUUID() + ".mp3");
     when(phrases.findById(theirs.getId())).thenReturn(Optional.of(theirs));
 

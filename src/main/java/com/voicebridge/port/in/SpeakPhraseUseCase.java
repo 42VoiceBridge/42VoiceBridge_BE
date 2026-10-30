@@ -10,5 +10,5 @@ public interface SpeakPhraseUseCase {
 
   SpeakResult speak(UUID userId, UUID phraseId);
 
-  record SpeakResult(UUID phraseId, String audioUrl) {}
+  record SpeakResult(UUID id, String audioUrl) {}
 }

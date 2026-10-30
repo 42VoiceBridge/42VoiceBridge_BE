@@ -12,7 +12,7 @@ import java.util.UUID;
 public class Phrase {
 
   /** 사용자 한 명이 직접 추가할 수 있는 문구 수. 기본 문구는 세지 않는다. */
-  public static final int MAX_CUSTOM_PHRASES_PER_USER = 50;
+  public static final int MAX_CUSTOM_PHRASES_PER_USER = 100;
 
   /** 문구 길이 상한(글자 수). 화면 버튼에 들어가고 한 번에 읽어 줄 만한 길이다. */
   public static final int MAX_TEXT_LENGTH = 100;
@@ -40,7 +40,7 @@ public class Phrase {
   }
 
   /** 사용자가 직접 추가하는 문구. 앞뒤 공백은 지우고 저장한다. */
-  public static Phrase createCustom(UUID ownerId, PhraseCategory category, String text) {
+  public static Phrase createForUser(UUID ownerId, PhraseCategory category, String text) {
     if (ownerId == null) {
       throw new IllegalArgumentException("직접 추가하는 문구에는 사용자가 있어야 합니다.");
     }
