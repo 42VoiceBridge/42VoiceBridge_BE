@@ -1,6 +1,8 @@
 # 42VoiceBridge_BE
 
-GSIA SW 챌린지(3주) — **AI 구음장애 보조 서비스**의 백엔드입니다. Whisper 음성 인식 모델을 (1) 공개 구음장애 데이터로 1차 적응 학습하고 (2) 사용자 개인 녹음으로 2차 개인화 학습해, 구음장애 발화를 텍스트로 정확히 변환하는 것이 목표입니다. 무작위/음소범위 기준이 아니라 **실제 인식 오류 패턴 기반으로 다음 등록 문장을 선택하는 오류 기반 적응형 등록**이 핵심 차별점입니다.
+GSIA SW 챌린지(3주) — **AI 구음장애 보조 서비스**의 백엔드입니다. 2026-10-30 방향 전환으로 **상황별 문구를 눌러 말하기**(병원·식당 같은 고정 카테고리별 기본 문구 + 내가 추가한 문구, 누르면 CLOVA Voice로 읽어 줌)가 중심 기능이 됐습니다. 말하기 → 인식 → 확인 → TTS 흐름은 그대로 남아 있습니다.
+
+> 개인화 학습과 진단(진단 세션·자모 오류 통계·추천 문장)은 기능 플래그 `voicebridge.features.personalization` / `voicebridge.features.diagnosis`로 **꺼 두었고, 꺼진 동안 해당 API는 404**입니다. 코드와 테이블은 남아 있어 환경변수 `FEATURE_PERSONALIZATION_ENABLED=true` / `FEATURE_DIAGNOSIS_ENABLED=true`로 다시 켤 수 있습니다.
 
 > 목표/타겟층/TTS 우선순위 등 서비스 기획 일부는 팀 회의로 확정 중입니다. 최신 요구사항은 Notion 문서를 우선 참고하세요.
 
@@ -73,6 +75,13 @@ graph TB
 
 3주 챌린지 특성상 각 도메인은 **계약(포트/인터페이스) 먼저 정의 후 일부 유스케이스만 완전 구현**하는 방식으로 진행 중입니다. 나머지는 컨트롤러 매핑 없이 TODO로 남아있어, 미구현 유스케이스를 호출해도 빌드가 깨지지 않습니다(빈 등록 자체가 없음).
 
+### 자주 쓰는 문구 — 구현 (2026-10-30)
+- `GET /api/v1/phrases?category=`: 카테고리(병원·식당·약국·마트/편의점·교통·일상/긴급)의 기본 문구와 내가 추가한 문구를 `[{id, category, text, isDefault}]`로 돌려준다. 다른 사용자의 문구와 카테고리 거르기는 DB 조회 조건에서 처리한다
+- `POST /api/v1/phrases`: 고정 카테고리 안에 문구 추가(201). 공백·제어문자·100자 초과는 400, 같은 카테고리에 이미 추가한 문구(`DUPLICATE_PHRASE`)·100개 상한은 409
+- `DELETE /api/v1/phrases/{phraseId}`: 내 문구만 삭제(204). 기본 문구·다른 사람 문구는 403. 저장한 음성도 함께 지운다
+- `POST /api/v1/phrases/{phraseId}/speak`: 처음 누르면 CLOVA Voice로 합성해 저장하고 이후 재사용한다. 응답은 재생 URL(운영: S3 임시 URL, local: `/api/v1/phrases/{id}/audio`). 클로바 실패는 503 `TTS_UNAVAILABLE`이고 아무것도 저장하지 않는다
+- 기본 문구는 `PhraseSeeder`가 넣는다(`voicebridge.phrase.seed-defaults`, 기본 켬, 테스트는 끔). 기본 문구가 하나라도 있으면 넣지 않는다. 목록은 기획 확정 전 초안
+
 ### 인증 — 완료
 - 이메일/비밀번호 회원가입·로그인
 - 카카오 로그인 (인가 코드 방식, PR #41 — 프론트가 `Kakao.Auth.authorize()`로 받은 인가 코드를 백엔드가 카카오 토큰으로 교환해 사용자를 확인한다. 백엔드에 카카오 REST API 키와 Redirect URI 설정이 필요하다)
@@ -86,7 +95,7 @@ graph TB
 - [JPyRust](https://github.com/farmer0010/JPyRust)(PyO3) in-process 브릿지 구현체(`JPyRustAiInferenceClient`)는 삭제되지 않고 `jpyrust-experiment` 프로파일로 실험적으로 보존 중 — 기본 프로파일에서는 비활성화됨
 - 로컬(`local` 프로파일)에서는 실제 AI 서버 대신 `StubAiInferenceClient`가 고정 응답을 돌려줌. HTTP 어댑터를 실제로 띄워보려면 AI팀 mock 서버(`ASR_ENGINE=mock python3 demo/server.py`, 42VoiceBridge_AI 레포)가 `voicebridge.ai.http.base-url`(기본 `http://127.0.0.1:8000`)에 떠 있어야 함
 
-### 진단 세션 — 5개 모두 구현
+### 진단 세션 — 5개 모두 구현 (2026-10-30부터 플래그로 꺼 둠)
 - `POST /api/v1/diagnosis-sessions`: 낭독 문장을 뽑아 진단 세션을 시작
 - `GET /{sessionId}`: 세션과 문장별 녹음 상태를 반환해 프론트가 이어하기를 구현할 수 있다. 같은 문장을 다시 녹음한 경우 가장 최근 녹음을 노출한다
 - `POST /{sessionId}/recordings`: multipart 음성을 저장하고 `PROCESSING`으로 기록한 뒤 **202 Accepted**를 즉시 반환. AI 인식은 트랜잭션 커밋 이후 별도 스레드에서 수행하고 결과를 `DONE` 또는 `FAILED`로 남긴다
@@ -95,13 +104,13 @@ graph TB
 - `Recording` 도메인은 상태 전이 `UPLOADED → PROCESSING → DONE | FAILED`를 직접 소유한다. 무음·비언어 오디오의 빈 인식 결과(`""`)는 **정상 완료**로 처리한다 — 구음장애 발화 특성상 인식 실패가 흔하고 그 패턴 자체가 분석 데이터이기 때문. `FAILED`는 AI 호출이 실패한 경우로, 비동기라 HTTP 응답으로 알릴 수 없어 상태로 남긴다
 - 음성 저장은 `StoragePort` 뒤에 있다. 로컬 프로파일은 파일시스템, 그 외에는 S3를 쓰므로 **AWS 크레덴셜 없이도 개발할 수 있다**. 사용자가 보낸 파일명은 저장 키에 쓰지 않고 허용 목록의 확장자만 추출한다
 
-### 추천 문장 — 구현
+### 추천 문장 — 구현 (2026-10-30부터 플래그로 꺼 둠)
 - `POST /api/v1/users/me/recommendations`: 개인화 등록용으로 읽을 문장을 추천. **문장 선택은 AI(`/v1/enroll/next-prompts`)가 하고**, 백엔드는 제안한 문장을 전략·버전·seed·문장 풀(버전·해시)과 함께 `shown_prompts`에 기록한다(AI 계약 §1, §3.6)
 - 문장 ID는 우리 `sentences` 테이블이 아니라 AI 문장 풀의 `promptId`다. 이미 제안한 문장은 다음 추천에서 빠진다
 - AI v1은 무작위(`random`) 선택만 지원한다. 오류 기반 선택은 AI 쪽 구현 이후
 - 로컬(`local` 프로파일)은 `StubEnrollmentPromptClient`가 고정 12문장에서 고른다
 
-### 개인화 — 모델·학습 작업 상태 조회 구현
+### 개인화 — 모델·학습 작업 상태 조회 구현 (2026-10-30부터 플래그로 꺼 둠)
 - `GET /api/v1/personalization/model`: 사용자 개인화 모델 상태 조회
 - `GET /api/v1/personalization/train/{jobId}`: 학습 작업 상태 조회
 - 개인화 녹음 업로드 / 학습 트리거는 포트만 정의된 상태 — [`docs/NEXT-STEPS-personalization-recognition.md`](./docs/NEXT-STEPS-personalization-recognition.md) 참고
@@ -134,6 +143,12 @@ graph TB
 | 13 | `POST /api/v1/recognitions` | JWT 필요 | `audioFile` multipart 업로드 → 인식·저장 결과 (`200`) |
 | 14 | `POST /api/v1/users/me/recommendations` | JWT 필요 | 개인화 등록용 추천 문장. 문장은 AI가 고르고, 제안한 문장을 기록한다. 본문 `{ "count": 10 }`(생략 가능, 1~50) |
 | 15 | `GET /api/v1/users/me/jamo-error-stats` | JWT 필요 | 자모 오류 통계(분석 완료 세션 누적). 표본 부족이면 `errorRate: null` |
+| 16 | `GET /api/v1/phrases?category=` | JWT 필요 | 문구 목록(기본 + 내 문구), 카테고리 필터 선택 |
+| 17 | `POST /api/v1/phrases` | JWT 필요 | 문구 추가. 본문 `{ "category": "RESTAURANT", "text": "물 좀 주세요." }` (`201`) |
+| 18 | `DELETE /api/v1/phrases/{phraseId}` | JWT 필요 | 내 문구 삭제 (`204`) |
+| 19 | `POST /api/v1/phrases/{phraseId}/speak` | JWT 필요 | 문구 말하기. 재생 URL 반환, 합성 음성은 문구마다 1회만 만든다 |
+
+> 5~9, 14, 15번(진단·개인화·추천·자모 통계)은 2026-10-30부터 기능 플래그로 꺼져 있어 404입니다.
 
 > `/api/v1/auth/**`를 제외한 모든 API는 JWT 인증이 필요합니다(`POST /api/v1/auth/login`으로 발급, `Authorization: Bearer {token}` 헤더로 호출).
 

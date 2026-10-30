@@ -26,6 +26,12 @@ management:
       show-components: never
 
 voicebridge:
+  features:
+    # 기존 개인화·진단 테스트가 계속 돌도록 테스트에서는 켠다. 꺼진 기본값은 FeatureFlagTest가 따로 검증한다.
+    personalization: true
+    diagnosis: true
+    suggestion: false
+    conversation: false
   personalization:
     retention-days: 30
     cleanup-delay-ms: 300000
@@ -53,6 +59,14 @@ voicebridge:
     recognition:
       threads: 2
       queue-capacity: 200
+  phrase:
+    # 테스트는 각자 필요한 문구를 직접 넣는다. 시드 문구가 섞이면 결과가 달라진다.
+    seed-defaults: false
+  suggestion:
+    # 테스트는 실제 Claude API를 부르지 않는다. 어댑터 테스트는 WireMock 주소와 가짜 키를 직접 넣는다.
+    api-key:
+    model: claude-haiku-5-5
+    timeout: 8s
   s3:
     bucket: test-bucket
     region: ap-northeast-2
@@ -62,3 +76,10 @@ voicebridge:
       api-key-id: test-api-key-id
       api-key: test-api-key
       speaker: nara
+  stt:
+    # 테스트는 실제 CSR을 부르지 않는다. 어댑터 테스트는 WireMock 주소와 가짜 키를 직접 넣는다.
+    naver:
+      base-url: https://naveropenapi.apigw.ntruss.com/recog/v1/stt
+      api-key-id:
+      api-key:
+      timeout: 5s

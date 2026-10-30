@@ -23,6 +23,17 @@ class LocalTtsPlaybackAdapterTest {
   }
 
   @Test
+  void phraseUrlPointsToPhraseAudioEndpoint() {
+    var adapter = new LocalTtsPlaybackAdapter(root.toString(), "http://localhost:8080/");
+    UUID phraseId = UUID.randomUUID();
+    String key = "recordings/" + UUID.randomUUID() + ".mp3";
+    assertThat(adapter.createPhraseUrl(key, phraseId))
+        .isEqualTo("http://localhost:8080/api/v1/phrases/" + phraseId + "/audio");
+    assertThatThrownBy(() -> adapter.createPhraseUrl("../escape.mp3", phraseId))
+        .isInstanceOf(CustomException.class);
+  }
+
+  @Test
   void rejectsTraversalAndSymlinkEscape() throws Exception {
     var adapter =
         new LocalTtsPlaybackAdapter(root.resolve("uploads").toString(), "http://localhost:8080");

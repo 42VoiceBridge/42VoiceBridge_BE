@@ -41,6 +41,15 @@ server:
   port: 8080
 
 voicebridge:
+  features:
+    # 2026-10 방향 전환(자주 쓰는 문구 말하기)으로 개인화·진단 API를 공개하지 않는다. 꺼 두면 해당 컨트롤러를 등록하지 않아 404가 된다.
+    # 코드와 테이블은 그대로 두므로 다시 켜면 이전처럼 동작한다. diagnosis는 진단 세션·자모 오류 통계·추천 문장을 함께 묶는다.
+    personalization: ${FEATURE_PERSONALIZATION_ENABLED:false}
+    diagnosis: ${FEATURE_DIAGNOSIS_ENABLED:false}
+    # 문장 확장·문구 추천(LLM). 엔드포인트(B-2)가 이 값으로 켜진다. 기본 꺼짐.
+    suggestion: ${FEATURE_SUGGESTION_ENABLED:false}
+    # 대화 모드(상대의 말 받아쓰기 → 답변 후보 → 말하기). 엔드포인트(C-2)가 이 값으로 켜진다. 기본 꺼짐.
+    conversation: ${FEATURE_CONVERSATION_ENABLED:false}
   personalization:
     # createdAt 기준. 변경한 기간은 기존 녹음에도 적용된다. 팀·AI의 보관 기간 합의는 별도 확인이 필요하다.
     retention-days: ${PERSONALIZATION_RETENTION_DAYS:30}
@@ -84,6 +93,15 @@ voicebridge:
       # 진단 녹음 인식 전용 스레드 수와 대기열. AI 서버가 요청을 하나씩 처리하므로 스레드를 늘려도 빨라지지 않는다.
       threads: 2
       queue-capacity: 200
+  phrase:
+    # 기본 문구가 하나도 없을 때 시드 문구를 넣는다(PhraseSeeder). 로컬·배포 모두 켜 둔다. 이미 있으면 아무것도 하지 않는다.
+    seed-defaults: true
+  suggestion:
+    # Claude API. 키는 환경변수로만 받는다(배포는 Secrets Manager voicebridge/dev/app → ANTHROPIC_API_KEY). 비어 있으면 추천만 503이다.
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: claude-haiku-5-5
+    # 사용자가 버튼을 누르고 기다리는 호출이다. SDK 재시도(1회)를 포함하면 최대 약 두 배가 걸린다.
+    timeout: 8s
   s3:
     bucket: ${S3_BUCKET:voicebridge-recordings}
     region: ${AWS_REGION:ap-northeast-2}
@@ -95,3 +113,10 @@ voicebridge:
       api-key-id: ${NCP_TTS_API_KEY_ID:}
       api-key: ${NCP_TTS_API_KEY:}
       speaker: nara
+  stt:
+    # 대화 모드(부록 C)에서 상대의 말을 받아쓰는 CLOVA Speech Recognition. 키는 환경변수로만 받는다(없으면 호출 시 503).
+    naver:
+      base-url: https://naveropenapi.apigw.ntruss.com/recog/v1/stt
+      api-key-id: ${CLOVA_STT_API_KEY_ID:}
+      api-key: ${CLOVA_STT_API_KEY:}
+      timeout: 5s

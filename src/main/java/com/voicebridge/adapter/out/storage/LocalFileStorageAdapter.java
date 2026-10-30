@@ -43,8 +43,13 @@ public class LocalFileStorageAdapter implements StoragePort {
 
   @Override
   public void delete(String key) {
+    // 지울 수 있는 것은 이 서비스가 만든 개인화 녹음과 TTS·문구 음성(mp3)뿐이다.
+    Path target =
+        TtsAudioKeys.matches(key)
+            ? baseDir.toAbsolutePath().normalize().resolve(key).normalize()
+            : resolveKey(key);
     try {
-      Files.deleteIfExists(resolveKey(key));
+      Files.deleteIfExists(target);
     } catch (IOException e) {
       throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR, "음성 파일 삭제에 실패했습니다.");
     }
