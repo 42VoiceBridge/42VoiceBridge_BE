@@ -6,10 +6,10 @@
 
 # AI 구음장애 보조 서비스 — API 명세서
 
-> 문서 버전: v1.3 (2026-10-30 갱신, 변경 이력은 9장)
+> 문서 버전: v1.4 (2026-10-30 갱신, 변경 이력은 9장)
 >
 
-> **2026-10-30 방향 전환**: 서비스의 중심을 “자주 쓰는 문구를 눌러 말하기”(10장)로 옮겼다. 개인화(4장)와 진단·자모 오류 통계·추천 문장(2·3장)은 기능 플래그(`voicebridge.features.personalization`, `voicebridge.features.diagnosis`)로 **꺼져 있고, 꺼진 동안 해당 주소는 404 `RESOURCE_NOT_FOUND`**다(토큰이 없으면 401이 먼저). 코드와 테이블은 남아 있어 플래그를 켜면 아래 내용대로 동작한다. 실사용 인식(5장)·확인/TTS(6장)는 그대로 공개한다. 문장 추천(10.6)도 플래그(`voicebridge.features.suggestion`)로 **기본 꺼짐**이고 꺼진 동안 404다.
+> **2026-10-30 방향 전환**: 서비스의 중심을 “자주 쓰는 문구를 눌러 말하기”(10장)로 옮겼다. 개인화(4장)와 진단·자모 오류 통계·추천 문장(2·3장)은 기능 플래그(`voicebridge.features.personalization`, `voicebridge.features.diagnosis`)로 **꺼져 있고, 꺼진 동안 해당 주소는 404 `RESOURCE_NOT_FOUND`**다(토큰이 없으면 401이 먼저). 코드와 테이블은 남아 있어 플래그를 켜면 아래 내용대로 동작한다. 실사용 인식(5장)·확인/TTS(6장)는 그대로 공개한다. 문장 추천(10.6)과 대화 모드(11장)도 플래그(`voicebridge.features.suggestion`, `voicebridge.features.conversation`)로 **기본 꺼짐**이고 꺼진 동안 404다.
 >
 
 ---
@@ -89,9 +89,9 @@ https://{host}/api/v1
 | 415 | 그 API가 받지 않는 Content-Type |
 | 409 | 상태 충돌(예: 이미 진행중인 학습 job에 재요청, 중복 문구·문구 상한) |
 | 422 | 비즈니스 규칙 위반(예: 최소 녹음 개수 미충족) |
-| 429 | 호출 상한 초과(`TOO_MANY_REQUESTS`, 문장 추천 분당 10회) |
+| 429 | 호출 상한 초과(`TOO_MANY_REQUESTS`, 문장 추천 분당 10회, 대화 턴 분당 10회, 대화 말하기 분당 20회) |
 | 500 | 서버 내부 오류 |
-| 502/503 | AI 추론/학습 서버 장애 (기본 모델 폴백 여부는 4.2절 참고), 음성 합성 서버 장애(`TTS_UNAVAILABLE`), 문장 추천 LLM 장애(`SUGGESTION_UNAVAILABLE`) |
+| 502/503 | AI 추론/학습 서버 장애 (기본 모델 폴백 여부는 4.2절 참고), 음성 합성 서버 장애(`TTS_UNAVAILABLE`), 문장 추천 LLM 장애(`SUGGESTION_UNAVAILABLE`), 음성인식 장애(`STT_UNAVAILABLE`) |
 | 503 | 음성 변환 슬롯 대기 또는 처리 시간 초과로 일시적 처리 불가 |
 
 ### 0.6 공통 에러 코드
@@ -121,6 +121,7 @@ https://{host}/api/v1
 | `PHRASE_LIMIT_EXCEEDED` | 직접 추가한 문구가 상한(100개)에 닿음 (HTTP 409). 쓰지 않는 문구를 지운 뒤 다시 추가 |
 | `TTS_UNAVAILABLE` | 음성 합성 서버(CLOVA Voice)를 쓸 수 없음 (HTTP 503). 아무것도 저장하지 않았으므로 잠시 후 같은 요청을 다시 보내면 된다 |
 | `SUGGESTION_UNAVAILABLE` | 문장 추천(LLM)을 쓸 수 없음 (HTTP 503). 장애·시간 초과·키 미설정·쓸 수 있는 후보 0개. 직접 입력하거나 잠시 후 다시 시도. 문구 저장·말하기는 영향 없음 |
+| `STT_UNAVAILABLE` | 상대의 말 받아쓰기(CLOVA Speech Recognition)를 쓸 수 없음 (HTTP 503). 장애·시간 초과·키 미설정·빈 인식. 다시 녹음하거나 문구함으로 대답 |
 | `TOO_MANY_REQUESTS` | 호출 상한 초과 (HTTP 429). 문장 추천은 사용자당 분당 10회. 잠시 후 다시 시도 |
 | `AUDIO_PROCESSING_UNAVAILABLE` | 음성 변환 슬롯 대기 초과 또는 변환 처리 시간 초과로 일시적으로 처리할 수 없음 (HTTP 503). 실사용 인식·진단 업로드·개인화 업로드의 변환 경로에 공통 적용 |
 
@@ -843,8 +844,10 @@ POST /v1/enroll/next-prompts
 | POST | /phrases/{phraseId}/speak | BE-B | O |
 | GET | /phrases/{phraseId}/audio (`local` 전용) | BE-B | O |
 | POST | /phrases/suggestions (플래그, 기본 꺼짐) | 팀장 | O |
+| POST | /conversation/turns (플래그, 기본 꺼짐) | 팀장 | O |
+| POST | /conversation/turns/{turnId}/candidates/{candidateId}/speak (플래그, 기본 꺼짐) | 팀장 | O |
 
-> 2·3·4장 주소(진단·자모 통계·추천·개인화)는 2026-10-30부터 기능 플래그로 꺼져 있어 404다. 10.6 문장 추천도 플래그로 기본 꺼짐(404)이다.
+> 2·3·4장 주소(진단·자모 통계·추천·개인화)는 2026-10-30부터 기능 플래그로 꺼져 있어 404다. 10.6 문장 추천과 11장 대화 모드도 플래그로 기본 꺼짐(404)이다.
 
 ---
 
@@ -883,6 +886,7 @@ POST /v1/enroll/next-prompts
 | 2026-10-30 | 0.5, 0.6, 8, 10 | 자주 쓰는 문구 API 추가(목록·추가·삭제·말하기, local 음성 조회). `PHRASE_DUPLICATED`·`PHRASE_LIMIT_EXCEEDED`(409), `TTS_UNAVAILABLE`(503) 추가 |
 | 2026-10-30 | 0.6, 8, 10 | 계획서(PHRASE-TTS-PIVOT-PLAN 4장)에 맞춤: 상황별 카테고리 6개, 목록을 `?category=` 필터 + 평평한 배열(`id`, `category`, `text`, `isDefault`)로, 말하기 응답 `phraseId` → `id`, `PHRASE_DUPLICATED` → `DUPLICATE_PHRASE`(같은 카테고리 내 내 문구끼리만), 상한 50 → 100개 |
 | 2026-10-30 | 0.5, 0.6, 8, 10.3, 10.6 | 문장 확장·문구 추천 `POST /phrases/suggestions` 추가(플래그 기본 꺼짐). `SUGGESTION_UNAVAILABLE`(503), `TOO_MANY_REQUESTS`(429) 추가. 문구 삭제의 UUID가 아닌 ID는 400 → 404 |
+| 2026-10-30 | 0, 0.5, 0.6, 8, 11 | 대화 모드 추가(턴 만들기·후보 말하기, 플래그 기본 꺼짐). `STT_UNAVAILABLE`(503) 추가 |
 
 ---
 
@@ -1044,3 +1048,57 @@ Response (200, `Cache-Control: no-store`):
 - 추천이 실패해도 문구 저장·말하기는 그대로 된다. 503이면 "직접 입력해 주세요" 안내를 보여 준다.
 
 에러: `VALIDATION_FAILED`(400, 위 입력 규칙·본문 누락), `AUTH_REQUIRED`(401), `RESOURCE_NOT_FOUND`(404, 플래그 꺼짐), `TOO_MANY_REQUESTS`(429), `SUGGESTION_UNAVAILABLE`(503, LLM 장애·시간 초과·키 미설정·쓸 수 있는 후보 0개)
+
+---
+
+## 11. 대화 모드 (기능 플래그, 기본 꺼짐)
+
+> 상대(의사·약사·점원)의 말을 녹음하면 서버가 받아쓰고(CLOVA Speech Recognition) 답변 후보를 만든다(Claude). 사용자가 후보를 누르면 TTS가 대신 대답한다. 플래그 `voicebridge.features.conversation`(env `FEATURE_CONVERSATION_ENABLED`)이 꺼져 있으면 두 주소 모두 404 `RESOURCE_NOT_FOUND`다.
+>
+
+> 🔒 개인정보: 상대의 목소리는 받아쓰기를 위해 **네이버 클라우드로**, 들은 말은 후보를 만들기 위해 **Anthropic(Claude)으로** 전송된다. 녹음 전에 상대에게 알리고 동의를 받는 화면이 필요하다(법적 검토는 별도). 서버는 녹음을 어디에도 저장하지 않고, 들은 말·후보는 **10분 동안만 Redis에** 둔다(DB 저장 없음, 로그는 개수만).
+>
+
+### 11.1 턴 만들기
+
+`POST /conversation/turns` (인증 필요, `multipart/form-data`)
+
+| part | 설명 |
+| --- | --- |
+| `audioFile` | 상대의 말 녹음. 실사용 인식(5.1)과 같은 형식·크기·길이 규칙(0.3~30초) |
+
+Response (200, `Cache-Control: no-store`):
+
+```json
+{
+  "success": true,
+  "data": {
+    "turnId": "uuid",
+    "heardText": "식사하셨어요?",
+    "candidates": [
+      { "id": "uuid", "text": "네, 먹었어요." },
+      { "id": "uuid", "text": "아니요, 아직 안 먹었어요." }
+    ]
+  }
+}
+```
+
+- 판정 순서: 녹음 검증(400) → 호출 상한(429, 분당 10회) → 받아쓰기(503 `STT_UNAVAILABLE`) → 답변 후보.
+- **답변 후보를 만들지 못해도(LLM 장애) 200**이고 `candidates`가 빈 배열이다. 들은 말은 보여 주고 "문구함이나 말하기로 대답해 주세요"로 안내한다.
+- 후보는 0~5개, 묻는 말이면 긍정·부정 두 방향을 모두 담도록 요청한다(보장은 아님). 후보는 자동으로 말하지 않는다.
+- `heardText`는 음성인식 결과라 틀릴 수 있다. 화면에 가장 크게 보여 주고 "다시 듣기(재녹음)"를 둔다.
+- 턴은 10분 뒤 만료된다. 만료된 턴의 후보는 말할 수 없다(404).
+
+에러: `VALIDATION_FAILED`(400, 파일 누락·빈 파일), `AUDIO_TOO_SHORT`·`AUDIO_TOO_LONG`·`AUDIO_INVALID`(400), `AUTH_REQUIRED`(401), `RESOURCE_NOT_FOUND`(404, 플래그 꺼짐), `TOO_MANY_REQUESTS`(429), `STT_UNAVAILABLE`(503), `AUDIO_PROCESSING_UNAVAILABLE`(503)
+
+### 11.2 후보 말하기
+
+`POST /conversation/turns/{turnId}/candidates/{candidateId}/speak` (인증 필요, 본문 없음)
+
+Response: 200 `Content-Type: audio/mpeg`, `Cache-Control: no-store`, 본문은 mp3 바이트.
+
+- **11.1에서 서버가 발급한 후보만** 말할 수 있다. 말할 텍스트는 요청으로 받지 않는다(본문을 보내도 무시).
+- 음성은 저장하지 않고 바로 돌려준다. `fetch`로 받아 Blob URL로 재생한다(Bearer 인증 필요, `<audio src>`에 주소를 바로 넣을 수 없다). 매번 합성하므로 1~2초 걸릴 수 있다(측정 전). 응답이 올 때까지 버튼을 비활성화한다.
+- 판정 순서: 턴 없음·만료(404) → 다른 사용자의 턴(403) → 이 턴에 없는 후보(404) → 호출 상한(429, 분당 20회) → 합성(503).
+
+에러: `VALIDATION_FAILED`(400, UUID가 아닌 ID), `AUTH_REQUIRED`(401), `FORBIDDEN_ACCESS`(403), `RESOURCE_NOT_FOUND`(404, 턴·후보 없음·만료·플래그 꺼짐), `TOO_MANY_REQUESTS`(429), `TTS_UNAVAILABLE`(503)

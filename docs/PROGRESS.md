@@ -4,7 +4,16 @@
 
 마지막 업데이트: 2026-10-30
 
-## 최신 작업 — 부록 C-1: 음성인식(STT) 포트·CSR 어댑터 (2026-10-30)
+## 최신 작업 — 부록 C-2: 대화 모드 턴·후보 말하기 (2026-10-30)
+
+- `POST /conversation/turns`(녹음 → 정규화 → 상한 → CSR 받아쓰기 → `LlmSuggestionPort.replyTo` → `SuggestionPolicy.filter` → Redis 턴 저장) / `POST /conversation/turns/{turnId}/candidates/{candidateId}/speak`(턴·소유자·후보 확인 → 상한 → TTS mp3 바로 응답). 플래그 `voicebridge.features.conversation`(기본 꺼짐).
+- LLM이 실패해도 200 + 빈 후보(들은 말은 보여 줌, 2026-10-30 결정). STT 실패는 503 `STT_UNAVAILABLE`, 턴을 만들지 않는다.
+- 저장: 녹음은 어디에도 저장 안 함, 들은 말·후보는 Redis `conversation:turn:{turnId}`에 10분(`ConversationPolicy`), TTS 음성도 저장 안 함. 로그는 개수와 턴 ID만. `@Transactional` 없음.
+- 호출 상한: 턴 분당 10회(`conversation`), 말하기 분당 20회(`conversation-speak`) — 가정값.
+- `ClaudeSuggestionAdapter`에 `replyTo` 추가(별도 지시문, 들은 말은 `<heard>` 데이터 블록, 긍정·부정 두 방향 요구).
+- **운영에서 켜려면**: Infra `deploy-ec2.sh`에 `CLOVA_STT_API_KEY_ID`·`CLOVA_STT_API_KEY`·`FEATURE_*` 전달 추가 필요. 실제 CSR·Claude·클로바 수동 E2E(병원 대화 20개)는 아직.
+
+## 이전 작업 — 부록 C-1: 음성인식(STT) 포트·CSR 어댑터 (2026-10-30)
 
 - `SpeechToTextPort.transcribe(byte[] wavBytes)` + `NaverClovaSpeechAdapter`(CLOVA Speech Recognition, `POST {base-url}?lang=Kor`, `application/octet-stream`, 응답 `{"text"}`, 타임아웃 5초). 키는 `CLOVA_STT_API_KEY_ID`/`CLOVA_STT_API_KEY`.
 - 실패(키 없음·빈 인식·4xx/5xx·시간 초과·형식 깨짐)는 모두 `STT_UNAVAILABLE`(503). 들은 말과 음성은 로그에 남기지 않는다(상태 코드·예외 이름만).

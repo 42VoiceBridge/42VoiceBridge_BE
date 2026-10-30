@@ -15,4 +15,10 @@ public interface LlmSuggestionPort {
    * 원본이다(거르기는 SuggestionPolicy).
    */
   List<String> expand(String text, PhraseCategory category);
+
+  /**
+   * 대화 모드(부록 C): 상대가 한 말(받아쓴 텍스트)에 사용자가 대답할 법한 문장 후보를 돌려준다. heardText는 신뢰할 수 없는 입력이다. 돌려주는 후보는 거르기
+   * 전 원본이다.
+   */
+  List<String> replyTo(String heardText);
 }

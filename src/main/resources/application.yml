@@ -48,6 +48,8 @@ voicebridge:
     diagnosis: ${FEATURE_DIAGNOSIS_ENABLED:false}
     # 문장 확장·문구 추천(LLM). 엔드포인트(B-2)가 이 값으로 켜진다. 기본 꺼짐.
     suggestion: ${FEATURE_SUGGESTION_ENABLED:false}
+    # 대화 모드(상대의 말 받아쓰기 → 답변 후보 → 말하기). 엔드포인트(C-2)가 이 값으로 켜진다. 기본 꺼짐.
+    conversation: ${FEATURE_CONVERSATION_ENABLED:false}
   personalization:
     # createdAt 기준. 변경한 기간은 기존 녹음에도 적용된다. 팀·AI의 보관 기간 합의는 별도 확인이 필요하다.
     retention-days: ${PERSONALIZATION_RETENTION_DAYS:30}

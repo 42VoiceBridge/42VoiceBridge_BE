@@ -31,6 +31,7 @@ voicebridge:
     personalization: true
     diagnosis: true
     suggestion: false
+    conversation: false
   personalization:
     retention-days: 30
     cleanup-delay-ms: 300000
