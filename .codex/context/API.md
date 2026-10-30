@@ -6,7 +6,10 @@
 
 # AI 구음장애 보조 서비스 — API 명세서
 
-> 문서 버전: v1.1 (2026-09-30 갱신, 변경 이력은 9장)
+> 문서 버전: v1.2 (2026-10-30 갱신, 변경 이력은 9장)
+>
+
+> **2026-10-30 방향 전환**: 서비스의 중심을 “자주 쓰는 문구를 눌러 말하기”(10장)로 옮겼다. 개인화(4장)와 진단·자모 오류 통계·추천 문장(2·3장)은 기능 플래그(`voicebridge.features.personalization`, `voicebridge.features.diagnosis`)로 **꺼져 있고, 꺼진 동안 해당 주소는 404 `RESOURCE_NOT_FOUND`**다(토큰이 없으면 401이 먼저). 코드와 테이블은 남아 있어 플래그를 켜면 아래 내용대로 동작한다. 실사용 인식(5장)·확인/TTS(6장)는 그대로 공개한다.
 >
 
 ---
@@ -76,6 +79,7 @@ https://{host}/api/v1
 | --- | --- |
 | 200 | 성공 (조회/수정) |
 | 201 | 생성 성공 |
+| 204 | 성공, 본문 없음 (문구 삭제) |
 | 202 | 비동기 작업 접수(예: 진단 녹음 업로드, 개인화 학습 트리거, TTS 요청) |
 | 400 | 요청 형식 오류(검증 실패) |
 | 401 | 인증 실패/토큰 만료 |
@@ -83,10 +87,10 @@ https://{host}/api/v1
 | 404 | 리소스 없음 |
 | 405 | 그 주소가 받지 않는 HTTP 메서드 |
 | 415 | 그 API가 받지 않는 Content-Type |
-| 409 | 상태 충돌(예: 이미 진행중인 학습 job에 재요청) |
+| 409 | 상태 충돌(예: 이미 진행중인 학습 job에 재요청, 중복 문구·문구 상한) |
 | 422 | 비즈니스 규칙 위반(예: 최소 녹음 개수 미충족) |
 | 500 | 서버 내부 오류 |
-| 502/503 | AI 추론/학습 서버 장애 (기본 모델 폴백 여부는 4.2절 참고) |
+| 502/503 | AI 추론/학습 서버 장애 (기본 모델 폴백 여부는 4.2절 참고), 음성 합성 서버 장애(`TTS_UNAVAILABLE`) |
 | 503 | 음성 변환 슬롯 대기 또는 처리 시간 초과로 일시적 처리 불가 |
 
 ### 0.6 공통 에러 코드
@@ -112,6 +116,9 @@ https://{host}/api/v1
 | `AUDIO_TOO_SHORT` | 진단 녹음이 0.3초 미만 (HTTP 400). 조금 더 길게 다시 녹음 |
 | `AUDIO_TOO_LONG` | 진단 녹음이 30초 초과 (HTTP 400). 짧게 끊어서 다시 녹음 |
 | `AUDIO_INVALID` | 진단 녹음 파일이 손상됐거나 지원하지 않는 형식 (HTTP 400). 다시 녹음 |
+| `PHRASE_DUPLICATED` | 추가하려는 문구가 이미 목록(기본 문구 또는 내가 추가한 문구)에 있음 (HTTP 409). 카테고리가 달라도 텍스트가 같으면 중복 |
+| `PHRASE_LIMIT_EXCEEDED` | 직접 추가한 문구가 상한(50개)에 닿음 (HTTP 409). 쓰지 않는 문구를 지운 뒤 다시 추가 |
+| `TTS_UNAVAILABLE` | 음성 합성 서버(CLOVA Voice)를 쓸 수 없음 (HTTP 503). 아무것도 저장하지 않았으므로 잠시 후 같은 요청을 다시 보내면 된다 |
 | `AUDIO_PROCESSING_UNAVAILABLE` | 음성 변환 슬롯 대기 초과 또는 변환 처리 시간 초과로 일시적으로 처리할 수 없음 (HTTP 503). 실사용 인식·진단 업로드·개인화 업로드의 변환 경로에 공통 적용 |
 
 ---
@@ -256,6 +263,9 @@ Response (200): 1.2 로그인과 같다(`accessToken`, `refreshToken`, `expiresI
 ---
 
 ## 2. 진단 세션 (담당: 백엔드 개발자 A)
+
+> ⏸ 2026-10-30부터 비공개: `voicebridge.features.diagnosis`가 꺼져 있으면(기본값) 이 장의 모든 주소가 404 `RESOURCE_NOT_FOUND`다.
+>
 
 ### 2.1 진단 세션 시작
 
@@ -453,6 +463,9 @@ Response (200):
 
 ## 3. 추천 문장 (담당: 백엔드 개발자 A)
 
+> ⏸ 2026-10-30부터 비공개: `voicebridge.features.diagnosis`가 꺼져 있으면(기본값) 이 장의 모든 주소가 404 `RESOURCE_NOT_FOUND`다.
+>
+
 ### 3.1 개인화용 추천 문장 받기
 
 `POST /users/me/recommendations` (인증 필요)
@@ -493,6 +506,9 @@ Response (200):
 ---
 
 ## 4. 개인화 (담당: 백엔드 개발자 B)
+
+> ⏸ 2026-10-30부터 비공개: `voicebridge.features.personalization`가 꺼져 있으면(기본값) 이 장의 모든 주소가 404 `RESOURCE_NOT_FOUND`다.
+>
 
 ### 4.1 개인화용 추가 녹음 업로드
 
@@ -818,6 +834,13 @@ POST /v1/enroll/next-prompts
 | POST | /recognitions/{id}/confirm | 주영 | O |
 | POST | /tts | 주영(stretch) | O |
 | GET | /tts/{id} | 주영(stretch) | O |
+| GET | /phrases | 팀장 | O |
+| POST | /phrases | BE-A | O |
+| DELETE | /phrases/{phraseId} | BE-A | O |
+| POST | /phrases/{phraseId}/speak | BE-B | O |
+| GET | /phrases/{phraseId}/audio (`local` 전용) | BE-B | O |
+
+> 2·3·4장 주소(진단·자모 통계·추천·개인화)는 2026-10-30부터 기능 플래그로 꺼져 있어 404다.
 
 ---
 
@@ -852,3 +875,128 @@ POST /v1/enroll/next-prompts
 | 2026-10-03 | 0.5, 0.6 | 클라이언트 요청 실수가 500으로 나가던 것을 수정: 없는 주소 404 `RESOURCE_NOT_FOUND`, 받지 않는 메서드 405 `METHOD_NOT_ALLOWED`, 읽을 수 없는 JSON 400 `VALIDATION_FAILED`, 받지 않는 Content-Type 415 `UNSUPPORTED_MEDIA_TYPE` |
 | 2026-10-03 | 6.2, 6.3 | TTS object key와 재생 URL 분리, private S3 임시 GET URL 및 만료·무효화 규칙, 인증된 로컬 MP3·Range 조회 추가 |
 | 2026-10-03 | 6.1 | 합성 직전 confirmation 재검사 및 무효·누락 시 외부 호출 없이 FAILED 처리 (PR #49 리뷰 반영) |
+| 2026-10-30 | 0, 2~4, 8 | 방향 전환: 개인화·진단(자모 통계·추천 포함) API를 기능 플래그로 끔. 꺼진 동안 404 `RESOURCE_NOT_FOUND` |
+| 2026-10-30 | 0.5, 0.6, 8, 10 | 자주 쓰는 문구 API 추가(목록·추가·삭제·말하기, local 음성 조회). `PHRASE_DUPLICATED`·`PHRASE_LIMIT_EXCEEDED`(409), `TTS_UNAVAILABLE`(503) 추가 |
+
+---
+
+## 10. 자주 쓰는 문구 (2026-10-30 신규)
+
+> 사용자가 자주 하는 말을 버튼으로 두고, 누르면 TTS로 읽어 준다. 카테고리는 고정이고(사용자가 만들 수 없음) 그 안에 **기본 문구**(모든 사용자 공통)와 **내가 추가한 문구**가 있다. 문구 수정은 v1에 없다(지우고 다시 추가). 기본 카테고리·문구 목록은 기획 확정 전 초안이다.
+>
+
+> 🔒 개인정보: 말하기를 누르면 문구 텍스트가 음성 합성을 위해 **네이버 클라우드 CLOVA Voice로 전송**된다. 직접 추가하는 문구에 이름·연락처·주소 같은 개인정보를 넣지 않도록 화면에서 안내한다. 서버 로그에는 문구 텍스트를 남기지 않는다.
+>
+
+카테고리 코드(선언 순서 = 화면 순서):
+
+| code | label |
+| --- | --- |
+| `GREETING` | 인사 |
+| `REQUEST` | 부탁 |
+| `DAILY` | 일상 |
+| `HEALTH` | 병원·건강 |
+| `EMERGENCY` | 긴급 |
+
+문구 규칙(서버 도메인 기준, 프론트는 같은 값을 안내 문구로만 쓴다):
+
+- 앞뒤 공백은 지우고 저장한다. 공백뿐이면 400.
+- 줄바꿈·탭 같은 제어문자는 400.
+- 최대 100자(이모지도 한 글자로 센다).
+- 직접 추가한 문구는 사용자당 최대 50개(기본 문구는 세지 않음).
+- 기본 문구나 내 문구와 텍스트가 같으면 중복(카테고리가 달라도).
+
+### 10.1 문구 목록
+
+`GET /phrases` (인증 필요)
+
+Response (200):
+
+```json
+{
+  "success": true,
+  "data": {
+    "categories": [
+      {
+        "category": "GREETING",
+        "label": "인사",
+        "phrases": [
+          { "phraseId": "uuid", "text": "안녕하세요.", "custom": false },
+          { "phraseId": "uuid", "text": "반가워요.", "custom": true }
+        ]
+      },
+      { "category": "REQUEST", "label": "부탁", "phrases": [] }
+    ]
+  }
+}
+```
+
+- 모든 카테고리가 위 표의 순서로 항상 온다. 문구가 없는 카테고리도 `phrases: []`로 온다(그 카테고리에 추가할 수 있게).
+- 카테고리 안에서는 기본 문구(`custom: false`)가 먼저, 그다음 내가 추가한 문구가 추가한 순서대로 온다.
+- 다른 사용자가 추가한 문구는 오지 않는다.
+
+에러: 인증 실패는 0.6절을 따른다.
+
+### 10.2 문구 추가
+
+`POST /phrases` (인증 필요)
+
+Request:
+
+```json
+{ "category": "DAILY", "text": "물 좀 주세요." }
+```
+
+Response (201):
+
+```json
+{
+  "success": true,
+  "data": { "phraseId": "uuid", "category": "DAILY", "text": "물 좀 주세요.", "custom": true }
+}
+```
+
+- `text`는 앞뒤 공백을 지운 값으로 돌아온다. 화면에는 응답의 `text`를 쓴다.
+
+에러: `VALIDATION_FAILED`(400, 빈 문구·제어문자·100자 초과·없는 카테고리 코드·본문 누락), `PHRASE_LIMIT_EXCEEDED`(409, 50개 상한), `PHRASE_DUPLICATED`(409, 이미 있는 문구). 400이 409보다 먼저 판정된다.
+
+### 10.3 문구 삭제
+
+`DELETE /phrases/{phraseId}` (인증 필요)
+
+Response: 204 (본문 없음)
+
+- 본인이 추가한 문구만 지울 수 있다. 그 문구로 만든 음성 파일도 함께 지운다.
+
+에러: `VALIDATION_FAILED`(400, 잘못된 ID 형식), `FORBIDDEN_ACCESS`(403, 기본 문구 — 메시지 "기본 문구는 삭제할 수 없습니다." / 다른 사용자의 문구), `RESOURCE_NOT_FOUND`(404, 없는 문구)
+
+### 10.4 문구 말하기
+
+`POST /phrases/{phraseId}/speak` (인증 필요, 본문 없음)
+
+Response (200, `Cache-Control: no-store`):
+
+```json
+{
+  "success": true,
+  "data": {
+    "phraseId": "uuid",
+    "audioUrl": "https://bucket.s3.ap-northeast-2.amazonaws.com/recordings/uuid.mp3?X-Amz-..."
+  }
+}
+```
+
+- **동기 API**다(TTS 6.1과 달리 폴링 없음). 처음 누른 문구는 서버가 CLOVA Voice로 합성해 저장하므로 응답이 1~2초 걸릴 수 있다(예상치, 측정 전). 이후로는 저장한 음성을 다시 쓰므로 합성하지 않고 바로 URL만 준다. 기본 문구의 음성은 모든 사용자가 공유한다.
+- `audioUrl`은 TTS 6.2와 같은 규칙의 임시 URL이다. 운영은 private S3 presigned GET(기본 10분 만료), `local` 프로파일은 `http://localhost:8080/api/v1/phrases/{phraseId}/audio`(Bearer 인증 필요, 10.5). **URL을 저장해 두지 말고 누를 때마다 이 API를 다시 호출**한다.
+- 같은 문구를 동시에 두 번 보내면 합성이 두 번 일어날 수 있다(결과는 하나로 정리된다). 응답이 올 때까지 버튼을 비활성화한다.
+- 합성이 실패하면 아무것도 저장하지 않으므로 다시 누르면 처음부터 합성을 시도한다.
+
+에러: `VALIDATION_FAILED`(400, 잘못된 ID 형식), `FORBIDDEN_ACCESS`(403, 다른 사용자의 문구), `RESOURCE_NOT_FOUND`(404, 없는 문구 또는 합성 중 삭제됨), `TTS_UNAVAILABLE`(503, 합성 서버 장애·키 미설정), `INTERNAL_SERVER_ERROR`(500, 저장소 업로드·URL 생성 실패)
+
+### 10.5 로컬 문구 음성 조회
+
+`GET /phrases/{phraseId}/audio` (`local` 프로파일 전용, 인증 필요)
+
+6.3과 같다. 200 `Content-Type: audio/mpeg`, `Cache-Control: no-store`, `Range` 지원(206/416). 아직 말하기(10.4)를 한 번도 하지 않은 문구는 409 `INVALID_STATE_TRANSITION`이다. 운영에서는 등록하지 않는다.
+
+에러: `VALIDATION_FAILED`(400), `FORBIDDEN_ACCESS`(403, 다른 사용자의 문구), `RESOURCE_NOT_FOUND`(404, 없는 문구·파일), `INVALID_STATE_TRANSITION`(409, 음성 없음), `INTERNAL_SERVER_ERROR`(500)
