@@ -2,9 +2,52 @@
 
 > 매 작업이 끝날 때마다 이 문서를 갱신한다. 새 대화를 시작할 때 이 문서부터 읽으면 이전 지시사항이 어떻게 끝났는지 복사-붙여넣기 없이 파악할 수 있다.
 
-마지막 업데이트: 2026-09-30
+마지막 업데이트: 2026-10-30
 
-## 최신 작업 — 네이버 클로바 보이스 TTS 엔진 연동 (2026-09-26)
+## 최신 작업 — 부록 C-2: 대화 모드 턴·후보 말하기 (2026-10-30)
+
+- `POST /conversation/turns`(녹음 → 정규화 → 상한 → CSR 받아쓰기 → `LlmSuggestionPort.replyTo` → `SuggestionPolicy.filter` → Redis 턴 저장) / `POST /conversation/turns/{turnId}/candidates/{candidateId}/speak`(턴·소유자·후보 확인 → 상한 → TTS mp3 바로 응답). 플래그 `voicebridge.features.conversation`(기본 꺼짐).
+- LLM이 실패해도 200 + 빈 후보(들은 말은 보여 줌, 2026-10-30 결정). STT 실패는 503 `STT_UNAVAILABLE`, 턴을 만들지 않는다.
+- 저장: 녹음은 어디에도 저장 안 함, 들은 말·후보는 Redis `conversation:turn:{turnId}`에 10분(`ConversationPolicy`), TTS 음성도 저장 안 함. 로그는 개수와 턴 ID만. `@Transactional` 없음.
+- 호출 상한: 턴 분당 10회(`conversation`), 말하기 분당 20회(`conversation-speak`) — 가정값.
+- `ClaudeSuggestionAdapter`에 `replyTo` 추가(별도 지시문, 들은 말은 `<heard>` 데이터 블록, 긍정·부정 두 방향 요구).
+- **운영에서 켜려면**: Infra `deploy-ec2.sh`에 `CLOVA_STT_API_KEY_ID`·`CLOVA_STT_API_KEY`·`FEATURE_*` 전달 추가 필요. 실제 CSR·Claude·클로바 수동 E2E(병원 대화 20개)는 아직.
+
+## 이전 작업 — 부록 C-1: 음성인식(STT) 포트·CSR 어댑터 (2026-10-30)
+
+- `SpeechToTextPort.transcribe(byte[] wavBytes)` + `NaverClovaSpeechAdapter`(CLOVA Speech Recognition, `POST {base-url}?lang=Kor`, `application/octet-stream`, 응답 `{"text"}`, 타임아웃 5초). 키는 `CLOVA_STT_API_KEY_ID`/`CLOVA_STT_API_KEY`.
+- 실패(키 없음·빈 인식·4xx/5xx·시간 초과·형식 깨짐)는 모두 `STT_UNAVAILABLE`(503). 들은 말과 음성은 로그에 남기지 않는다(상태 코드·예외 이름만).
+- 엔드포인트는 C-2. 계약은 공식 문서 검색 결과로 확인했고(컨테이너에서 ncloud-docs 원문이 열리지 않음), **실제 키 왕복은 확인 전**이다. TTS 키를 같이 쓸 수 있는지도 확인 전.
+- 운영 전달: Infra `deploy-ec2.sh`에 `CLOVA_STT_*` 선택 필드 추가 필요(C-2와 함께).
+
+## 이전 작업 — 부록 B-2: 문장 확장·문구 추천 엔드포인트 (2026-10-30)
+
+- `POST /api/v1/phrases/suggestions` (`SuggestPhrasesUseCase` → `SuggestPhrasesService` → `PhraseSuggestionController`). 플래그 `voicebridge.features.suggestion`(기본 꺼짐, env `FEATURE_SUGGESTION_ENABLED`)이 꺼지면 컨트롤러를 등록하지 않아 404.
+- 판정 순서: 입력 검증(`Phrase.normalizeText`, `PhraseCategory.from` — 400, LLM·호출 횟수 안 씀) → 호출 상한(429) → LLM + `SuggestionPolicy.filter`(후보 0개면 503). 트랜잭션 없음, DB 쓰기 없음, 자동 TTS 없음. 로그는 후보 개수만.
+- `Phrase.normalize`를 `public normalizeText`로 열어 추천 입력에도 같은 규칙을 쓴다(규칙 중복 없음).
+- 문구 삭제 매핑을 `/{phraseId:[0-9a-fA-F-]{36}}`로 좁혔다. 안 그러면 플래그가 꺼졌을 때 `POST /phrases/suggestions`가 삭제 주소에 걸려 405가 된다. UUID가 아닌 ID 삭제는 400 → 404.
+- **운영에서 켜려면**: Infra `deploy-ec2.sh`가 `FEATURE_*` 변수를 넘기지 않는다. 시크릿에 `FEATURE_SUGGESTION_ENABLED=true`를 넣어도 컨테이너에 안 들어가므로 Infra 스크립트에 추가하거나 기본값을 바꿔야 한다. `ANTHROPIC_API_KEY`는 Infra PR #14로 전달된다.
+
+## 이전 작업 — 부록 B-1: LLM 포트·어댑터, 호출 상한 (2026-10-30)
+
+- `LlmSuggestionPort`(문장 확장) + `ClaudeSuggestionAdapter`(공식 Java SDK 3.2.0, `claude-haiku-5-5`, effort low, 구조화 출력 `{candidates: [string]}`, 타임아웃 8초·재시도 1회). 키(`ANTHROPIC_API_KEY`)가 없으면 클라이언트를 만들지 않고 호출 시 503.
+- 실패(거절·형식 깨짐·429·5xx·시간 초과·키 없음)는 모두 `SUGGESTION_UNAVAILABLE`(503). 입력·출력 텍스트는 로그에 남기지 않는다. 입력은 `<input>` 데이터 블록에 넣고 꺾쇠를 바꿔 블록을 닫지 못하게 한다.
+- `CallRateLimitPort` + `RedisCallRateLimitAdapter`(Lua로 INCR+PEXPIRE 원자 처리, Redis 장애 시 막는 쪽으로 실패). 정책값은 `SuggestionPolicy`(후보 5개, 분당 10회 — D9 가정값). 후보 거르기는 `Phrase` 규칙 재사용.
+- 엔드포인트는 B-2. 플래그 `voicebridge.features.suggestion`(기본 꺼짐)만 미리 둠.
+- SDK 3.2.0은 키를 `Authorization: Bearer`로 보낸다(WireMock으로 확인). 실제 API 왕복은 실제 키로 아직 확인 전.
+
+## 최신 작업 — 방향 전환: 자주 쓰는 문구 말하기 (2026-10-30)
+
+- 브랜치 `claude/trusting-carson-08d3c2`에 계획서 6장의 PR 단위대로 커밋 4개(플래그 → 문구 CRUD → 말하기 → 문서). PR은 아직 만들지 않았다.
+- **플래그**: `voicebridge.features.personalization` / `diagnosis`(기본 꺼짐, env `FEATURE_*_ENABLED`). 꺼지면 해당 컨트롤러를 등록하지 않아 404. 진단 플래그는 진단 세션·자모 통계·추천을 묶는다(D4). 테스트 설정은 켜서 기존 테스트를 그대로 돌리고, 꺼진 상태는 `FeatureFlagTest`가 본다.
+- **문구**: `Phrase`/`PhraseCategory` 도메인, `V2__phrases.sql`, `PhraseSeeder`(멱등). 검증값(100자, 100개, 제어문자)은 도메인에만 둔다.
+- **계획서 정렬(PR #56 머지 후)**: 계획서 원문(`docs/PHRASE-TTS-PIVOT-PLAN-2026-10-30.md`)을 늦게 받아 #56이 원문과 달랐다. 운영 적용 전이라 V2를 그 자리에서 고쳐 맞췄다 — 상황별 카테고리 6개, `?category=` 필터 + 평평한 목록(`id`, `isDefault`), 중복은 `(owner_id, category, text_sha256)` 유니크(같은 카테고리 내 내 문구끼리, 대소문자 구분), 상한 100개, `DUPLICATE_PHRASE`. 별도 `(owner_id, category)` 인덱스는 유니크 키 앞부분과 겹쳐 두지 않았다.
+- **AI 서버**: 2026-10-30 백엔드 EC2에서 `GET /v1/health` 확인(`ai-contract-v1`, `transformers+peft`, whisper-small `973afd2496…`, 어댑터 없음). D4(진단·자모 통계·추천 끔)는 그대로 유지하기로 확정.
+- **말하기**: 클로바·업로드는 트랜잭션 밖. 실패하면 503 `TTS_UNAVAILABLE`, 캐시 미저장. 합성 중 다른 요청이 먼저 붙였으면 방금 올린 음성을 지운다. `AudioPlaybackUrlPort.createPhraseUrl` 추가, local은 `GET /phrases/{id}/audio`. 문구를 지우면 음성도 지우도록 `StoragePort.delete`가 mp3 음성 key도 받는다(진단 녹음 wav는 여전히 거절).
+- 검증: 이 세션 컨테이너는 Docker가 없고 Maven Central·jitpack이 막혀, Google Maven 미러 + JPyRust 컴파일 스텁 + JDK 21(`--release 17`)로 돌렸다. Testcontainers(MySQL·Redis) 테스트는 여기서 돌지 않는다 — `PhrasePersistenceAdapterTest`·`FlywayMigrationTest`(테이블 15개)는 CI에서 확인해야 한다.
+- **남은 것**: 클로바 실제 키 왕복 수동 검증, S3 실검증, Notion 명세서 반영, 개인화 코드 삭제 여부(D5), 기본 문구 목록 확정(D1).
+
+## 이전 작업 — 네이버 클로바 보이스 TTS 엔진 연동 (2026-09-26)
 
 - `feature/naver-clova-tts`에서 `TtsEnginePort`의 실제 구현체(`NaverClovaVoiceAdapter`, CLOVA Voice
   TTS Premium)를 추가하고, `TtsRequest`가 `PENDING → COMPLETED/FAILED`로 전이하는 비동기 합성 흐름을
@@ -444,13 +487,20 @@
 - 넣었을 때 "진단 문장 N개를 넣었습니다", 이미 있을 때 "진단 문장이 이미 N개 있어 넣지 않습니다"를 INFO로 남긴다.
 - 운영 기동 확인은 `docker logs voicebridge-be`에서 `Successfully applied 1 migration`(Flyway), `[문장 시드]`, `Started VoiceBridgeApplication` 세 줄과 `GET /actuator/health`의 `{"status":"UP"}`로 한다.
 
+### 33. 방향 전환 — 개인화·진단 플래그, 자주 쓰는 문구 (claude/trusting-carson-08d3c2) — PR 대기
+
+- 맨 위 "최신 작업" 참고. API 명세서 v1.2(10장 신규, 2~4장 비공개 표기).
+
 ## 알려진 이슈 / 확인 필요 사항
+
+- **문구 말하기를 동시에 두 번 보내면 합성이 두 번 일어날 수 있다.** 결과는 먼저 붙은 음성 하나로 정리되고 나머지는 지운다. 잠금은 두지 않았다(3주 챌린지, 프론트에서 응답 전 버튼 비활성화). 문구 삭제와 말하기가 겹치면 음성 파일이 하나 남을 수 있다(재생에는 쓰이지 않음).
+- **기본 문구를 바꿔도 이미 넣은 환경에는 반영되지 않는다**(시더는 기본 문구가 하나라도 있으면 넣지 않음). 기획이 목록을 확정하면 교체 작업이 따로 필요하다.
 
 > 과거에 실제로 겪고 해결한 에러(빌드/테스트, 인증, AI 연동, Git/GitHub 운영 등)는 여기서 빼고 [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)로 옮겼습니다. 아래는 아직 해결되지 않은, 열려있는 항목만 남겨둡니다.
 
 - **TTS 등 진단 외 `@Async`는 스프링 부트 기본 실행기(스레드 8개, 대기열 무제한)를 쓴다.** 스레드가 늘지는 않지만 대기열에 상한이 없어 작업이 몰리면 대기가 길어진다. 진단 인식은 전용 실행기로 분리했다(9/29, 작업 이력 23번). 나머지 설정은 담당자와 논의.
 - **비동기 인식 중 서버가 죽으면 해당 녹음이 `PROCESSING`에 갇힌다.** 재시도 경로가 없어, 사용자가 그 문장을 다시 녹음하기 전까지 세션이 끝나지 않는다(세션은 문장마다 가장 최근 녹음이 `DONE`이어야 `ANALYZED`가 됨). 같은 종류로, **세션 완료 판단(`DiagnosisSessionAnalysisTrigger`) 자체가 DB 오류 등으로 실패하면** 녹음은 이미 전부 `DONE`으로 커밋된 뒤라 다시 판단할 계기가 없어 세션이 `IN_PROGRESS`에 남는다. 둘을 묶어 복구 수단(재시도 API 또는 정리 스케줄러)을 만드는 것을 9/29 회의 안건으로 올렸다.
-- **운영 DB 스키마는 Flyway가 만든다**(작업 이력 29번). 앱이 처음 뜰 때 `db/migration/V1__init.sql`이 빈 DB에 테이블 14개를 만들고, Hibernate가 `validate`로 엔티티와 맞는지 확인한다. 예전 PR 본문(#37·#38·#45)과 개인화 스키마 문서의 수동 DDL은 기록용이다. 이미 테이블이 있는 DB에는 Flyway가 적용되지 않으니(시작 거부) 운영 DB가 비어 있는지 먼저 확인한다.
+- **운영 DB 스키마는 Flyway가 만든다**(작업 이력 29번). 앱이 처음 뜰 때 `db/migration/V1__init.sql`이 빈 DB에 테이블 14개를, `V2__phrases.sql`이 `phrases`를 만들고(총 15개), Hibernate가 `validate`로 엔티티와 맞는지 확인한다. 예전 PR 본문(#37·#38·#45)과 개인화 스키마 문서의 수동 DDL은 기록용이다. 이미 테이블이 있는 DB에는 Flyway가 적용되지 않으니(시작 거부) 운영 DB가 비어 있는지 먼저 확인한다.
 - **배포된 AI 서버가 없다**(10/3 AI 쪽 문서). 배포 환경에서는 진단 인식이 `FAILED`, 자모 통계·추천이 503이다. 로컬은 스텁으로 동작한다. 데모 방식은 팀장 결정 대기.
 - 자모 오류 통계: `min_support`는 진단 화면용으로 10으로 정했다(9/29). AI 쪽 답(10/3, R2): 탐색용 화면으로는 괜찮지만 사용자 발음 판정처럼 보이면 안 되고, 오류율은 횟수와 함께 보여줘야 한다(프론트에 전달). 진단을 기본 모델로 고정하는 `use_adapter=false`는 #40에서 반영됐다.
 - **`S3StorageAdapter`는 실제로 검증하지 못했다.** 버킷과 크레덴셜이 없어 로컬 파일 어댑터로만 확인했다. 인프라 쪽에 프로비저닝 요청이 등록돼 있다.

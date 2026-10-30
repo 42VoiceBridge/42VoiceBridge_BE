@@ -20,4 +20,22 @@ class S3StorageAdapterTest {
     assertThat(captor.getValue().key()).isEqualTo(key);
     assertThat(captor.getValue().contentType()).isEqualTo("audio/mpeg");
   }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void deleteAcceptsAudioMp3AndPersonalizationWavOnly() {
+    var s3 = mock(S3Client.class);
+    var adapter = new S3StorageAdapter(s3, "bucket");
+
+    adapter.delete("recordings/" + java.util.UUID.randomUUID() + ".mp3");
+    adapter.delete("personalization/" + java.util.UUID.randomUUID() + ".wav");
+    verify(s3, times(2)).deleteObject(any(java.util.function.Consumer.class));
+
+    // 진단 녹음과 경로 조작은 지우지 않는다
+    for (String bad :
+        new String[] {"recordings/" + java.util.UUID.randomUUID() + ".wav", "../x.mp3", null}) {
+      assertThatThrownBy(() -> adapter.delete(bad)).isInstanceOf(IllegalArgumentException.class);
+    }
+    verifyNoMoreInteractions(s3);
+  }
 }

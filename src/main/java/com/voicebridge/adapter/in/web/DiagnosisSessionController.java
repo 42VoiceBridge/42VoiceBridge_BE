@@ -14,6 +14,7 @@ import com.voicebridge.port.in.UploadDiagnosisRecordingUseCase;
 import java.io.IOException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
+// 기능 플래그가 꺼져 있으면(기본값) 등록하지 않는다. application.yml의 voicebridge.features 참고.
+@ConditionalOnProperty(name = "voicebridge.features.diagnosis", havingValue = "true")
 @RequestMapping("/api/v1/diagnosis-sessions")
 @RequiredArgsConstructor
 public class DiagnosisSessionController {

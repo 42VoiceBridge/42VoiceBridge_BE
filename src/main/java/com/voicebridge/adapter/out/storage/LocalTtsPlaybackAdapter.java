@@ -43,6 +43,12 @@ public class LocalTtsPlaybackAdapter implements AudioPlaybackUrlPort, TtsAudioRe
   }
 
   @Override
+  public String createPhraseUrl(String storageKey, UUID phraseId) {
+    TtsAudioKeys.validate(storageKey);
+    return baseUrl + "/api/v1/phrases/" + phraseId + "/audio";
+  }
+
+  @Override
   public byte[] readAudio(String storageKey) {
     TtsAudioKeys.validate(storageKey);
     try {
