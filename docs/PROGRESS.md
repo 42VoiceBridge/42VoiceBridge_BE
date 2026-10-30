@@ -4,7 +4,14 @@
 
 마지막 업데이트: 2026-10-30
 
-## 최신 작업 — API 명세서 v1.5 코드 대조와 문서 정리 (2026-10-30)
+## 최신 작업 — CLOVA Voice 호출 타임아웃 (2026-10-30)
+
+- `NaverClovaVoiceAdapter`에 연결·응답 타임아웃(`voicebridge.tts.naver.timeout`, 5초)을 추가했다. 이전에는 지정이 없어 네이버가 응답하지 않으면 문구 말하기·후보 말하기 요청이 끝없이 묶일 수 있었다. 방식은 STT 어댑터(`NaverClovaSpeechAdapter`)와 같다(`SimpleClientHttpRequestFactory`).
+- 타임아웃은 런타임 예외로 끝나므로 기존 실패 처리 그대로다. 10.4·11.2는 503 `TTS_UNAVAILABLE`, 6.1 비동기 TTS는 `FAILED`.
+- 5초는 STT와 맞춘 가정값이다. 실제 합성 시간은 아직 측정하지 않았다.
+- 테스트: WireMock으로 응답을 1.5초 늦추고 타임아웃 0.3초 어댑터가 예외를 던지는지 확인하는 케이스를 추가했다. **이 환경은 `jitpack.io`가 막혀 JPyRust 의존성을 받지 못해 로컬 빌드를 못 했고, CI로 검증한다.**
+
+## 이전 작업 — API 명세서 v1.5 코드 대조와 문서 정리 (2026-10-30)
 
 - `.codex/context/API.md`를 main(`6acffdb`, #62) 코드와 한 절씩 대조해 v1.5로 갱신. 코드는 바꾸지 않았다.
 - 문서 오류 정정: 5.2 인식 이력 항목에 `createdAt`이 있다고 적혀 있었으나 응답 DTO(`RecognitionResponse`)에는 없다. 2.1 `sentenceId` 예시(`s-001`)를 UUID로, 모든 시각 예시의 `Z`를 제거(서버는 오프셋 없는 `LocalDateTime`). 7.3의 AI job 주소를 `/v1/jobs/{job_id}`로.

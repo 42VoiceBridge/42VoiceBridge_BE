@@ -3,8 +3,10 @@ package com.voicebridge.adapter.out.tts;
 import com.voicebridge.port.out.TtsEnginePort;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -32,8 +34,14 @@ public class NaverClovaVoiceAdapter implements TtsEnginePort {
       @Value("${voicebridge.tts.naver.base-url}") String ttsUri,
       @Value("${voicebridge.tts.naver.api-key-id}") String apiKeyId,
       @Value("${voicebridge.tts.naver.api-key}") String apiKey,
-      @Value("${voicebridge.tts.naver.speaker}") String speaker) {
-    this.restClient = restClientBuilder.build();
+      @Value("${voicebridge.tts.naver.speaker}") String speaker,
+      @Value("${voicebridge.tts.naver.timeout}") Duration timeout) {
+    // 타임아웃이 없으면 네이버가 응답하지 않을 때 요청이 끝없이 묶인다. 넘으면 런타임 예외가 나고,
+    // 문구·후보 말하기는 503 TTS_UNAVAILABLE, 비동기 TTS(6.1)는 FAILED로 끝난다.
+    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+    requestFactory.setConnectTimeout(timeout);
+    requestFactory.setReadTimeout(timeout);
+    this.restClient = restClientBuilder.requestFactory(requestFactory).build();
     this.ttsUri = ttsUri;
     this.apiKeyId = apiKeyId;
     this.apiKey = apiKey;

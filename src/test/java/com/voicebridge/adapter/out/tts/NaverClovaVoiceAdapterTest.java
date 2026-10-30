@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,13 +31,17 @@ class NaverClovaVoiceAdapterTest {
 
   @BeforeEach
   void setUp() {
-    adapter =
-        new NaverClovaVoiceAdapter(
-            RestClient.builder(),
-            wireMock.baseUrl() + "/tts-premium/v1/tts",
-            "key-id",
-            "key",
-            "nara");
+    adapter = adapter(Duration.ofSeconds(2));
+  }
+
+  private NaverClovaVoiceAdapter adapter(Duration timeout) {
+    return new NaverClovaVoiceAdapter(
+        RestClient.builder(),
+        wireMock.baseUrl() + "/tts-premium/v1/tts",
+        "key-id",
+        "key",
+        "nara",
+        timeout);
   }
 
   @AfterEach
@@ -89,5 +94,15 @@ class NaverClovaVoiceAdapterTest {
         post(urlPathEqualTo("/tts-premium/v1/tts")).willReturn(aResponse().withStatus(400)));
 
     assertThatThrownBy(() -> adapter.synthesize("물 좀 주세요")).isInstanceOf(RuntimeException.class);
+  }
+
+  @Test
+  void 응답이_타임아웃보다_늦으면_기다리지_않고_예외를_던진다() {
+    wireMock.stubFor(
+        post(urlPathEqualTo("/tts-premium/v1/tts"))
+            .willReturn(aResponse().withStatus(200).withBody(new byte[] {1}).withFixedDelay(1500)));
+
+    assertThatThrownBy(() -> adapter(Duration.ofMillis(300)).synthesize("물 좀 주세요"))
+        .isInstanceOf(RuntimeException.class);
   }
 }

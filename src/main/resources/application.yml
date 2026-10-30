@@ -113,6 +113,8 @@ voicebridge:
       api-key-id: ${NCP_TTS_API_KEY_ID:}
       api-key: ${NCP_TTS_API_KEY:}
       speaker: nara
+      # 연결·응답 대기 상한. 문구 말하기는 사용자가 버튼을 누르고 기다리는 동기 호출이라 STT와 같은 5초로 둔다(실측 전 가정값).
+      timeout: 5s
   stt:
     # 대화 모드(부록 C)에서 상대의 말을 받아쓰는 CLOVA Speech Recognition. 키는 환경변수로만 받는다(없으면 호출 시 503).
     naver:
