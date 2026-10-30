@@ -4,7 +4,14 @@
 
 마지막 업데이트: 2026-10-30
 
-## 최신 작업 — 부록 B-2: 문장 확장·문구 추천 엔드포인트 (2026-10-30)
+## 최신 작업 — 부록 C-1: 음성인식(STT) 포트·CSR 어댑터 (2026-10-30)
+
+- `SpeechToTextPort.transcribe(byte[] wavBytes)` + `NaverClovaSpeechAdapter`(CLOVA Speech Recognition, `POST {base-url}?lang=Kor`, `application/octet-stream`, 응답 `{"text"}`, 타임아웃 5초). 키는 `CLOVA_STT_API_KEY_ID`/`CLOVA_STT_API_KEY`.
+- 실패(키 없음·빈 인식·4xx/5xx·시간 초과·형식 깨짐)는 모두 `STT_UNAVAILABLE`(503). 들은 말과 음성은 로그에 남기지 않는다(상태 코드·예외 이름만).
+- 엔드포인트는 C-2. 계약은 공식 문서 검색 결과로 확인했고(컨테이너에서 ncloud-docs 원문이 열리지 않음), **실제 키 왕복은 확인 전**이다. TTS 키를 같이 쓸 수 있는지도 확인 전.
+- 운영 전달: Infra `deploy-ec2.sh`에 `CLOVA_STT_*` 선택 필드 추가 필요(C-2와 함께).
+
+## 이전 작업 — 부록 B-2: 문장 확장·문구 추천 엔드포인트 (2026-10-30)
 
 - `POST /api/v1/phrases/suggestions` (`SuggestPhrasesUseCase` → `SuggestPhrasesService` → `PhraseSuggestionController`). 플래그 `voicebridge.features.suggestion`(기본 꺼짐, env `FEATURE_SUGGESTION_ENABLED`)이 꺼지면 컨트롤러를 등록하지 않아 404.
 - 판정 순서: 입력 검증(`Phrase.normalizeText`, `PhraseCategory.from` — 400, LLM·호출 횟수 안 씀) → 호출 상한(429) → LLM + `SuggestionPolicy.filter`(후보 0개면 503). 트랜잭션 없음, DB 쓰기 없음, 자동 TTS 없음. 로그는 후보 개수만.
