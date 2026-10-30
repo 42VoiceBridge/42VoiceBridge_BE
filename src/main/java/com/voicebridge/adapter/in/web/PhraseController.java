@@ -53,7 +53,8 @@ public class PhraseController {
         .body(ApiResponse.success(PhraseResponse.from(result)));
   }
 
-  @DeleteMapping("/{phraseId}")
+  // UUID 모양만 받는다. 그래야 /phrases/suggestions 같은 다른 주소가 이 매핑에 걸려 405가 되지 않는다(추천 기능이 꺼졌을 때 404).
+  @DeleteMapping("/{phraseId:[0-9a-fA-F-]{36}}")
   public ResponseEntity<Void> delete(
       @AuthenticationPrincipal UUID userId, @PathVariable("phraseId") UUID phraseId) {
     deletePhraseUseCase.delete(userId, phraseId);
