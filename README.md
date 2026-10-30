@@ -1,6 +1,6 @@
 # 42VoiceBridge_BE
 
-GSIA SW 챌린지(3주) — **AI 구음장애 보조 서비스**의 백엔드입니다. 2026-10-30 방향 전환으로 **자주 쓰는 문구를 눌러 말하기**(고정 카테고리별 기본 문구 + 내가 추가한 문구, 누르면 CLOVA Voice로 읽어 줌)가 중심 기능이 됐습니다. 말하기 → 인식 → 확인 → TTS 흐름은 그대로 남아 있습니다.
+GSIA SW 챌린지(3주) — **AI 구음장애 보조 서비스**의 백엔드입니다. 2026-10-30 방향 전환으로 **상황별 문구를 눌러 말하기**(병원·식당 같은 고정 카테고리별 기본 문구 + 내가 추가한 문구, 누르면 CLOVA Voice로 읽어 줌)가 중심 기능이 됐습니다. 말하기 → 인식 → 확인 → TTS 흐름은 그대로 남아 있습니다.
 
 > 개인화 학습과 진단(진단 세션·자모 오류 통계·추천 문장)은 기능 플래그 `voicebridge.features.personalization` / `voicebridge.features.diagnosis`로 **꺼 두었고, 꺼진 동안 해당 API는 404**입니다. 코드와 테이블은 남아 있어 환경변수 `FEATURE_PERSONALIZATION_ENABLED=true` / `FEATURE_DIAGNOSIS_ENABLED=true`로 다시 켤 수 있습니다.
 
@@ -76,8 +76,8 @@ graph TB
 3주 챌린지 특성상 각 도메인은 **계약(포트/인터페이스) 먼저 정의 후 일부 유스케이스만 완전 구현**하는 방식으로 진행 중입니다. 나머지는 컨트롤러 매핑 없이 TODO로 남아있어, 미구현 유스케이스를 호출해도 빌드가 깨지지 않습니다(빈 등록 자체가 없음).
 
 ### 자주 쓰는 문구 — 구현 (2026-10-30)
-- `GET /api/v1/phrases`: 카테고리(인사·부탁·일상·병원/건강·긴급)별로 기본 문구와 내가 추가한 문구를 돌려준다. 다른 사용자의 문구는 DB 조회 조건에서 빠진다
-- `POST /api/v1/phrases`: 고정 카테고리 안에 문구 추가(201). 공백·제어문자·100자 초과는 400, 이미 있는 문구·50개 상한은 409
+- `GET /api/v1/phrases?category=`: 카테고리(병원·식당·약국·마트/편의점·교통·일상/긴급)의 기본 문구와 내가 추가한 문구를 `[{id, category, text, isDefault}]`로 돌려준다. 다른 사용자의 문구와 카테고리 거르기는 DB 조회 조건에서 처리한다
+- `POST /api/v1/phrases`: 고정 카테고리 안에 문구 추가(201). 공백·제어문자·100자 초과는 400, 같은 카테고리에 이미 추가한 문구(`DUPLICATE_PHRASE`)·100개 상한은 409
 - `DELETE /api/v1/phrases/{phraseId}`: 내 문구만 삭제(204). 기본 문구·다른 사람 문구는 403. 저장한 음성도 함께 지운다
 - `POST /api/v1/phrases/{phraseId}/speak`: 처음 누르면 CLOVA Voice로 합성해 저장하고 이후 재사용한다. 응답은 재생 URL(운영: S3 임시 URL, local: `/api/v1/phrases/{id}/audio`). 클로바 실패는 503 `TTS_UNAVAILABLE`이고 아무것도 저장하지 않는다
 - 기본 문구는 `PhraseSeeder`가 넣는다(`voicebridge.phrase.seed-defaults`, 기본 켬, 테스트는 끔). 기본 문구가 하나라도 있으면 넣지 않는다. 목록은 기획 확정 전 초안
@@ -143,8 +143,8 @@ graph TB
 | 13 | `POST /api/v1/recognitions` | JWT 필요 | `audioFile` multipart 업로드 → 인식·저장 결과 (`200`) |
 | 14 | `POST /api/v1/users/me/recommendations` | JWT 필요 | 개인화 등록용 추천 문장. 문장은 AI가 고르고, 제안한 문장을 기록한다. 본문 `{ "count": 10 }`(생략 가능, 1~50) |
 | 15 | `GET /api/v1/users/me/jamo-error-stats` | JWT 필요 | 자모 오류 통계(분석 완료 세션 누적). 표본 부족이면 `errorRate: null` |
-| 16 | `GET /api/v1/phrases` | JWT 필요 | 카테고리별 문구 목록(기본 + 내 문구) |
-| 17 | `POST /api/v1/phrases` | JWT 필요 | 문구 추가. 본문 `{ "category": "DAILY", "text": "물 좀 주세요." }` (`201`) |
+| 16 | `GET /api/v1/phrases?category=` | JWT 필요 | 문구 목록(기본 + 내 문구), 카테고리 필터 선택 |
+| 17 | `POST /api/v1/phrases` | JWT 필요 | 문구 추가. 본문 `{ "category": "RESTAURANT", "text": "물 좀 주세요." }` (`201`) |
 | 18 | `DELETE /api/v1/phrases/{phraseId}` | JWT 필요 | 내 문구 삭제 (`204`) |
 | 19 | `POST /api/v1/phrases/{phraseId}/speak` | JWT 필요 | 문구 말하기. 재생 URL 반환, 합성 음성은 문구마다 1회만 만든다 |
 

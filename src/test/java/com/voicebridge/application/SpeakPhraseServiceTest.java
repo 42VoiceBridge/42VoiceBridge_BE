@@ -39,7 +39,7 @@ class SpeakPhraseServiceTest {
 
   private SpeakPhraseService service;
   private final UUID userId = UUID.randomUUID();
-  private final Phrase phrase = Phrase.createDefault(PhraseCategory.GREETING, "안녕하세요.");
+  private final Phrase phrase = Phrase.createDefault(PhraseCategory.HOSPITAL, "안녕하세요.");
   private final String winnerKey = "recordings/" + UUID.randomUUID() + ".mp3";
   private final String myKey = "recordings/" + UUID.randomUUID() + ".mp3";
 
