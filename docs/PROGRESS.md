@@ -13,6 +13,13 @@
 - 남은 것: AI 서버의 개인화 어댑터 파일 삭제(계약 없음), 대화 모드 턴(Redis 10분 TTL).
 - 다음 PR: 회원 탈퇴(이 삭제 + 내 문구·음성 + 계정 + 탈퇴 후 액세스 토큰 차단).
 
+## 이전 작업 — 비밀번호 변경 (2026-10-31)
+
+- `PATCH /api/v1/users/me/password` (`ChangePasswordUseCase` → `ChangePasswordService`). 이메일 회원만, 현재 비밀번호 확인 후 새 비밀번호(8자 이상, 현재와 다름)로 바꾸고 새 토큰 한 쌍을 발급한다. 리프레시 토큰은 사용자당 하나라 다른 기기의 리프레시 토큰은 무효가 된다.
+- 규칙은 도메인 `User.checkNewPassword`·`User.changePassword`에만 둔다. 현재 비밀번호가 틀리면 400 `PASSWORD_MISMATCH`(401이면 프론트가 토큰 재발급으로 오해), 카카오 계정은 400 `PASSWORD_NOT_SUPPORTED`.
+- 같은 묶음의 다음 PR: 음성 데이터 초기화(`DELETE /users/me/voice-data`), 회원 탈퇴(`POST /users/me/withdraw` + 탈퇴 후 액세스 토큰 차단). 2026-10-31 계약 승인(초기화 범위: 목소리와 그 결과만, 내 문구는 남김).
+- 회원가입 DTO의 `@Size(min = 8)`은 도메인 규칙과 중복이다. 이 PR에서는 건드리지 않았다.
+
 ## 이전 작업 — CLOVA Voice 호출 타임아웃 (2026-10-30)
 
 - `NaverClovaVoiceAdapter`에 연결·응답 타임아웃(`voicebridge.tts.naver.timeout`, 5초)을 추가했다. 이전에는 지정이 없어 네이버가 응답하지 않으면 문구 말하기·후보 말하기 요청이 끝없이 묶일 수 있었다. 방식은 STT 어댑터(`NaverClovaSpeechAdapter`)와 같다(`SimpleClientHttpRequestFactory`).

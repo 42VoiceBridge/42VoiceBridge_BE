@@ -5,6 +5,9 @@ import java.util.UUID;
 
 public class User {
 
+  /** 새 비밀번호 최소 길이(글자 수). 비밀번호 변경에서 쓴다. */
+  public static final int MIN_PASSWORD_LENGTH = 8;
+
   private final UUID id;
   private String email;
   private String password;
@@ -65,6 +68,27 @@ public class User {
 
   public boolean isLocalUser() {
     return provider == AuthProvider.LOCAL;
+  }
+
+  /** 새 비밀번호 규칙을 확인한다. 맞지 않으면 사용자에게 보여 줄 메시지와 함께 IllegalArgumentException을 던진다(400). */
+  public static void checkNewPassword(String rawPassword) {
+    if (rawPassword == null || rawPassword.isBlank()) {
+      throw new IllegalArgumentException("새 비밀번호를 입력해 주세요.");
+    }
+    if (rawPassword.codePointCount(0, rawPassword.length()) < MIN_PASSWORD_LENGTH) {
+      throw new IllegalArgumentException("비밀번호는 " + MIN_PASSWORD_LENGTH + "자 이상이어야 합니다.");
+    }
+  }
+
+  /** 해시한 새 비밀번호로 바꾼다. 카카오 계정은 비밀번호가 없어 바꿀 수 없다. */
+  public void changePassword(String hashedPassword) {
+    if (!isLocalUser()) {
+      throw new IllegalStateException("카카오 계정은 비밀번호를 사용하지 않습니다.");
+    }
+    if (hashedPassword == null || hashedPassword.isBlank()) {
+      throw new IllegalArgumentException("새 비밀번호가 필요합니다.");
+    }
+    this.password = hashedPassword;
   }
 
   public UUID getId() {
