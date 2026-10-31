@@ -4,7 +4,16 @@
 
 마지막 업데이트: 2026-10-31
 
-## 최신 작업 — 비밀번호 변경 (2026-10-31)
+## 최신 작업 — 음성 데이터 초기화 (2026-10-31)
+
+- `DELETE /api/v1/users/me/voice-data` → 204 (`ResetVoiceDataUseCase` → `ResetVoiceDataService`, `VoiceDataErasurePort` → `VoiceDataErasureAdapter`). 2026-10-31 계약 승인: 목소리와 그 결과만 지우고 계정·내 문구는 남긴다.
+- 지우는 테이블: tts_requests(확인 문장 경유), confirmations, recognitions, recordings, diagnosis_sessions(+문장), jamo_error_snapshots(+토큰), shown_prompts, personalization_recordings·jobs·adapters. 테이블 사이 외래키가 없어 어댑터가 하나씩 지운다. 하위 테이블이 있는 두 엔티티는 읽어서 remove.
+- DB는 어댑터의 트랜잭션에서 지우고 커밋한 뒤, 서비스가 저장소 파일을 지운다(트랜잭션 밖). 파일 삭제 실패는 key만 로그에 남기고 204.
+- 저장소 어댑터(S3·로컬)가 진단 녹음 `recordings/{uuid}.wav` 삭제를 허용하도록 바꿨다(이전에는 일부러 막혀 있었다). 다른 확장자와 경로 조작은 여전히 거절.
+- 남은 것: AI 서버의 개인화 어댑터 파일 삭제(계약 없음), 대화 모드 턴(Redis 10분 TTL).
+- 다음 PR: 회원 탈퇴(이 삭제 + 내 문구·음성 + 계정 + 탈퇴 후 액세스 토큰 차단).
+
+## 이전 작업 — 비밀번호 변경 (2026-10-31)
 
 - `PATCH /api/v1/users/me/password` (`ChangePasswordUseCase` → `ChangePasswordService`). 이메일 회원만, 현재 비밀번호 확인 후 새 비밀번호(8자 이상, 현재와 다름)로 바꾸고 새 토큰 한 쌍을 발급한다. 리프레시 토큰은 사용자당 하나라 다른 기기의 리프레시 토큰은 무효가 된다.
 - 규칙은 도메인 `User.checkNewPassword`·`User.changePassword`에만 둔다. 현재 비밀번호가 틀리면 400 `PASSWORD_MISMATCH`(401이면 프론트가 토큰 재발급으로 오해), 카카오 계정은 400 `PASSWORD_NOT_SUPPORTED`.

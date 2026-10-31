@@ -76,17 +76,24 @@ class LocalFileStorageAdapterTest {
   }
 
   @Test
-  void 음성_mp3도_지울_수_있고_그_외_key는_거절한다() throws IOException {
+  void 음성_mp3와_진단_녹음도_지울_수_있고_그_외_key는_거절한다() throws IOException {
     LocalFileStorageAdapter adapter = newAdapter();
     String key = adapter.upload(new byte[] {1}, "phrase.mp3");
     adapter.delete(key);
     adapter.delete(key);
     assertThat(Files.exists(tempDir.resolve(key))).isFalse();
 
-    // 진단 녹음(recordings/*.wav)이나 경로 조작은 여전히 지울 수 없다
+    // 진단 녹음(recordings/*.wav)은 음성 데이터 초기화·탈퇴 때 지운다
     String wav = adapter.upload(new byte[] {1}, "recording.wav");
-    assertThatThrownBy(() -> adapter.delete(wav)).isInstanceOf(IllegalArgumentException.class);
-    assertThat(Files.exists(tempDir.resolve(wav))).isTrue();
+    adapter.delete(wav);
+    assertThat(Files.exists(tempDir.resolve(wav))).isFalse();
+
+    // 다른 확장자나 경로 조작은 지울 수 없다
+    String webm = adapter.upload(new byte[] {1}, "upload.webm");
+    assertThatThrownBy(() -> adapter.delete(webm)).isInstanceOf(IllegalArgumentException.class);
+    assertThat(Files.exists(tempDir.resolve(webm))).isTrue();
+    assertThatThrownBy(() -> adapter.delete("recordings/../../outside.wav"))
+        .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> adapter.delete("recordings/../../outside.mp3"))
         .isInstanceOf(IllegalArgumentException.class);
   }
