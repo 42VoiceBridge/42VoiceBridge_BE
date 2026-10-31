@@ -29,6 +29,7 @@ public class RecognitionPersistenceAdapter implements RecognitionRepositoryPort 
                   .id(recognition.getId())
                   .userId(recognition.getUserId())
                   .recognizedText(recognition.getRecognizedText())
+                  .rawText(recognition.getRawText())
                   .modelUsed(recognition.getModelUsed())
                   .confidence(recognition.getConfidence())
                   .createdAt(recognition.getCreatedAt())
@@ -62,6 +63,7 @@ public class RecognitionPersistenceAdapter implements RecognitionRepositoryPort 
         entity.getId(),
         entity.getUserId(),
         entity.getRecognizedText(),
+        entity.getRawText(),
         entity.getModelUsed(),
         entity.getConfidence(),
         entity.getCreatedAt());

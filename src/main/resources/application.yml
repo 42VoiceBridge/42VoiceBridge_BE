@@ -50,6 +50,10 @@ voicebridge:
     suggestion: ${FEATURE_SUGGESTION_ENABLED:false}
     # 대화 모드(상대의 말 받아쓰기 → 답변 후보 → 말하기). 엔드포인트(C-2)가 이 값으로 켜진다. 기본 꺼짐.
     conversation: ${FEATURE_CONVERSATION_ENABLED:false}
+    # 실사용 인식(5.1) 원문을 Claude로 보정해 보정본만 보여 준다(원문은 raw_text). 실패하면 원문을 쓴다.
+    # 따로 지정하지 않으면 문장 추천 플래그를 따른다. Infra 배포 스크립트는 정해진 FEATURE_* 키만 넘기므로,
+    # 이 기능만 따로 끄려면 Infra에 FEATURE_RECOGNITION_CORRECTION_ENABLED 전달을 추가해야 한다.
+    recognition-correction: ${FEATURE_RECOGNITION_CORRECTION_ENABLED:${FEATURE_SUGGESTION_ENABLED:false}}
   personalization:
     # createdAt 기준. 변경한 기간은 기존 녹음에도 적용된다. 팀·AI의 보관 기간 합의는 별도 확인이 필요하다.
     retention-days: ${PERSONALIZATION_RETENTION_DAYS:30}
