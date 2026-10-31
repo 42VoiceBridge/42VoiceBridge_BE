@@ -23,17 +23,23 @@ class S3StorageAdapterTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  void deleteAcceptsAudioMp3AndPersonalizationWavOnly() {
+  void deleteAcceptsOwnAudioKeysOnly() {
     var s3 = mock(S3Client.class);
     var adapter = new S3StorageAdapter(s3, "bucket");
 
     adapter.delete("recordings/" + java.util.UUID.randomUUID() + ".mp3");
+    adapter.delete("recordings/" + java.util.UUID.randomUUID() + ".wav");
     adapter.delete("personalization/" + java.util.UUID.randomUUID() + ".wav");
-    verify(s3, times(2)).deleteObject(any(java.util.function.Consumer.class));
+    verify(s3, times(3)).deleteObject(any(java.util.function.Consumer.class));
 
-    // 진단 녹음과 경로 조작은 지우지 않는다
+    // 다른 확장자와 경로 조작은 지우지 않는다
     for (String bad :
-        new String[] {"recordings/" + java.util.UUID.randomUUID() + ".wav", "../x.mp3", null}) {
+        new String[] {
+          "recordings/" + java.util.UUID.randomUUID() + ".webm",
+          "recordings/../x.wav",
+          "../x.mp3",
+          null
+        }) {
       assertThatThrownBy(() -> adapter.delete(bad)).isInstanceOf(IllegalArgumentException.class);
     }
     verifyNoMoreInteractions(s3);

@@ -295,6 +295,22 @@ Response (200, `Cache-Control: no-store`): 1.2 로그인과 같다(`accessToken`
 - 판정 순서: 카카오 계정(400) → 현재 비밀번호 비어 있음(400) → 현재 비밀번호 틀림(400) → 새 비밀번호 규칙(400).
 
 에러: `VALIDATION_FAILED`(400, 비어 있음·8자 미만·현재와 같음), `PASSWORD_MISMATCH`(400, 현재 비밀번호 틀림), `PASSWORD_NOT_SUPPORTED`(400, 카카오 계정), `AUTH_REQUIRED`·`AUTH_TOKEN_EXPIRED`(401)
+### 1.7 음성 데이터 초기화
+
+`DELETE /users/me/voice-data` (인증 필요, 본문 없음)
+
+Response: 204 (본문 없음)
+
+- 내 **목소리와 거기서 나온 결과**를 모두 지운다. 되돌릴 수 없으므로 프론트에서 한 번 더 확인받는다.
+  - 진단: 진단 녹음(음성 파일 포함), 진단 세션, 자모 오류 통계, 추천 문장 기록
+  - 개인화: 개인화 녹음(음성 파일 포함), 학습 job, 어댑터 기록
+  - 실사용 인식: 인식 결과, 확인 문장, TTS 요청과 그 음성 파일
+- **남는 것**: 계정, 내가 추가한 문구와 그 음성. 대화 모드 턴(10분 뒤 자동 삭제)은 따로 지우지 않는다.
+- 여러 번 불러도 결과가 같다(지울 것이 없어도 204).
+- DB는 한 번에 지우고, 음성 파일은 그 뒤에 지운다. 파일 삭제가 일부 실패해도 204다(서버가 key를 기록해 따로 정리한다).
+- AI 서버에 올라간 개인화 어댑터 파일은 지울 수 있는 AI 계약이 없어 지우지 않는다. 개인화는 꺼져 있고 운영 AI 서버에 어댑터가 없다(2026-10-30 확인).
+
+에러: `AUTH_REQUIRED`·`AUTH_TOKEN_EXPIRED`(401), `INTERNAL_SERVER_ERROR`(500, DB 삭제 실패 — 아무것도 지워지지 않음)
 
 ---
 
@@ -870,6 +886,7 @@ BE가 직접 부르는 외부 API다. 키는 모두 환경변수로만 받고, �
 | POST | /auth/refresh | BE-A | X |
 | GET | /users/me | BE-A | O |
 | PATCH | /users/me/password | 팀장 | O |
+| DELETE | /users/me/voice-data | 팀장 | O |
 | POST | /diagnosis-sessions | BE-A | O |
 | GET | /diagnosis-sessions/{id} | BE-A | O |
 | POST | /diagnosis-sessions/{id}/recordings | BE-A | O |
@@ -940,6 +957,7 @@ BE가 직접 부르는 외부 API다. 키는 모두 환경변수로만 받고, �
 | 2026-10-30 | 0, 0.2, 0.5~0.7, 2.1, 4.2~4.4, 5.1, 5.2, 6.0, 7, 8 | v1.5 코드 대조 정리. 이 문서를 최신 명세로 명시(Notion v1.3은 갱신 중단). 인증 없는 `/actuator/health`·Swagger 명시. 시각 형식(0.7, 오프셋 없음) 추가하고 예시의 `Z` 제거. `AUDIO_*`가 대화 턴에도 쓰임, 호출 상한 3종 명시, 꺼진 기능의 404 명시. 2.1 `sentenceId` 예시를 UUID로. 5.1 현재 항상 `BASE_ADAPTED`·`confidence: null`. **5.2 이력 항목에 `createdAt` 없음**(문서 오류 정정). 7.2·7.3 AI 학습 경로 현황 정정(`/v1/jobs/{job_id}`), 7.7 외부 서비스(CLOVA Voice·CSR·Claude) 추가. 8 요약표에 `GET /tts/{ttsId}/audio` 추가 |
 | 2026-10-30 | 7.7 | CLOVA Voice 호출에 타임아웃 5초 추가. 넘으면 10.4·11.2는 503 `TTS_UNAVAILABLE`, 6.1은 `FAILED`(기존 실패 처리와 같음) |
 | 2026-10-31 | 0.6, 1.4, 1.6, 8 | 내 정보에 `provider` 추가. 비밀번호 변경 `PATCH /users/me/password` 추가(새 토큰 발급). `PASSWORD_MISMATCH`·`PASSWORD_NOT_SUPPORTED`(400) 추가 |
+| 2026-10-31 | 1.7, 8 | 음성 데이터 초기화 `DELETE /users/me/voice-data` 추가(목소리와 그 결과만, 계정·내 문구는 남김) |
 | 2026-10-31 | 7.7 | `local` 프로파일 STT 스텁 추가(키 없이 대화 모드 확인). 운영·기본 프로파일은 그대로 CLOVA CSR |
 
 ---
