@@ -12,7 +12,15 @@
 - 남은 것: 로컬에서 답변 후보까지 보려면 `ANTHROPIC_API_KEY`가 필요하다(없으면 후보 빈 배열로 200). FE는 턴 만들기가 실패해도 결과 화면으로 넘어가는 문제가 있다(FE 몫).
 - 검증: Spotless 통과. 이 환경은 `jitpack.io` 차단으로 컴파일이 안 돼 테스트는 CI로 확인한다.
 
-## 최신 작업 — 음성 데이터 초기화 (2026-10-31)
+## 최신 작업 — 회원 탈퇴 (2026-10-31)
+
+- `POST /api/v1/users/me/withdraw` → 204 (`WithdrawUseCase` → `WithdrawService`, `AccountErasurePort` → `AccountErasureAdapter`). 이메일 회원은 비밀번호 재확인(틀리면 400 `PASSWORD_MISMATCH`), 카카오 회원은 본문 없이.
+- `AccountErasureAdapter`가 한 트랜잭션에서 `VoiceDataErasurePort`(다른 빈이라 같은 트랜잭션에 참여) → 내 문구 → 사용자 행 순으로 지운다. 커밋 뒤 서비스가 리프레시 토큰 삭제와 음성 파일 삭제(실패는 로그만).
+- **JWT 필터가 토큰 주인의 존재를 확인한다**(`UserRepositoryPort.existsById`, 요청마다 PK 조회 1번). 없으면 401 `AUTH_TOKEN_EXPIRED`. 탈퇴 뒤 남은 액세스 토큰(최대 1시간)으로 주인 없는 데이터가 생기는 것을 막는다. DB 장애는 401로 바꾸지 않는다.
+- 이 변경으로 DB에 없는 사용자의 실제 토큰을 쓰던 테스트 6개가 사용자 행을 먼저 만들도록 고쳤다(`existingUser`).
+- 카카오 연결 끊기(unlink)는 하지 않는다(카카오 토큰을 저장하지 않음).
+
+## 이전 작업 — 음성 데이터 초기화 (2026-10-31)
 
 - `DELETE /api/v1/users/me/voice-data` → 204 (`ResetVoiceDataUseCase` → `ResetVoiceDataService`, `VoiceDataErasurePort` → `VoiceDataErasureAdapter`). 2026-10-31 계약 승인: 목소리와 그 결과만 지우고 계정·내 문구는 남긴다.
 - 지우는 테이블: tts_requests(확인 문장 경유), confirmations, recognitions, recordings, diagnosis_sessions(+문장), jamo_error_snapshots(+토큰), shown_prompts, personalization_recordings·jobs·adapters. 테이블 사이 외래키가 없어 어댑터가 하나씩 지운다. 하위 테이블이 있는 두 엔티티는 읽어서 remove.

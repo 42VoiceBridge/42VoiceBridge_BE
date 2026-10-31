@@ -31,6 +31,7 @@ class AudioNormalizationHttpIntegrationTest {
   @TempDir Path directory;
   @Autowired MockMvc mvc;
   @Autowired TokenProviderPort tokens;
+  @Autowired com.voicebridge.port.out.UserRepositoryPort users;
   @MockitoBean AiInferenceClient ai;
 
   @Test
@@ -42,7 +43,8 @@ class AudioNormalizationHttpIntegrationTest {
     mvc.perform(
             multipart("/api/v1/recognitions")
                 .file(new MockMultipartFile("audioFile", "../wrong.wav", "audio/wav", webm))
-                .header("Authorization", "Bearer " + tokens.createAccessToken(userId)))
+                .header(
+                    "Authorization", "Bearer " + tokens.createAccessToken(existingUser(userId))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.recognizedText").value("물 좀 주세요"));
     var bytes = ArgumentCaptor.forClass(byte[].class);
@@ -58,9 +60,27 @@ class AudioNormalizationHttpIntegrationTest {
                 .file(
                     new MockMultipartFile(
                         "audioFile", "audio.wav", "audio/wav", new byte[] {1, 2, 3}))
-                .header("Authorization", "Bearer " + tokens.createAccessToken(UUID.randomUUID())))
+                .header(
+                    "Authorization",
+                    "Bearer " + tokens.createAccessToken(existingUser(UUID.randomUUID()))))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     verifyNoInteractions(ai);
+  }
+
+  // JWT 필터는 토큰 주인이 DB에 있어야 통과시킨다(탈퇴 계정 차단). 토큰을 만들기 전에 사용자를 만든다.
+  private UUID existingUser(UUID id) {
+    if (!users.existsById(id)) {
+      users.save(
+          com.voicebridge.domain.user.User.reconstitute(
+              id,
+              id + "@example.com",
+              null,
+              "테스트",
+              com.voicebridge.domain.user.AuthProvider.LOCAL,
+              null,
+              java.time.LocalDateTime.now()));
+    }
+    return id;
   }
 }

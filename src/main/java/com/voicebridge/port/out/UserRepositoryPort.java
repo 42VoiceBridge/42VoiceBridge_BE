@@ -16,4 +16,6 @@ public interface UserRepositoryPort {
   Optional<User> findByProviderAndProviderId(AuthProvider provider, String providerId);
 
   boolean existsByEmail(String email);
+
+  boolean existsById(UUID id);
 }

@@ -46,6 +46,7 @@ class DiagnosisAudioNormalizationIntegrationTest {
   @TempDir Path directory;
   @Autowired MockMvc mvc;
   @Autowired TokenProviderPort tokens;
+  @Autowired com.voicebridge.port.out.UserRepositoryPort users;
   @Autowired DiagnosisSessionRepositoryPort sessions;
   @MockitoBean StoragePort storage;
   @MockitoBean AiInferenceClient ai;
@@ -65,7 +66,7 @@ class DiagnosisAudioNormalizationIntegrationTest {
         multipart("/api/v1/diagnosis-sessions/{sessionId}/recordings", sessionId)
             .file(new MockMultipartFile("audioFile", "recording.webm", "audio/webm", audio))
             .param("sentenceId", sentenceId.toString())
-            .header("Authorization", "Bearer " + tokens.createAccessToken(userId)));
+            .header("Authorization", "Bearer " + tokens.createAccessToken(existingUser(userId))));
   }
 
   @Test
@@ -107,5 +108,21 @@ class DiagnosisAudioNormalizationIntegrationTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("AUDIO_INVALID"));
     verifyNoInteractions(storage, ai);
+  }
+
+  // JWT 필터는 토큰 주인이 DB에 있어야 통과시킨다(탈퇴 계정 차단). 토큰을 만들기 전에 사용자를 만든다.
+  private UUID existingUser(UUID id) {
+    if (!users.existsById(id)) {
+      users.save(
+          com.voicebridge.domain.user.User.reconstitute(
+              id,
+              id + "@example.com",
+              null,
+              "테스트",
+              com.voicebridge.domain.user.AuthProvider.LOCAL,
+              null,
+              java.time.LocalDateTime.now()));
+    }
+    return id;
   }
 }
