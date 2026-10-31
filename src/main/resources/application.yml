@@ -105,6 +105,11 @@ voicebridge:
   s3:
     bucket: ${S3_BUCKET:voicebridge-recordings}
     region: ${AWS_REGION:ap-northeast-2}
+  storage:
+    # 지우지 못한 음성 파일 재시도(음성 데이터 초기화·회원 탈퇴). 기본 10분마다.
+    deletion-retry:
+      enabled: ${STORAGE_DELETION_RETRY_ENABLED:true}
+      delay-ms: ${STORAGE_DELETION_RETRY_DELAY_MS:600000}
   tts:
     playback-url-ttl: ${TTS_PLAYBACK_URL_TTL:10m}
     local-playback-base-url: ${TTS_LOCAL_PLAYBACK_BASE_URL:http://localhost:8080}
