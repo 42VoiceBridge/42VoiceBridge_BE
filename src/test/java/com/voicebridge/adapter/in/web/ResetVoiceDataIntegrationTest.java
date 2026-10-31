@@ -50,7 +50,8 @@ class ResetVoiceDataIntegrationTest {
           "personalization_jobs",
           "personalization_adapters",
           "phrases",
-          "users");
+          "users",
+          "storage_deletion_queue");
 
   @Autowired MockMvc mvc;
   @Autowired JdbcTemplate jdbc;
@@ -228,12 +229,14 @@ class ResetVoiceDataIntegrationTest {
   }
 
   @Test
-  void 파일_삭제가_실패해도_DB는_지워지고_204다() throws Exception {
+  void 파일_삭제가_실패해도_DB는_지워지고_204이며_파일은_재시도_큐에_들어간다() throws Exception {
     doThrow(new IllegalStateException("s3 down")).when(storage).delete(any());
 
     mvc.perform(reset(me)).andExpect(status().isNoContent());
 
     assertThat(rowsOf(me).values()).allMatch(n -> n == 0);
+    assertThat(jdbc.queryForList("select storage_key from storage_deletion_queue", String.class))
+        .containsExactlyInAnyOrder("me-tts.mp3", "me-diagnosis.wav", "me-personalization.wav");
   }
 
   @Test
