@@ -44,8 +44,8 @@ public class S3StorageAdapter implements StoragePort {
 
   @Override
   public void delete(String key) {
-    // 지울 수 있는 것은 이 서비스가 만든 개인화 녹음과 TTS·문구 음성(mp3)뿐이다.
-    if (!TtsAudioKeys.matches(key)) {
+    // 지울 수 있는 것은 이 서비스가 만든 개인화 녹음, 진단 녹음(wav), TTS·문구 음성(mp3)뿐이다.
+    if (!TtsAudioKeys.matches(key) && !TtsAudioKeys.matchesDiagnosisRecording(key)) {
       validateKey(key);
     }
     try {
