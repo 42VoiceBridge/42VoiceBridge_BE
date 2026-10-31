@@ -58,7 +58,7 @@ class FlywayMigrationTest {
             "SELECT COUNT(*) FROM information_schema.TABLES"
                 + " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME <> 'flyway_schema_history'",
             Integer.class);
-    assertThat(tables).isEqualTo(15);
+    assertThat(tables).isEqualTo(16);
   }
 
   @Test
