@@ -34,6 +34,10 @@ public class RecognitionJpaEntity {
   @Column(nullable = false, columnDefinition = "TEXT")
   private String recognizedText;
 
+  // AI 인식 원문. V4 이전 행은 NULL이다.
+  @Column(nullable = true, columnDefinition = "TEXT")
+  private String rawText;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   private ModelType modelUsed;
@@ -49,12 +53,14 @@ public class RecognitionJpaEntity {
       UUID id,
       UUID userId,
       String recognizedText,
+      String rawText,
       ModelType modelUsed,
       Double confidence,
       LocalDateTime createdAt) {
     this.id = id;
     this.userId = userId;
     this.recognizedText = recognizedText;
+    this.rawText = rawText;
     this.modelUsed = modelUsed;
     this.confidence = confidence;
     this.createdAt = createdAt;

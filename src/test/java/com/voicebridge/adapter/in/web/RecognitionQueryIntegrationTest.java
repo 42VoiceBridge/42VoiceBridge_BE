@@ -150,6 +150,7 @@ class RecognitionQueryIntegrationTest {
             UUID.randomUUID(),
             user,
             text,
+            text,
             ModelType.BASE_ADAPTED,
             0.8,
             LocalDateTime.of(2026, 9, 23, 12, 0, second));

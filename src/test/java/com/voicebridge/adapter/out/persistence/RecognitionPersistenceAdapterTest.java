@@ -34,6 +34,21 @@ class RecognitionPersistenceAdapterTest {
   }
 
   @Test
+  void 보정본과_인식_원문을_따로_저장하고_읽는다() {
+    var recognition =
+        Recognition.create(UUID.randomUUID(), "물 좀 주세여", "물 좀 주세요", ModelType.BASE_ADAPTED, null);
+    var saved = adapter.save(recognition);
+    entityManager.clear();
+
+    var row = repository.findById(saved.getId()).orElseThrow();
+    assertThat(row.getRecognizedText()).isEqualTo("물 좀 주세요");
+    assertThat(row.getRawText()).isEqualTo("물 좀 주세여");
+    var read = adapter.findById(saved.getId()).orElseThrow();
+    assertThat(read.getRecognizedText()).isEqualTo("물 좀 주세요");
+    assertThat(read.getRawText()).isEqualTo("물 좀 주세여");
+  }
+
+  @Test
   void 빈_인식결과도_DB에_저장한다() {
     var saved =
         adapter.save(Recognition.create(UUID.randomUUID(), "", ModelType.BASE_ADAPTED, 0.0));
