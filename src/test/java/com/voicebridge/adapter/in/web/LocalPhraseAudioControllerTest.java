@@ -26,6 +26,8 @@ class LocalPhraseAudioControllerTest {
   @Autowired MockMvc mvc;
   @MockitoBean GetPhraseAudioUseCase audio;
   @MockitoBean JwtTokenProvider jwt;
+  // JWT 필터가 토큰 주인의 존재를 확인한다(탈퇴 계정 차단). 이 테스트는 인증 객체를 직접 넣으므로 쓰이지 않는다.
+  @MockitoBean com.voicebridge.port.out.UserRepositoryPort users;
 
   @Test
   void 음성을_캐시하지_않고_내려주며_Range도_받는다() throws Exception {

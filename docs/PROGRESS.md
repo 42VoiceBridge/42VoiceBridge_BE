@@ -2,9 +2,33 @@
 
 > 매 작업이 끝날 때마다 이 문서를 갱신한다. 새 대화를 시작할 때 이 문서부터 읽으면 이전 지시사항이 어떻게 끝났는지 복사-붙여넣기 없이 파악할 수 있다.
 
-마지막 업데이트: 2026-10-30
+마지막 업데이트: 2026-10-31
 
-## 최신 작업 — CLOVA Voice 호출 타임아웃 (2026-10-30)
+## 최신 작업 — 회원 탈퇴 (2026-10-31)
+
+- `POST /api/v1/users/me/withdraw` → 204 (`WithdrawUseCase` → `WithdrawService`, `AccountErasurePort` → `AccountErasureAdapter`). 이메일 회원은 비밀번호 재확인(틀리면 400 `PASSWORD_MISMATCH`), 카카오 회원은 본문 없이.
+- `AccountErasureAdapter`가 한 트랜잭션에서 `VoiceDataErasurePort`(다른 빈이라 같은 트랜잭션에 참여) → 내 문구 → 사용자 행 순으로 지운다. 커밋 뒤 서비스가 리프레시 토큰 삭제와 음성 파일 삭제(실패는 로그만).
+- **JWT 필터가 토큰 주인의 존재를 확인한다**(`UserRepositoryPort.existsById`, 요청마다 PK 조회 1번). 없으면 401 `AUTH_TOKEN_EXPIRED`. 탈퇴 뒤 남은 액세스 토큰(최대 1시간)으로 주인 없는 데이터가 생기는 것을 막는다. DB 장애는 401로 바꾸지 않는다.
+- 이 변경으로 DB에 없는 사용자의 실제 토큰을 쓰던 테스트 6개가 사용자 행을 먼저 만들도록 고쳤다(`existingUser`).
+- 카카오 연결 끊기(unlink)는 하지 않는다(카카오 토큰을 저장하지 않음).
+
+## 이전 작업 — 음성 데이터 초기화 (2026-10-31)
+
+- `DELETE /api/v1/users/me/voice-data` → 204 (`ResetVoiceDataUseCase` → `ResetVoiceDataService`, `VoiceDataErasurePort` → `VoiceDataErasureAdapter`). 2026-10-31 계약 승인: 목소리와 그 결과만 지우고 계정·내 문구는 남긴다.
+- 지우는 테이블: tts_requests(확인 문장 경유), confirmations, recognitions, recordings, diagnosis_sessions(+문장), jamo_error_snapshots(+토큰), shown_prompts, personalization_recordings·jobs·adapters. 테이블 사이 외래키가 없어 어댑터가 하나씩 지운다. 하위 테이블이 있는 두 엔티티는 읽어서 remove.
+- DB는 어댑터의 트랜잭션에서 지우고 커밋한 뒤, 서비스가 저장소 파일을 지운다(트랜잭션 밖). 파일 삭제 실패는 key만 로그에 남기고 204.
+- 저장소 어댑터(S3·로컬)가 진단 녹음 `recordings/{uuid}.wav` 삭제를 허용하도록 바꿨다(이전에는 일부러 막혀 있었다). 다른 확장자와 경로 조작은 여전히 거절.
+- 남은 것: AI 서버의 개인화 어댑터 파일 삭제(계약 없음), 대화 모드 턴(Redis 10분 TTL).
+- 다음 PR: 회원 탈퇴(이 삭제 + 내 문구·음성 + 계정 + 탈퇴 후 액세스 토큰 차단).
+
+## 이전 작업 — 비밀번호 변경 (2026-10-31)
+
+- `PATCH /api/v1/users/me/password` (`ChangePasswordUseCase` → `ChangePasswordService`). 이메일 회원만, 현재 비밀번호 확인 후 새 비밀번호(8자 이상, 현재와 다름)로 바꾸고 새 토큰 한 쌍을 발급한다. 리프레시 토큰은 사용자당 하나라 다른 기기의 리프레시 토큰은 무효가 된다.
+- 규칙은 도메인 `User.checkNewPassword`·`User.changePassword`에만 둔다. 현재 비밀번호가 틀리면 400 `PASSWORD_MISMATCH`(401이면 프론트가 토큰 재발급으로 오해), 카카오 계정은 400 `PASSWORD_NOT_SUPPORTED`.
+- 같은 묶음의 다음 PR: 음성 데이터 초기화(`DELETE /users/me/voice-data`), 회원 탈퇴(`POST /users/me/withdraw` + 탈퇴 후 액세스 토큰 차단). 2026-10-31 계약 승인(초기화 범위: 목소리와 그 결과만, 내 문구는 남김).
+- 회원가입 DTO의 `@Size(min = 8)`은 도메인 규칙과 중복이다. 이 PR에서는 건드리지 않았다.
+
+## 이전 작업 — CLOVA Voice 호출 타임아웃 (2026-10-30)
 
 - `NaverClovaVoiceAdapter`에 연결·응답 타임아웃(`voicebridge.tts.naver.timeout`, 5초)을 추가했다. 이전에는 지정이 없어 네이버가 응답하지 않으면 문구 말하기·후보 말하기 요청이 끝없이 묶일 수 있었다. 방식은 STT 어댑터(`NaverClovaSpeechAdapter`)와 같다(`SimpleClientHttpRequestFactory`).
 - 타임아웃은 런타임 예외로 끝나므로 기존 실패 처리 그대로다. 10.4·11.2는 503 `TTS_UNAVAILABLE`, 6.1 비동기 TTS는 `FAILED`.
