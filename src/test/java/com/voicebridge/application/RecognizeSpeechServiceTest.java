@@ -26,13 +26,16 @@ class RecognizeSpeechServiceTest {
   @Mock AiInferenceClient ai;
   @Mock RecognitionRepositoryPort recordings;
   @Mock AudioNormalizationPort normalizer;
+  @Mock RecognitionTextCorrector corrector;
   RecognizeSpeechService service;
   final UUID userId = UUID.randomUUID();
   final byte[] audio = {1, 2, 3};
 
   @BeforeEach
   void setUp() {
-    service = new RecognizeSpeechService(adapters, ai, recordings, normalizer);
+    service = new RecognizeSpeechService(adapters, ai, recordings, normalizer, corrector);
+    // 기본은 보정 없이 원문을 그대로 돌려준다. 보정 동작은 RecognitionTextCorrectorTest가 검증한다.
+    lenient().when(corrector.correct(any(), any())).thenAnswer(i -> i.getArgument(1));
     lenient()
         .when(normalizer.normalize(audio))
         .thenReturn(
@@ -231,6 +234,34 @@ class RecognizeSpeechServiceTest {
         .extracting("errorCode")
         .isEqualTo(ErrorCode.AI_INFERENCE_UNAVAILABLE);
     verifyNoInteractions(recordings);
+  }
+
+  @Test
+  void 보정본은_화면용_문장으로_원문은_rawText로_저장한다() {
+    when(adapters.findActiveByUserId(userId)).thenReturn(Optional.empty());
+    when(ai.recognize(audio, ModelType.BASE_ADAPTED, userId))
+        .thenReturn(new AiInferenceClient.RecognitionResult("물 좀 주세여", null));
+    when(corrector.correct(userId, "물 좀 주세여")).thenReturn("물 좀 주세요");
+    when(recordings.save(any())).thenAnswer(i -> i.getArgument(0));
+
+    var result = service.recognize(userId, audio, "voice.wav");
+
+    assertThat(result.recognizedText()).isEqualTo("물 좀 주세요");
+    verify(recordings)
+        .save(
+            argThat(
+                r -> r.getRecognizedText().equals("물 좀 주세요") && r.getRawText().equals("물 좀 주세여")));
+  }
+
+  @Test
+  void AI_인식이_실패하면_보정을_부르지_않는다() {
+    when(adapters.findActiveByUserId(userId)).thenReturn(Optional.empty());
+    when(ai.recognize(audio, ModelType.BASE_ADAPTED, userId))
+        .thenThrow(new IllegalStateException("ai down"));
+
+    assertThatThrownBy(() -> service.recognize(userId, audio, "voice.wav"))
+        .isInstanceOf(CustomException.class);
+    verify(corrector, never()).correct(any(), any());
   }
 
   private PersonalizationAdapter activeAdapter() {

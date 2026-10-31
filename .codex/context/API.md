@@ -700,6 +700,8 @@ Response (200):
 `modelUsed`: `PERSONALIZED` | `BASE_ADAPTED`
 
 - 2026-10-30 개인화 중단 이후 활성 adapter가 없으므로 현재는 항상 `BASE_ADAPTED`(기본 Whisper-small)다.
+- **인식 보정(2026-10-31)**: 플래그 `voicebridge.features.recognition-correction`이 켜져 있으면 `recognizedText`는 AI 인식 원문을 Claude가 **철자·받침·띄어쓰기만 보정한 문장**이다. 원문은 응답에 오지 않고 서버의 `raw_text`에만 남는다. 보정본이 원문과 너무 다르거나(공백 뺀 글자 편집 거리 비율 0.6 초과) 보정이 실패하면(키 없음, 시간 초과, 호출 상한 분당 20회, 장애) 원문을 그대로 준다. 인식 자체는 보정 때문에 실패하지 않는다. 보정본도 사용자가 확인(6.0)해야 TTS로 이어진다. 이력(5.2·5.3)도 같은 문장을 준다. 진단 녹음(2장)에는 보정을 걸지 않는다.
+- 🔒 보정이 켜져 있으면 인식 텍스트가 **Anthropic(Claude)으로 전송**된다. 문장 추천(10.6)과 같은 고지가 필요하다.
 - `confidence`: AI v1은 점수를 주지 않아 `null`이다. 값이 오면 0~1 사이다. 화면에 표시하지 않는다.
 - AI 서버: 2026-10-30 백엔드 EC2에서 `GET /v1/health`로 확인(`ai-contract-v1`, `openai/whisper-small` revision `973afd2496…`, 어댑터 없음). 기록은 `docs/PHRASE-TTS-PIVOT-PLAN-2026-10-30.md`.
 
@@ -887,13 +889,13 @@ POST /v1/enroll/next-prompts
 
 ### 7.7 외부 서비스 (AI 서버 밖)
 
-BE가 직접 부르는 외부 API다. 키는 모두 환경변수로만 받고, 키가 없으면 그 기능만 503이다. 요청 텍스트·음성은 로그에 남기지 않는다.
+BE가 직접 부르는 외부 API다. 키는 모두 환경변수로만 받고, 키가 없으면 그 기능만 503이다. 요청 텍스트·음성은 로그에 남기지 않는다. `local` 프로파일에서는 CLOVA Speech Recognition 대신 스텁(`StubSpeechToTextAdapter`, 고정 문장 "어디가 불편해서 오셨어요?")이 쓰여 키 없이 대화 모드를 확인할 수 있다.
 
 | 서비스 | 쓰는 곳 | 주소 | 환경변수 | 타임아웃 | 실패 시 |
 | --- | --- | --- | --- | --- | --- |
 | NCP CLOVA Voice (TTS Premium) | 6.1 TTS, 10.4 문구 말하기, 11.2 후보 말하기 | `https://naveropenapi.apigw.ntruss.com/tts-premium/v1/tts`, 화자 `nara`, mp3 | `NCP_TTS_API_KEY_ID`, `NCP_TTS_API_KEY` | 5초(`voicebridge.tts.naver.timeout`, 연결·응답 각각) | 10.4·11.2는 503 `TTS_UNAVAILABLE`, 6.1은 비동기라 `FAILED` |
 | NCP CLOVA Speech Recognition (CSR) | 11.1 상대의 말 받아쓰기 | `https://naveropenapi.apigw.ntruss.com/recog/v1/stt?lang=Kor`, 본문은 16kHz WAV 바이트 | `CLOVA_STT_API_KEY_ID`, `CLOVA_STT_API_KEY` | 5초 | 503 `STT_UNAVAILABLE`. NCP Application에 CSR을 선택하지 않으면 네이버가 429를 주고 BE는 503으로 바꾼다 |
-| Anthropic Claude | 10.6 문장 추천, 11.1 답변 후보 | Messages API, 모델 `claude-haiku-5-5` | `ANTHROPIC_API_KEY` | 8초(SDK 재시도 1회 포함 시 최대 약 두 배) | 10.6은 503 `SUGGESTION_UNAVAILABLE`, 11.1은 후보 빈 배열로 200 |
+| Anthropic Claude | 10.6 문장 추천, 11.1 답변 후보, 5.1 인식 보정 | Messages API, 모델 `claude-haiku-5-5` | `ANTHROPIC_API_KEY` | 8초(SDK 재시도 1회 포함 시 최대 약 두 배) | 10.6은 503 `SUGGESTION_UNAVAILABLE`, 11.1은 후보 빈 배열로 200, 5.1은 보정 없이 원문으로 200 |
 
 기능 플래그(`FEATURE_SUGGESTION_ENABLED` 등)와 키는 운영에서 Secrets Manager `voicebridge/dev/app`의 선택 필드로 들어간다. 플래그 값은 문자열 `"true"`여야 한다(Infra `docs/ENVIRONMENT-VARIABLES.md`).
 
@@ -983,6 +985,8 @@ BE가 직접 부르는 외부 API다. 키는 모두 환경변수로만 받고, �
 | 2026-10-31 | 0.6, 1.4, 1.6, 8 | 내 정보에 `provider` 추가. 비밀번호 변경 `PATCH /users/me/password` 추가(새 토큰 발급). `PASSWORD_MISMATCH`·`PASSWORD_NOT_SUPPORTED`(400) 추가 |
 | 2026-10-31 | 1.7, 8 | 음성 데이터 초기화 `DELETE /users/me/voice-data` 추가(목소리와 그 결과만, 계정·내 문구는 남김) |
 | 2026-10-31 | 0.6, 1.8, 8 | 회원 탈퇴 `POST /users/me/withdraw` 추가(계정·모든 데이터 삭제). 탈퇴한 계정의 액세스 토큰은 401 `AUTH_TOKEN_EXPIRED` |
+| 2026-10-31 | 7.7 | `local` 프로파일 STT 스텁 추가(키 없이 대화 모드 확인). 운영·기본 프로파일은 그대로 CLOVA CSR |
+| 2026-10-31 | 5.1, 7.7 | 인식 보정 추가(플래그 `recognition-correction`, 기본은 문장 추천 플래그를 따름). `recognizedText`는 보정본, 원문은 서버 `raw_text`에만 저장. 실패하면 원문 |
 
 ---
 

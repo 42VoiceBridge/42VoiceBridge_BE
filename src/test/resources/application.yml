@@ -33,6 +33,8 @@ voicebridge:
     diagnosis: true
     suggestion: false
     conversation: false
+    # 인식 보정은 꺼 둔다. 켜진 동작은 RecognitionTextCorrectorTest가 단위로 검증한다.
+    recognition-correction: false
   storage:
     # 테스트는 스케줄러를 끄고 재시도 서비스를 직접 부른다.
     deletion-retry:

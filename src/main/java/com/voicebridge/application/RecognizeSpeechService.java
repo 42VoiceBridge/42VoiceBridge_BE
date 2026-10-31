@@ -30,6 +30,8 @@ public class RecognizeSpeechService implements RecognizeSpeechUseCase {
   private final RecognitionRepositoryPort recognitionRepositoryPort;
   // 스프링에서 생성한 객체를 주입받아서 사용하기 위함
   private final AudioNormalizationPort audioNormalizationPort;
+  // 기능 플래그가 켜져 있으면 인식 원문을 LLM으로 보정한다. 실패하면 원문을 그대로 돌려준다.
+  private final RecognitionTextCorrector recognitionTextCorrector;
 
   @Override
   public RecognizeResult recognize(UUID userId, byte[] audioBytes, String fileName) {
@@ -72,11 +74,14 @@ public class RecognizeSpeechService implements RecognizeSpeechUseCase {
     // 도메인 객체 생성해서 save 인자로 넘긴다.
     // save()는 포트 구현체인 어댑터를 통해서 DB에 저장된다.
     // 결과 saved에는 저장 후 어댑터가 반환한 Recognition 객체 저장된다.
+    // 화면에는 보정본(또는 보정하지 못한 원문)을 보여 주고, AI 원문은 rawText로만 남긴다.
+    String displayText = recognitionTextCorrector.correct(userId, result.recognizedText());
     Recognition saved =
         recognitionRepositoryPort.save(
             Recognition.create(
                 userId,
                 result.recognizedText(),
+                displayText,
                 result.actualModelType() == null ? modelType : result.actualModelType(),
                 result.confidence()));
     // save()가 성공하면, 인식 ID와 변환 정보를 로그로 연결한다.

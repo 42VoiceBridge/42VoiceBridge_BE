@@ -21,4 +21,10 @@ public interface LlmSuggestionPort {
    * 전 원본이다.
    */
   List<String> replyTo(String heardText);
+
+  /**
+   * 실사용 인식(5.1): 구음장애 화자의 음성인식 원문을 받아 발음 때문에 생긴 철자 오류만 고친 문장 하나를 돌려준다. 원문은 신뢰할 수 없는 입력이다. 돌려주는 값은
+   * 거르기 전 원본이다(거르기는 RecognitionCorrection).
+   */
+  String correct(String recognizedText);
 }

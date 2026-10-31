@@ -4,6 +4,23 @@
 
 마지막 업데이트: 2026-10-31
 
+## 최신 작업 — 실사용 인식 보정 (2026-10-31)
+
+- 요청: 말하기 인식 결과가 너무 말한 그대로 나와서, Claude로 보정한 문장만 보이게 해 달라(팀장).
+- 동작: `POST /recognitions`에서 AI 원문을 받은 뒤 `RecognitionTextCorrector`가 `LlmSuggestionPort.correct`(철자·받침·띄어쓰기만 고치는 전용 지시)로 보정한다. 응답 `recognizedText`는 보정본, 원문은 `recognitions.raw_text`(Flyway V4)에만 저장한다. FE 변경 없이 말하기 화면·대화 모드 "내가 직접 말하기"·이력에 보정본이 나온다.
+- 안전장치: 보정본은 도메인 규칙 `RecognitionCorrection`을 통과해야 쓴다(공백 뺀 글자 편집 거리 비율 0.6 이하, 제어문자 없음, 빈 원문은 보정 안 함). 보정 실패·상한(분당 20회)·Redis 장애는 모두 원문으로 대체해 인식을 막지 않는다. LLM 호출은 트랜잭션 밖이다. 확인 후에만 TTS(기존 규칙)는 그대로다. 진단 녹음에는 걸지 않는다.
+- 플래그: `voicebridge.features.recognition-correction`. 지정하지 않으면 문장 추천 플래그를 따른다. Infra 배포 스크립트가 새 키를 아직 넘기지 않아서다. 보정만 따로 끄려면 Infra에 `FEATURE_RECOGNITION_CORRECTION_ENABLED` 전달을 추가해야 한다.
+- 남은 것: 보정 품질과 지연(Claude 호출만큼 인식 응답이 늘어남, 타임아웃 8초)은 측정 전이다. 발표에서 이 결과를 Whisper 인식 정확도로 소개하지 않는다(보정 포함 결과다).
+- 검증: Spotless 통과. 로컬은 `jitpack.io` 차단으로 컴파일이 안 돼 CI로 확인한다.
+
+## 최신 작업 — local 프로파일 STT 스텁 (2026-10-31)
+
+- 증상: 로컬에서 대화 모드 녹음 후 "음성 인식을 지금 사용할 수 없습니다"(503 `STT_UNAVAILABLE`)가 뜨고, FE가 결과 화면으로 넘어가 빈 들은 말과 "추천 답변을 생성하지 못했습니다"를 보여 줬다.
+- 원인: 다른 AI 연동(인식·자모 통계·추천)은 `local`에서 스텁으로 바뀌는데 STT만 스텁이 없어 `NaverClovaSpeechAdapter`가 쓰였고, 로컬에는 CSR 키가 없어 항상 503이었다.
+- 수정: `StubSpeechToTextAdapter`(`@Profile("local")`, 고정 문장 반환, 빈 음성은 실제 어댑터처럼 거절)를 추가하고 `NaverClovaSpeechAdapter`에 `@Profile("!local")`을 붙였다. 프로파일별로 구현체가 하나만 켜지는지 배선 테스트(`SpeechToTextPortProfileWiringTest`)와 스텁 단위 테스트를 추가했다.
+- 남은 것: 로컬에서 답변 후보까지 보려면 `ANTHROPIC_API_KEY`가 필요하다(없으면 후보 빈 배열로 200). FE는 턴 만들기가 실패해도 결과 화면으로 넘어가는 문제가 있다(FE 몫).
+- 검증: Spotless 통과. 이 환경은 `jitpack.io` 차단으로 컴파일이 안 돼 테스트는 CI로 확인한다.
+
 ## 최신 작업 — 저장소 파일 삭제 재시도 큐 (2026-10-31)
 
 - 음성 데이터 초기화·회원 탈퇴에서 DB는 지웠는데 S3 파일 삭제가 실패하면, key를 `storage_deletion_queue`(Flyway V3)에 넣고 `StorageDeletionRetryScheduler`가 10분마다(`voicebridge.storage.deletion-retry.delay-ms`) 오래된 것부터 100개씩 다시 지운다. 성공하면 큐에서 빼고, 실패하면 시도 횟수를 올린다. 6회 이상 실패하면 error 로그.
