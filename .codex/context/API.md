@@ -6,7 +6,7 @@
 
 # AI 구음장애 보조 서비스 — API 명세서
 
-> 문서 버전: v1.5 (2026-10-30 코드 대조 갱신, 변경 이력은 9장)
+> 문서 버전: v1.6 (2026-10-31 갱신, 변경 이력은 9장)
 >
 
 > **이 문서가 최신 API 명세다.** Notion 「3. API 명세서」(v1.3, 2026-10-03)는 이후 갱신되지 않았고 10·11장(문구·문장 추천·대화 모드)이 없다. 둘이 다르면 이 문서를 따른다.
@@ -107,6 +107,8 @@ https://{host}/api/v1
 | `AUTH_REQUIRED` | 인증이 필요한 API를 토큰 없이 호출 (HTTP 401). 로그인 필요 |
 | `REFRESH_TOKEN_INVALID` | 리프레시 토큰이 위조·만료됐거나 이미 재발급에 쓰여 무효화됨 (HTTP 401) |
 | `KAKAO_AUTH_FAILED` | 카카오 로그인 실패 — 인가 코드 만료·재사용, redirect URI 불일치, 카카오 서버 장애 등 (HTTP 401) |
+| `PASSWORD_MISMATCH` | 비밀번호 변경·회원 탈퇴에서 현재 비밀번호가 틀림 (HTTP 400). 401이 아니므로 토큰 재발급을 시도하지 않는다 |
+| `PASSWORD_NOT_SUPPORTED` | 카카오 계정에 비밀번호 변경을 요청함 (HTTP 400). 카카오 계정에는 비밀번호 변경 버튼을 보여 주지 않는다 |
 | `EMAIL_ALREADY_EXISTS` | 이미 가입된 이메일 (HTTP 409). 카카오 계정 이메일이 기존 이메일 회원과 같을 때도 발생 |
 | `VALIDATION_FAILED` | 요청 검증 실패. 필수 파라미터·파일이 빠지면 메시지에 빠진 필드명이 담긴다(예: `필수 요청 값이 없습니다: audioFile`). 읽을 수 없는 JSON 본문도 이 코드다 |
 | `RESOURCE_NOT_FOUND` | 대상 리소스 없음. 없는 API 주소, 기능 플래그로 꺼진 API(2·3·4장, 10.6, 11장)도 404로 온다 |
@@ -238,11 +240,13 @@ Response (200):
   "data": {
     "userId": "uuid",
     "email": "user@example.com",
-    "nickname": "string"
+    "nickname": "string",
+    "provider": "LOCAL"
   }
 }
 ```
 
+- `provider`는 `LOCAL`(이메일 회원) 또는 `KAKAO`다. `KAKAO`면 비밀번호 변경(1.6) 버튼을 보여 주지 않는다.
 - 카카오로 가입한 사용자는 카카오에서 이메일을 받지 못한 경우 `email`이 `null`이다.
 - 개인화 모델 보유 여부는 4.4 `GET /personalization/model`로 확인한다.
 
@@ -272,6 +276,25 @@ Response (200): 1.2 로그인과 같다(`accessToken`, `refreshToken`, `expiresI
 - 사용자는 카카오 회원번호로 구분한다. 이메일은 없어도 가입되며, 닉네임이 없으면 `카카오사용자`로 저장된다.
 
 에러: `VALIDATION_FAILED`(400, `authorizationCode` 없음), `KAKAO_AUTH_FAILED`(401, 인가 코드 만료·재사용, redirect URI 불일치, 카카오 서버 장애 등), `EMAIL_ALREADY_EXISTS`(409, 카카오 계정 이메일이 이미 이메일 회원가입에 쓰인 경우)
+
+### 1.6 비밀번호 변경
+
+`PATCH /users/me/password` (인증 필요)
+
+Request:
+
+```json
+{ "currentPassword": "old-password", "newPassword": "new-password" }
+```
+
+Response (200, `Cache-Control: no-store`): 1.2 로그인과 같다(`accessToken`, `refreshToken`, `expiresIn`).
+
+- 이메일 회원(LOCAL)만 쓸 수 있다. 카카오 회원은 비밀번호가 없다(`GET /users/me`의 `provider`로 구분해 버튼을 숨긴다).
+- 새 비밀번호는 8자 이상이고 현재 비밀번호와 달라야 한다.
+- 성공하면 **새 토큰 한 쌍을 발급**한다. 응답의 토큰으로 바꿔 저장한다. 리프레시 토큰은 사용자당 하나라 **다른 기기의 리프레시 토큰은 무효**가 되고, 그 기기는 액세스 토큰(1시간)이 만료되면 다시 로그인해야 한다.
+- 판정 순서: 카카오 계정(400) → 현재 비밀번호 비어 있음(400) → 현재 비밀번호 틀림(400) → 새 비밀번호 규칙(400).
+
+에러: `VALIDATION_FAILED`(400, 비어 있음·8자 미만·현재와 같음), `PASSWORD_MISMATCH`(400, 현재 비밀번호 틀림), `PASSWORD_NOT_SUPPORTED`(400, 카카오 계정), `AUTH_REQUIRED`·`AUTH_TOKEN_EXPIRED`(401)
 
 ---
 
@@ -846,6 +869,7 @@ BE가 직접 부르는 외부 API다. 키는 모두 환경변수로만 받고, �
 | POST | /auth/kakao | BE-A | X |
 | POST | /auth/refresh | BE-A | X |
 | GET | /users/me | BE-A | O |
+| PATCH | /users/me/password | 팀장 | O |
 | POST | /diagnosis-sessions | BE-A | O |
 | GET | /diagnosis-sessions/{id} | BE-A | O |
 | POST | /diagnosis-sessions/{id}/recordings | BE-A | O |
@@ -915,6 +939,7 @@ BE가 직접 부르는 외부 API다. 키는 모두 환경변수로만 받고, �
 | 2026-10-30 | 0, 0.5, 0.6, 8, 11 | 대화 모드 추가(턴 만들기·후보 말하기, 플래그 기본 꺼짐). `STT_UNAVAILABLE`(503) 추가 |
 | 2026-10-30 | 0, 0.2, 0.5~0.7, 2.1, 4.2~4.4, 5.1, 5.2, 6.0, 7, 8 | v1.5 코드 대조 정리. 이 문서를 최신 명세로 명시(Notion v1.3은 갱신 중단). 인증 없는 `/actuator/health`·Swagger 명시. 시각 형식(0.7, 오프셋 없음) 추가하고 예시의 `Z` 제거. `AUDIO_*`가 대화 턴에도 쓰임, 호출 상한 3종 명시, 꺼진 기능의 404 명시. 2.1 `sentenceId` 예시를 UUID로. 5.1 현재 항상 `BASE_ADAPTED`·`confidence: null`. **5.2 이력 항목에 `createdAt` 없음**(문서 오류 정정). 7.2·7.3 AI 학습 경로 현황 정정(`/v1/jobs/{job_id}`), 7.7 외부 서비스(CLOVA Voice·CSR·Claude) 추가. 8 요약표에 `GET /tts/{ttsId}/audio` 추가 |
 | 2026-10-30 | 7.7 | CLOVA Voice 호출에 타임아웃 5초 추가. 넘으면 10.4·11.2는 503 `TTS_UNAVAILABLE`, 6.1은 `FAILED`(기존 실패 처리와 같음) |
+| 2026-10-31 | 0.6, 1.4, 1.6, 8 | 내 정보에 `provider` 추가. 비밀번호 변경 `PATCH /users/me/password` 추가(새 토큰 발급). `PASSWORD_MISMATCH`·`PASSWORD_NOT_SUPPORTED`(400) 추가 |
 
 ---
 

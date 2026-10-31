@@ -1,6 +1,7 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:voicebridge;MODE=MySQL
+    # 컨텍스트마다 다른 메모리 DB를 쓴다. 이름이 같으면 캐시에서 밀려난 컨텍스트가 닫힐 때(create-drop) 다른 컨텍스트의 테이블까지 지운다.
+    url: jdbc:h2:mem:voicebridge-${random.uuid};MODE=MySQL
     driver-class-name: org.h2.Driver
     username: sa
     password:
