@@ -6,6 +6,7 @@ import com.voicebridge.port.out.SpeechToTextPort;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -26,6 +27,8 @@ import org.springframework.web.client.RestClientResponseException;
  */
 @Slf4j
 @Component
+// local 프로파일은 StubSpeechToTextAdapter를 쓴다(키 없이 대화 모드 확인용).
+@Profile("!local")
 public class NaverClovaSpeechAdapter implements SpeechToTextPort {
 
   private static final String API_KEY_ID_HEADER = "X-NCP-APIGW-API-KEY-ID";

@@ -4,7 +4,15 @@
 
 마지막 업데이트: 2026-10-30
 
-## 최신 작업 — CLOVA Voice 호출 타임아웃 (2026-10-30)
+## 최신 작업 — local 프로파일 STT 스텁 (2026-10-31)
+
+- 증상: 로컬에서 대화 모드 녹음 후 "음성 인식을 지금 사용할 수 없습니다"(503 `STT_UNAVAILABLE`)가 뜨고, FE가 결과 화면으로 넘어가 빈 들은 말과 "추천 답변을 생성하지 못했습니다"를 보여 줬다.
+- 원인: 다른 AI 연동(인식·자모 통계·추천)은 `local`에서 스텁으로 바뀌는데 STT만 스텁이 없어 `NaverClovaSpeechAdapter`가 쓰였고, 로컬에는 CSR 키가 없어 항상 503이었다.
+- 수정: `StubSpeechToTextAdapter`(`@Profile("local")`, 고정 문장 반환, 빈 음성은 실제 어댑터처럼 거절)를 추가하고 `NaverClovaSpeechAdapter`에 `@Profile("!local")`을 붙였다. 프로파일별로 구현체가 하나만 켜지는지 배선 테스트(`SpeechToTextPortProfileWiringTest`)와 스텁 단위 테스트를 추가했다.
+- 남은 것: 로컬에서 답변 후보까지 보려면 `ANTHROPIC_API_KEY`가 필요하다(없으면 후보 빈 배열로 200). FE는 턴 만들기가 실패해도 결과 화면으로 넘어가는 문제가 있다(FE 몫).
+- 검증: Spotless 통과. 이 환경은 `jitpack.io` 차단으로 컴파일이 안 돼 테스트는 CI로 확인한다.
+
+## 이전 작업 — CLOVA Voice 호출 타임아웃 (2026-10-30)
 
 - `NaverClovaVoiceAdapter`에 연결·응답 타임아웃(`voicebridge.tts.naver.timeout`, 5초)을 추가했다. 이전에는 지정이 없어 네이버가 응답하지 않으면 문구 말하기·후보 말하기 요청이 끝없이 묶일 수 있었다. 방식은 STT 어댑터(`NaverClovaSpeechAdapter`)와 같다(`SimpleClientHttpRequestFactory`).
 - 타임아웃은 런타임 예외로 끝나므로 기존 실패 처리 그대로다. 10.4·11.2는 503 `TTS_UNAVAILABLE`, 6.1 비동기 TTS는 `FAILED`.
