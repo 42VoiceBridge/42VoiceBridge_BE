@@ -24,6 +24,7 @@ public class GetMyProfileService implements GetMyProfileUseCase {
             .findById(userId)
             .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
-    return new MyProfileResult(user.getId(), user.getEmail(), user.getNickname());
+    return new MyProfileResult(
+        user.getId(), user.getEmail(), user.getNickname(), user.getProvider().name());
   }
 }

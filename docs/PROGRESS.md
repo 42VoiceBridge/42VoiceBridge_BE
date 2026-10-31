@@ -2,7 +2,7 @@
 
 > 매 작업이 끝날 때마다 이 문서를 갱신한다. 새 대화를 시작할 때 이 문서부터 읽으면 이전 지시사항이 어떻게 끝났는지 복사-붙여넣기 없이 파악할 수 있다.
 
-마지막 업데이트: 2026-10-30
+마지막 업데이트: 2026-10-31
 
 ## 최신 작업 — local 프로파일 STT 스텁 (2026-10-31)
 
@@ -11,6 +11,13 @@
 - 수정: `StubSpeechToTextAdapter`(`@Profile("local")`, 고정 문장 반환, 빈 음성은 실제 어댑터처럼 거절)를 추가하고 `NaverClovaSpeechAdapter`에 `@Profile("!local")`을 붙였다. 프로파일별로 구현체가 하나만 켜지는지 배선 테스트(`SpeechToTextPortProfileWiringTest`)와 스텁 단위 테스트를 추가했다.
 - 남은 것: 로컬에서 답변 후보까지 보려면 `ANTHROPIC_API_KEY`가 필요하다(없으면 후보 빈 배열로 200). FE는 턴 만들기가 실패해도 결과 화면으로 넘어가는 문제가 있다(FE 몫).
 - 검증: Spotless 통과. 이 환경은 `jitpack.io` 차단으로 컴파일이 안 돼 테스트는 CI로 확인한다.
+
+## 최신 작업 — 비밀번호 변경 (2026-10-31)
+
+- `PATCH /api/v1/users/me/password` (`ChangePasswordUseCase` → `ChangePasswordService`). 이메일 회원만, 현재 비밀번호 확인 후 새 비밀번호(8자 이상, 현재와 다름)로 바꾸고 새 토큰 한 쌍을 발급한다. 리프레시 토큰은 사용자당 하나라 다른 기기의 리프레시 토큰은 무효가 된다.
+- 규칙은 도메인 `User.checkNewPassword`·`User.changePassword`에만 둔다. 현재 비밀번호가 틀리면 400 `PASSWORD_MISMATCH`(401이면 프론트가 토큰 재발급으로 오해), 카카오 계정은 400 `PASSWORD_NOT_SUPPORTED`.
+- 같은 묶음의 다음 PR: 음성 데이터 초기화(`DELETE /users/me/voice-data`), 회원 탈퇴(`POST /users/me/withdraw` + 탈퇴 후 액세스 토큰 차단). 2026-10-31 계약 승인(초기화 범위: 목소리와 그 결과만, 내 문구는 남김).
+- 회원가입 DTO의 `@Size(min = 8)`은 도메인 규칙과 중복이다. 이 PR에서는 건드리지 않았다.
 
 ## 이전 작업 — CLOVA Voice 호출 타임아웃 (2026-10-30)
 
