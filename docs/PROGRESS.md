@@ -12,7 +12,14 @@
 - 남은 것: 로컬에서 답변 후보까지 보려면 `ANTHROPIC_API_KEY`가 필요하다(없으면 후보 빈 배열로 200). FE는 턴 만들기가 실패해도 결과 화면으로 넘어가는 문제가 있다(FE 몫).
 - 검증: Spotless 통과. 이 환경은 `jitpack.io` 차단으로 컴파일이 안 돼 테스트는 CI로 확인한다.
 
-## 최신 작업 — 회원 탈퇴 (2026-10-31)
+## 최신 작업 — 저장소 파일 삭제 재시도 큐 (2026-10-31)
+
+- 음성 데이터 초기화·회원 탈퇴에서 DB는 지웠는데 S3 파일 삭제가 실패하면, key를 `storage_deletion_queue`(Flyway V3)에 넣고 `StorageDeletionRetryScheduler`가 10분마다(`voicebridge.storage.deletion-retry.delay-ms`) 오래된 것부터 100개씩 다시 지운다. 성공하면 큐에서 빼고, 실패하면 시도 횟수를 올린다. 6회 이상 실패하면 error 로그.
+- 두 서비스의 파일 삭제를 `StorageFileDeleter`로 합쳤다. 큐 기록까지 실패하면 error 로그에 key가 남는다(수동 삭제).
+- 스케줄러는 `voicebridge.storage.deletion-retry.enabled`(기본 true, 테스트 false). 개인정보처리방침 근거(2026-10-31 팀 결정).
+- 같은 날 Infra: BE 컨테이너 로그 순환(10MB x 3, 42VoiceBridge_Infra#16).
+
+## 이전 작업 — 회원 탈퇴 (2026-10-31)
 
 - `POST /api/v1/users/me/withdraw` → 204 (`WithdrawUseCase` → `WithdrawService`, `AccountErasurePort` → `AccountErasureAdapter`). 이메일 회원은 비밀번호 재확인(틀리면 400 `PASSWORD_MISMATCH`), 카카오 회원은 본문 없이.
 - `AccountErasureAdapter`가 한 트랜잭션에서 `VoiceDataErasurePort`(다른 빈이라 같은 트랜잭션에 참여) → 내 문구 → 사용자 행 순으로 지운다. 커밋 뒤 서비스가 리프레시 토큰 삭제와 음성 파일 삭제(실패는 로그만).

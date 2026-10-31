@@ -7,7 +7,6 @@ import com.voicebridge.port.in.WithdrawUseCase;
 import com.voicebridge.port.out.AccountErasurePort;
 import com.voicebridge.port.out.PasswordEncoderPort;
 import com.voicebridge.port.out.RefreshTokenStorePort;
-import com.voicebridge.port.out.StoragePort;
 import com.voicebridge.port.out.UserRepositoryPort;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +26,7 @@ public class WithdrawService implements WithdrawUseCase {
   private final PasswordEncoderPort passwordEncoderPort;
   private final AccountErasurePort accountErasurePort;
   private final RefreshTokenStorePort refreshTokenStorePort;
-  private final StoragePort storagePort;
+  private final StorageFileDeleter storageFileDeleter;
 
   @Override
   public void withdraw(WithdrawCommand command) {
@@ -41,8 +40,9 @@ public class WithdrawService implements WithdrawUseCase {
 
     List<String> storageKeys = accountErasurePort.eraseAccount(user.getId());
     revokeRefreshToken(user);
-    int failed = deleteFiles(storageKeys);
-    log.info("[회원 탈퇴] userId={} 파일 {}개 중 삭제 실패 {}개", user.getId(), storageKeys.size(), failed);
+    // DB 행은 이미 지워졌으므로 되돌리지 않는다. 지우지 못한 파일은 재시도 큐가 다시 지운다.
+    int queued = storageFileDeleter.deleteOrQueue(storageKeys);
+    log.info("[회원 탈퇴] userId={} 파일 {}개 중 재시도 대기 {}개", user.getId(), storageKeys.size(), queued);
   }
 
   // 탈퇴는 되돌릴 수 없어 이메일 회원은 비밀번호를 다시 받는다. 카카오 회원은 비밀번호가 없다.
@@ -63,19 +63,5 @@ public class WithdrawService implements WithdrawUseCase {
       log.warn(
           "[회원 탈퇴] 리프레시 토큰 삭제 실패 userId={} cause={}", user.getId(), e.getClass().getSimpleName());
     }
-  }
-
-  // DB 행은 이미 지워졌으므로 되돌리지 않는다. 지우지 못한 파일은 key만 남겨 나중에 정리한다(key는 무작위 UUID라 개인정보가 없다).
-  private int deleteFiles(List<String> storageKeys) {
-    int failed = 0;
-    for (String key : storageKeys) {
-      try {
-        storagePort.delete(key);
-      } catch (RuntimeException e) {
-        failed++;
-        log.warn("[회원 탈퇴] 파일 삭제 실패 key={} cause={}", key, e.getClass().getSimpleName());
-      }
-    }
-    return failed;
   }
 }
