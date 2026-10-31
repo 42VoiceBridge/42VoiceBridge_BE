@@ -49,6 +49,11 @@ public class UserPersistenceAdapter implements UserRepositoryPort {
     return userJpaRepository.existsByEmail(email);
   }
 
+  @Override
+  public boolean existsById(UUID id) {
+    return userJpaRepository.existsById(id);
+  }
+
   private static UserJpaEntity toEntity(User user) {
     return UserJpaEntity.builder()
         .id(user.getId())
