@@ -10,6 +10,8 @@ public enum ErrorCode {
   AUTH_REQUIRED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
   KAKAO_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "카카오 인증에 실패했습니다."),
   REFRESH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "리프레시 토큰이 유효하지 않습니다."),
+  PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "현재 비밀번호가 올바르지 않습니다."),
+  PASSWORD_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "카카오 계정은 비밀번호를 사용하지 않습니다."),
   EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
   VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
   RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
